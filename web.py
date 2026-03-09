@@ -196,6 +196,97 @@ def api_wiki_snippet(title: str, code: str, language: str = "", description: str
     return wiki_mod.save_snippet(title, code, language, description, tag_list, project)
 
 
+# ─── Voice / Text intake (for iOS Shortcuts → n8n → here) ────
+
+@app.post("/api/voice/text")
+def api_voice_text(
+    text: str = Form(...),
+    project: str = Form("default"),
+    source: str = Form("voice"),
+):
+    """Accept already-transcribed text (from iOS Shortcuts via n8n).
+    Auto-categorizes with GPT and saves to memory."""
+    import json as _json
+    from openai import OpenAI
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+
+    text = text.strip()
+    if not text:
+        return {"error": "Empty text"}
+
+    # Auto-categorize
+    cat_response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": """Categorize the voice note. Reply ONLY with JSON:
+{"category":"wiki|devops|knowledge|step","kind":"note|command|config|incident|decision|pattern|lesson|howto|snippet|action","title":"short title in Russian","tags":["tag1","tag2"],"priority":0}
+
+Rules:
+- Commands, configs, deploys, incidents → devops
+- Architecture decisions, patterns, lessons → knowledge
+- Notes, links, how-tos, tips, ideas → wiki
+- Action steps, tasks, todos → step
+- priority: 0=info, 1-2=normal, 3=important, 4-5=critical"""},
+            {"role": "user", "content": text},
+        ],
+        temperature=0,
+    )
+    try:
+        cat = _json.loads(cat_response.choices[0].message.content)
+    except (_json.JSONDecodeError, IndexError):
+        cat = {"category": "wiki", "kind": "note", "title": text[:50], "tags": [], "priority": 0}
+
+    tags = cat.get("tags", [])
+    if "voice" not in tags:
+        tags.append("voice")
+
+    step = memory_store.add_step(
+        action=f"{cat.get('kind', 'note')}: {cat.get('title', text[:50])}",
+        result=text,
+        status="success",
+        context=f"voice input via {source}",
+        tags=tags,
+        project=project,
+        source=source,
+        category=cat.get("category", "wiki"),
+        kind=cat.get("kind", "note"),
+        priority=cat.get("priority", 0),
+    )
+
+    return {
+        "ok": True,
+        "id": step["id"],
+        "text": text,
+        "category": cat.get("category"),
+        "kind": cat.get("kind"),
+        "title": cat.get("title"),
+        "tags": tags,
+        "priority": cat.get("priority", 0),
+    }
+
+
+@app.post("/api/voice/text/raw")
+def api_voice_text_raw(
+    text: str = Form(...),
+    project: str = Form("default"),
+):
+    """Save text as-is without GPT categorization (faster, no API cost)."""
+    tags = ["voice"]
+    step = memory_store.add_step(
+        action=f"note: {text[:60]}",
+        result=text,
+        status="success",
+        context="voice input (raw)",
+        tags=tags,
+        project=project,
+        source="voice",
+        category="wiki",
+        kind="note",
+        priority=0,
+    )
+    return {"ok": True, "id": step["id"], "text": text}
+
+
 @app.post("/api/voice")
 async def api_voice(
     audio: UploadFile = File(...),
