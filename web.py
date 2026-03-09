@@ -3,7 +3,9 @@ Web UI — FastAPI + встроенный HTML.
 Таймлайн шагов, golden path, поиск, экспорт — всё в браузере.
 """
 
-from fastapi import FastAPI, Query
+import os
+import tempfile
+from fastapi import FastAPI, Query, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, PlainTextResponse
 import memory_store
 import retriever
@@ -194,6 +196,121 @@ def api_wiki_snippet(title: str, code: str, language: str = "", description: str
     return wiki_mod.save_snippet(title, code, language, description, tag_list, project)
 
 
+@app.post("/api/voice")
+async def api_voice(
+    audio: UploadFile = File(...),
+    project: str = Form("default"),
+    auto_categorize: bool = Form(True),
+):
+    """Voice input: record → Whisper transcribe → GPT categorize → save."""
+    from openai import OpenAI
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+
+    # Save uploaded audio to temp file
+    suffix = ".webm"
+    if audio.filename:
+        suffix = "." + audio.filename.rsplit(".", 1)[-1] if "." in audio.filename else ".webm"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await audio.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        # Transcribe with Whisper
+        with open(tmp_path, "rb") as f:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=f,
+                language="ru",
+            )
+        text = transcript.text.strip()
+
+        if not text:
+            return {"error": "Empty transcription"}
+
+        # Auto-categorize with GPT
+        if auto_categorize:
+            cat_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": """Categorize the voice note. Reply ONLY with JSON:
+{"category":"wiki|devops|knowledge|step","kind":"note|command|config|incident|decision|pattern|lesson|howto|snippet|action","title":"short title","tags":["tag1","tag2"],"priority":0-5}
+
+Rules:
+- Commands, configs, deploys, incidents → devops
+- Architecture decisions, patterns, lessons → knowledge
+- Notes, links, how-tos, tips → wiki
+- Action steps, tasks → step
+- priority: 0=info, 1-2=normal, 3=important, 4-5=critical"""},
+                    {"role": "user", "content": text},
+                ],
+                temperature=0,
+            )
+            import json
+            try:
+                cat = json.loads(cat_response.choices[0].message.content)
+            except (json.JSONDecodeError, IndexError):
+                cat = {"category": "wiki", "kind": "note", "title": text[:50], "tags": ["voice"], "priority": 0}
+        else:
+            cat = {"category": "wiki", "kind": "note", "title": text[:50], "tags": ["voice"], "priority": 0}
+
+        # Save to memory
+        tags = cat.get("tags", [])
+        if "voice" not in tags:
+            tags.append("voice")
+
+        step = memory_store.add_step(
+            action=f"{cat.get('kind', 'note')}: {cat.get('title', text[:50])}",
+            result=text,
+            status="success",
+            context="voice input",
+            tags=tags,
+            project=project,
+            source="voice",
+            category=cat.get("category", "wiki"),
+            kind=cat.get("kind", "note"),
+            priority=cat.get("priority", 0),
+        )
+
+        return {
+            "id": step["id"],
+            "text": text,
+            "category": cat.get("category"),
+            "kind": cat.get("kind"),
+            "title": cat.get("title"),
+            "tags": tags,
+            "priority": cat.get("priority", 0),
+        }
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.post("/api/voice/transcribe")
+async def api_voice_transcribe(audio: UploadFile = File(...)):
+    """Only transcribe, don't save — for preview."""
+    from openai import OpenAI
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+
+    suffix = ".webm"
+    if audio.filename:
+        suffix = "." + audio.filename.rsplit(".", 1)[-1] if "." in audio.filename else ".webm"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await audio.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        with open(tmp_path, "rb") as f:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=f,
+                language="ru",
+            )
+        return {"text": transcript.text.strip()}
+    finally:
+        os.unlink(tmp_path)
+
+
 @app.delete("/api/clear")
 def api_clear(project: str | None = None):
     memory_store.clear(project)
@@ -316,6 +433,33 @@ HTML = """<!DOCTYPE html>
   .loading { color: #8b949e; font-style: italic; }
   .hidden { display: none; }
   .context-text { color: #6e7681; font-size: 12px; margin-top: 4px; }
+
+  /* Voice UI */
+  .voice-area { text-align: center; padding: 30px 0; }
+  .voice-btn {
+    width: 120px; height: 120px; border-radius: 50%; border: 4px solid #30363d;
+    background: #161b22; color: #c9d1d9; font-size: 40px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .voice-btn:active, .voice-btn.recording {
+    background: #da3633; border-color: #da3633; transform: scale(1.1);
+  }
+  .voice-btn.recording { animation: pulse 1.5s infinite; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(218,54,51,0.6); }
+    70% { box-shadow: 0 0 0 20px rgba(218,54,51,0); }
+    100% { box-shadow: 0 0 0 0 rgba(218,54,51,0); }
+  }
+  .voice-status { margin-top: 16px; font-size: 16px; min-height: 24px; }
+  .voice-timer { font-size: 32px; font-weight: 700; color: #f85149; margin-top: 8px; }
+  .voice-result {
+    margin-top: 20px; padding: 16px; background: #161b22; border: 1px solid #30363d;
+    border-radius: 8px; text-align: left;
+  }
+  .voice-result .transcript { font-size: 16px; line-height: 1.6; margin-bottom: 12px; }
+  .voice-result .cat-info { font-size: 13px; color: #8b949e; }
 </style>
 </head>
 <body>
@@ -336,6 +480,7 @@ HTML = """<!DOCTYPE html>
     <button onclick="showPanel('search')" id="btn-search">Search</button>
     <button onclick="showPanel('agents')" id="btn-agents">Agents</button>
     <button onclick="showPanel('export')" id="btn-export">Export</button>
+    <button onclick="showPanel('voice')" id="btn-voice" style="background:#da3633;border-color:#da3633;color:#fff">Voice</button>
     <button onclick="loadDemo()" style="margin-left:auto;background:#1f6feb;color:#fff">Demo</button>
   </div>
 
@@ -374,6 +519,20 @@ HTML = """<!DOCTYPE html>
       <div class="result-panel" id="agents-critique" style="margin-bottom:12px"></div>
       <div class="result-panel" id="agents-execution"></div>
     </div>
+  </div>
+
+  <!-- Voice -->
+  <div id="panel-voice" class="hidden">
+    <div class="voice-area">
+      <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()">&#127908;</button>
+      <div class="voice-timer hidden" id="voiceTimer">0:00</div>
+      <div class="voice-status" id="voiceStatus">Tap to record</div>
+    </div>
+    <div class="voice-result hidden" id="voiceResult">
+      <div class="transcript" id="voiceTranscript"></div>
+      <div class="cat-info" id="voiceCatInfo"></div>
+    </div>
+    <div id="voiceHistory"></div>
   </div>
 
   <!-- Export -->
@@ -494,6 +653,100 @@ async function runCritic() {
 async function doExport(fmt) {
   const text = await (await fetch(`${API}/api/export/${fmt}`)).text();
   document.getElementById('export-result').textContent = text;
+}
+
+// ─── Voice Recording ─────────────────────────────
+let mediaRecorder = null;
+let audioChunks = [];
+let voiceTimerInterval = null;
+let voiceStartTime = 0;
+
+function toggleVoice() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopVoice();
+  } else {
+    startVoice();
+  }
+}
+
+async function startVoice() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    // Use mp4 on iOS Safari, webm elsewhere
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/mp4')
+        ? 'audio/mp4'
+        : '';
+    const options = mimeType ? {mimeType} : {};
+    mediaRecorder = new MediaRecorder(stream, options);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      sendVoice();
+    };
+
+    mediaRecorder.start();
+    document.getElementById('voiceBtn').classList.add('recording');
+    document.getElementById('voiceStatus').textContent = 'Recording...';
+    document.getElementById('voiceResult').classList.add('hidden');
+
+    // Timer
+    voiceStartTime = Date.now();
+    document.getElementById('voiceTimer').classList.remove('hidden');
+    voiceTimerInterval = setInterval(() => {
+      const sec = Math.floor((Date.now() - voiceStartTime) / 1000);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      document.getElementById('voiceTimer').textContent = m + ':' + String(s).padStart(2, '0');
+    }, 200);
+  } catch (err) {
+    document.getElementById('voiceStatus').textContent = 'Microphone access denied';
+  }
+}
+
+function stopVoice() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+  document.getElementById('voiceBtn').classList.remove('recording');
+  clearInterval(voiceTimerInterval);
+  document.getElementById('voiceTimer').classList.add('hidden');
+  document.getElementById('voiceStatus').textContent = 'Transcribing...';
+}
+
+async function sendVoice() {
+  const ext = (mediaRecorder && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
+  const blob = new Blob(audioChunks, {type: mediaRecorder ? mediaRecorder.mimeType : 'audio/webm'});
+  const formData = new FormData();
+  formData.append('audio', blob, 'voice.' + ext);
+  formData.append('project', 'default');
+  formData.append('auto_categorize', 'true');
+
+  try {
+    const res = await fetch(`${API}/api/voice`, {method: 'POST', body: formData});
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById('voiceStatus').textContent = 'Error: ' + data.error;
+      return;
+    }
+
+    document.getElementById('voiceStatus').textContent = 'Saved! #' + data.id;
+    document.getElementById('voiceResult').classList.remove('hidden');
+    document.getElementById('voiceTranscript').textContent = data.text;
+    document.getElementById('voiceCatInfo').innerHTML =
+      `<span class="cat-badge ${data.category}">${data.category}(${data.kind})</span> ` +
+      (data.tags||[]).map(t => `<span class="tag">${t}</span>`).join(' ') +
+      (data.priority > 0 ? ` <span class="prio">P${data.priority}</span>` : '');
+
+    loadStats();
+    loadTimeline(currentCat);
+  } catch (err) {
+    document.getElementById('voiceStatus').textContent = 'Network error';
+  }
 }
 
 loadStats(); loadTimeline();
