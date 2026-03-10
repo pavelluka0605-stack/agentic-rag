@@ -16,6 +16,7 @@ import devops_mem
 import knowledge_base
 import wiki as wiki_mod
 import bluesales
+import bluesales_config
 
 app = FastAPI(title="Agentic RAG", version="3.0")
 
@@ -290,6 +291,106 @@ def api_bluesales_sync(days: int = 30, project: str = "default"):
 def api_bluesales_summary(project: str = "default"):
     """Get summary of BlueSales CRM data in RAG memory."""
     return bluesales.get_crm_summary(project)
+
+
+@app.post("/api/bluesales/phrase")
+def api_bluesales_send_phrase(
+    customer_id: int,
+    group: str,
+    phrase_name: str,
+    project: str = "default",
+):
+    """Send a quick phrase with variable substitution."""
+    try:
+        result = bluesales.send_quick_phrase(customer_id, group, phrase_name)
+        memory_store.add_step(
+            action=f"phrase sent: {group}/{phrase_name} → customer #{customer_id}",
+            result=result.get("rendered_text", "")[:500],
+            status="success",
+            context=f"BlueSales Quick Phrase | {group}/{phrase_name}",
+            tags=["bluesales", "message", "phrase"],
+            project=project,
+            source="bluesales",
+            category="crm",
+            kind="message",
+        )
+        return result
+    except bluesales.BlueSalesError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/bluesales/config/schema")
+def api_bluesales_schema():
+    """Get complete CRM schema: fields, statuses, tags, phrases, automation."""
+    return bluesales_config.get_full_schema()
+
+
+@app.get("/api/bluesales/config/phrases")
+def api_bluesales_phrases():
+    """Get all quick phrases grouped by category."""
+    return bluesales_config.list_phrases()
+
+
+@app.get("/api/bluesales/config/statuses")
+def api_bluesales_statuses():
+    """Get CRM statuses and order statuses."""
+    cfg = bluesales_config.load_config()
+    return {
+        "crm_statuses": cfg.get("crm_statuses", []),
+        "order_statuses": cfg.get("order_statuses", []),
+    }
+
+
+@app.get("/api/bluesales/config/tags")
+def api_bluesales_tags():
+    """Get all tags by category."""
+    return bluesales_config.get_tags()
+
+
+@app.get("/api/bluesales/config/fields")
+def api_bluesales_fields():
+    """Get customer and order field definitions."""
+    return {
+        "customer_standard": bluesales_config.CUSTOMER_STANDARD_FIELDS,
+        "customer_custom": bluesales_config.get_custom_fields("customer"),
+        "order_standard": bluesales_config.ORDER_STANDARD_FIELDS,
+        "order_custom": bluesales_config.get_custom_fields("order"),
+    }
+
+
+@app.post("/api/bluesales/config/phrase")
+def api_bluesales_add_phrase(group: str, name: str, text: str, hotkey: str = ""):
+    """Add a new quick phrase."""
+    bluesales_config.add_phrase(group, name, text, hotkey)
+    return {"ok": True}
+
+
+@app.post("/api/bluesales/config/tag")
+def api_bluesales_add_tag(category: str, tag: str):
+    """Add a new tag."""
+    bluesales_config.add_tag(category, tag)
+    return {"ok": True}
+
+
+@app.post("/api/bluesales/config/status/crm")
+def api_bluesales_add_crm_status(name: str, color: str = "#888888"):
+    """Add a CRM status."""
+    statuses = bluesales_config.add_crm_status(name, color)
+    return {"ok": True, "statuses": statuses}
+
+
+@app.post("/api/bluesales/config/status/order")
+def api_bluesales_add_order_status(name: str, color: str = "#888888"):
+    """Add an order status."""
+    statuses = bluesales_config.add_order_status(name, color)
+    return {"ok": True, "statuses": statuses}
+
+
+@app.post("/api/bluesales/config/field")
+def api_bluesales_add_field(entity: str, key: str, label: str, field_type: str = "str"):
+    """Add a custom field to customer or order."""
+    fields = bluesales_config.add_custom_field(entity, key, label, field_type)
+    return {"ok": True, "fields": fields}
 
 
 @app.post("/api/bluesales/webhook")
@@ -797,20 +898,25 @@ HTML = """<!DOCTYPE html>
   <!-- BlueSales CRM -->
   <div id="panel-bluesales" class="hidden">
     <div class="nav">
-      <button onclick="bsTest()" style="background:#238636;color:#fff">Test Connection</button>
-      <button onclick="bsSync()">Sync Data</button>
+      <button onclick="bsTest()" style="background:#238636;color:#fff">Test</button>
+      <button onclick="bsSync()">Sync</button>
       <button onclick="bsCustomers()">Customers</button>
       <button onclick="bsOrders()">Orders</button>
+      <button onclick="bsPhrases()">Phrases</button>
+      <button onclick="bsStatuses()">Statuses</button>
+      <button onclick="bsTags()">Tags</button>
+      <button onclick="bsFields()">Fields</button>
+      <button onclick="bsSchema()">Full Config</button>
       <button onclick="bsSummary()">Summary</button>
     </div>
     <div style="margin-top:12px">
       <div class="input-bar">
         <input id="bs-customer-id" placeholder="Customer ID" style="max-width:150px" />
         <input id="bs-message" placeholder="Message text..." />
-        <button onclick="bsSend()" style="background:#1a73e8">Send Message</button>
+        <button onclick="bsSend()" style="background:#1a73e8">Send</button>
       </div>
     </div>
-    <div class="result-panel" id="bs-result" style="margin-top:12px">BlueSales CRM Remote Control. Click "Test Connection" to start.</div>
+    <div class="result-panel" id="bs-result" style="margin-top:12px">BlueSales CRM Remote Control. Click "Test" to start.</div>
   </div>
 
   <!-- Export -->
@@ -1029,6 +1135,101 @@ async function bsSummary() {
     `Orders: <strong>${r.orders}</strong><br>` +
     `Messages: <strong>${r.messages}</strong><br>` +
     `Webhook events: <strong>${r.webhook_events}</strong>`;
+}
+
+async function bsPhrases() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Loading phrases...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/config/phrases`);
+  let html = '<strong>Quick Phrases</strong><br><br>';
+  for (const [group, phrases] of Object.entries(r)) {
+    html += `<div style="margin:8px 0"><strong style="color:#60a5fa">[${group}]</strong></div>`;
+    phrases.forEach(p => {
+      const hk = p.hotkey ? ` <span style="color:#f39c12">(${p.hotkey})</span>` : '';
+      html += `<div style="padding:3px 0 3px 16px">${p.name}${hk}: <span style="color:#8b949e">${p.preview}...</span></div>`;
+    });
+  }
+  document.getElementById('bs-result').innerHTML = html;
+}
+
+async function bsStatuses() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Loading statuses...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/config/statuses`);
+  let html = '<strong>CRM Statuses (Sales Funnel)</strong><br><br>';
+  (r.crm_statuses||[]).forEach((s,i) => {
+    html += `<div style="padding:3px 0"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${s.color};margin-right:8px"></span>${i+1}. ${s.name}</div>`;
+  });
+  html += '<br><strong>Order Statuses</strong><br><br>';
+  (r.order_statuses||[]).forEach(s => {
+    html += `<div style="padding:3px 0"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${s.color};margin-right:8px"></span>${s.name}</div>`;
+  });
+  document.getElementById('bs-result').innerHTML = html;
+}
+
+async function bsTags() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Loading tags...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/config/tags`);
+  let html = '<strong>Tags</strong><br><br>';
+  for (const [cat, tags] of Object.entries(r)) {
+    html += `<div style="margin:8px 0"><strong style="color:#f39c12">[${cat}]</strong></div>`;
+    tags.forEach(t => {
+      html += `<div style="padding:2px 0 2px 16px"><span style="background:#30363d;padding:2px 8px;border-radius:12px;font-size:0.85em">${t}</span></div>`;
+    });
+  }
+  document.getElementById('bs-result').innerHTML = html;
+}
+
+async function bsFields() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Loading fields...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/config/fields`);
+  let html = '<strong>Customer Fields</strong><br><br>';
+  html += '<em>Standard:</em><br>';
+  for (const [key, info] of Object.entries(r.customer_standard||{})) {
+    const ro = info.readonly ? ' <span style="color:#8b949e">(readonly)</span>' : '';
+    const req = info.required ? ' <span style="color:#f85149">*</span>' : '';
+    html += `<div style="padding:2px 0 2px 16px"><code>${key}</code>: ${info.label}${req}${ro}</div>`;
+  }
+  html += '<br><em>Custom:</em><br>';
+  (r.customer_custom||[]).forEach(f => {
+    html += `<div style="padding:2px 0 2px 16px"><code>${f.key}</code>: ${f.label} <span style="color:#8b949e">(${f.type})</span></div>`;
+  });
+  html += '<br><strong>Order Fields</strong><br><br><em>Standard:</em><br>';
+  for (const [key, info] of Object.entries(r.order_standard||{})) {
+    const ro = info.readonly ? ' <span style="color:#8b949e">(readonly)</span>' : '';
+    const req = info.required ? ' <span style="color:#f85149">*</span>' : '';
+    html += `<div style="padding:2px 0 2px 16px"><code>${key}</code>: ${info.label}${req}${ro}</div>`;
+  }
+  html += '<br><em>Custom:</em><br>';
+  (r.order_custom||[]).forEach(f => {
+    html += `<div style="padding:2px 0 2px 16px"><code>${f.key}</code>: ${f.label} <span style="color:#8b949e">(${f.type})</span></div>`;
+  });
+  document.getElementById('bs-result').innerHTML = html;
+}
+
+async function bsSchema() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Loading full config...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/config/schema`);
+  let html = '<strong>Full BlueSales CRM Schema</strong><br><br>';
+  html += `Customer fields (standard): <strong>${Object.keys(r.customer_standard_fields||{}).length}</strong><br>`;
+  html += `Customer fields (custom): <strong>${(r.customer_custom_fields||[]).length}</strong><br>`;
+  html += `Order fields (standard): <strong>${Object.keys(r.order_standard_fields||{}).length}</strong><br>`;
+  html += `Order fields (custom): <strong>${(r.order_custom_fields||[]).length}</strong><br>`;
+  html += `CRM statuses: <strong>${(r.crm_statuses||[]).length}</strong><br>`;
+  html += `Order statuses: <strong>${(r.order_statuses||[]).length}</strong><br>`;
+  html += `Tag categories: <strong>${Object.keys(r.tags||{}).length}</strong><br>`;
+  html += `Phrase groups: <strong>${Object.keys(r.quick_phrases||{}).length}</strong><br>`;
+  html += `Delivery services: <strong>${(r.delivery_services||[]).length}</strong><br>`;
+  html += `Payment methods: <strong>${(r.payment_methods||[]).length}</strong><br>`;
+  html += `Automation rules: <strong>${(r.automation_rules||[]).length}</strong><br>`;
+  html += '<br><strong>Automation Rules:</strong><br>';
+  (r.automation_rules||[]).forEach(rule => {
+    html += `<div style="padding:4px 0;border-bottom:1px solid #30363d">`;
+    html += `<strong>${rule.name}</strong> <span style="color:#8b949e">trigger: ${rule.trigger}</span><br>`;
+    (rule.actions||[]).forEach(a => {
+      html += `<span style="margin-left:16px;color:#67e8f9">${a.type}</span>: ${a.value}<br>`;
+    });
+    html += '</div>';
+  });
+  document.getElementById('bs-result').innerHTML = html;
 }
 
 // ─── Voice Recording ─────────────────────────────

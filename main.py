@@ -46,6 +46,12 @@ Web:   python main.py --web [--port 8000]
   /bs-customers — показать клиентов
   /bs-orders    — показать заказы
   /bs-send      — отправить сообщение клиенту
+  /bs-phrase    — отправить быструю фразу
+  /bs-phrases   — показать все быстрые фразы
+  /bs-statuses  — CRM-статусы и статусы заказов
+  /bs-tags      — показать/добавить теги
+  /bs-fields    — показать все поля клиента/заказа
+  /bs-config    — полная схема CRM
   /bs-summary   — сводка CRM данных
 
   === Tools ===
@@ -71,6 +77,7 @@ import devops_mem
 import knowledge_base
 import wiki
 import bluesales
+import bluesales_config
 
 try:
     from rich.console import Console
@@ -475,6 +482,100 @@ def main():
             print(f"  Заказов: {summary['orders']}")
             print(f"  Сообщений: {summary['messages']}")
             print(f"  Webhook событий: {summary['webhook_events']}")
+
+        elif cmd == "/bs-phrases":
+            phrases = bluesales_config.list_phrases()
+            print_info("=== Быстрые фразы ===")
+            for group, items in phrases.items():
+                print(f"\n  [{group}]")
+                for p in items:
+                    hk = f" ({p['hotkey']})" if p.get("hotkey") else ""
+                    print(f"    {p['name']}{hk}: {p['preview']}...")
+
+        elif cmd == "/bs-phrase":
+            phrases = bluesales_config.list_phrases()
+            print_info("Группы фраз:")
+            groups = list(phrases.keys())
+            for i, g in enumerate(groups, 1):
+                print(f"  {i}. {g}")
+            gi = _input("Номер группы")
+            if gi and gi.isdigit() and 1 <= int(gi) <= len(groups):
+                group = groups[int(gi) - 1]
+                cfg = bluesales_config.load_config()
+                group_phrases = cfg["quick_phrases"][group]
+                print_info(f"Фразы [{group}]:")
+                for i, p in enumerate(group_phrases, 1):
+                    print(f"  {i}. {p['name']}: {p['text'][:60]}...")
+                pi = _input("Номер фразы")
+                cid = _input("ID клиента")
+                if pi and pi.isdigit() and cid:
+                    phrase = group_phrases[int(pi) - 1]
+                    rendered = bluesales_config.render_phrase(phrase["text"])
+                    print_info(f"Текст: {rendered}")
+                    confirm = _input("Отправить? (y/n)")
+                    if confirm.lower() == "y":
+                        try:
+                            bluesales.send_message(int(cid), rendered)
+                            print_ok("Отправлено!")
+                        except bluesales.BlueSalesError as e:
+                            print_err(f"Ошибка: {e}")
+
+        elif cmd == "/bs-statuses":
+            cfg = bluesales_config.load_config()
+            print_info("=== CRM-статусы (воронка продаж) ===")
+            for s in cfg.get("crm_statuses", []):
+                print(f"  {s.get('order', '-')}. {s['name']}")
+            print_info("\n=== Статусы заказов ===")
+            for s in cfg.get("order_statuses", []):
+                print(f"  - {s['name']}")
+
+        elif cmd == "/bs-tags":
+            tags = bluesales_config.get_tags()
+            print_info("=== Теги ===")
+            for category, tag_list in tags.items():
+                print(f"\n  [{category}]")
+                for t in tag_list:
+                    print(f"    - {t}")
+            add = _input("\nДобавить тег? Категория:Тег (или Enter)")
+            if add and ":" in add:
+                cat, tag = add.split(":", 1)
+                bluesales_config.add_tag(cat.strip(), tag.strip())
+                print_ok(f"Тег '{tag.strip()}' добавлен в '{cat.strip()}'")
+
+        elif cmd == "/bs-fields":
+            print_info("=== Стандартные поля клиента ===")
+            for key, info in bluesales_config.CUSTOMER_STANDARD_FIELDS.items():
+                ro = " (readonly)" if info.get("readonly") else ""
+                req = " *" if info.get("required") else ""
+                print(f"  {key}: {info['label']}{req}{ro}")
+            print_info("\n=== Дополнительные поля клиента ===")
+            for f in bluesales_config.get_custom_fields("customer"):
+                print(f"  {f['key']}: {f['label']} ({f['type']})")
+            print_info("\n=== Стандартные поля заказа ===")
+            for key, info in bluesales_config.ORDER_STANDARD_FIELDS.items():
+                ro = " (readonly)" if info.get("readonly") else ""
+                req = " *" if info.get("required") else ""
+                print(f"  {key}: {info['label']}{req}{ro}")
+            print_info("\n=== Дополнительные поля заказа ===")
+            for f in bluesales_config.get_custom_fields("order"):
+                print(f"  {f['key']}: {f['label']} ({f['type']})")
+
+        elif cmd == "/bs-config":
+            schema = bluesales_config.get_full_schema()
+            print_info("=== Полная схема BlueSales CRM ===")
+            print(f"  Поля клиента (стандартные): {len(schema['customer_standard_fields'])}")
+            print(f"  Поля клиента (доп.): {len(schema['customer_custom_fields'])}")
+            print(f"  Поля заказа (стандартные): {len(schema['order_standard_fields'])}")
+            print(f"  Поля заказа (доп.): {len(schema['order_custom_fields'])}")
+            print(f"  CRM-статусов: {len(schema['crm_statuses'])}")
+            print(f"  Статусов заказа: {len(schema['order_statuses'])}")
+            print(f"  Групп тегов: {len(schema['tags'])}")
+            print(f"  Групп быстрых фраз: {len(schema['quick_phrases'])}")
+            print(f"  Служб доставки: {len(schema['delivery_services'])}")
+            print(f"  Способов оплаты: {len(schema['payment_methods'])}")
+            print(f"  Правил автоматизации: {len(schema['automation_rules'])}")
+            print_info("\nКонфиг сохранён в: bluesales_config.json")
+            bluesales_config.save_config(bluesales_config.load_config())
 
         # ─── Tools ───
         elif cmd == "/export":

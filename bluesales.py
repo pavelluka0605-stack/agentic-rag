@@ -29,6 +29,7 @@ except ImportError:
     requests = None  # type: ignore[assignment]
 
 import memory_store
+import bluesales_config
 
 logger = logging.getLogger(__name__)
 
@@ -662,6 +663,38 @@ def test_connection(login: str = "", password: str = "") -> dict:
         return {"ok": False, "error": f"Connection failed: {e}"}
     except BlueSalesError as e:
         return {"ok": False, "error": str(e)}
+
+
+# ─── Summary for RAG ────────────────────────────────
+
+def send_quick_phrase(
+    customer_id: int,
+    phrase_group: str,
+    phrase_name: str,
+    customer_data: Optional[dict] = None,
+    order_data: Optional[dict] = None,
+    login: str = "",
+    password: str = "",
+) -> dict:
+    """Send a quick phrase to a customer with variable substitution.
+
+    1. Looks up the phrase template from config
+    2. Fills in variables from customer/order data
+    3. Sends via BlueSales API
+    """
+    template = bluesales_config.get_phrase(phrase_group, phrase_name)
+    if not template:
+        raise BlueSalesError(f"Phrase not found: {phrase_group}/{phrase_name}")
+
+    rendered = bluesales_config.render_phrase(template, customer_data, order_data)
+    result = send_message(customer_id, rendered, login, password)
+
+    return {
+        "ok": True,
+        "phrase": phrase_name,
+        "rendered_text": rendered,
+        "api_result": result,
+    }
 
 
 # ─── Summary for RAG ────────────────────────────────
