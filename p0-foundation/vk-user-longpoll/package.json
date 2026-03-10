@@ -1,0 +1,13 @@
+{
+  "name": "vk-user-longpoll-listener",
+  "version": "1.0.0",
+  "description": "VK User Long Poll — чтение личных сообщений в реальном времени → N8N webhook",
+  "main": "listener.js",
+  "scripts": {
+    "start": "node listener.js",
+    "health": "curl -s http://127.0.0.1:3101/health | jq ."
+  },
+  "keywords": ["vk", "user-longpoll", "messages", "n8n"],
+  "license": "UNLICENSED",
+  "private": true
+}

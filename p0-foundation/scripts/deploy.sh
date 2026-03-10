@@ -155,6 +155,54 @@ systemctl enable vk-longpoll
 systemctl restart vk-longpoll
 log "VK Long Poll сервис запущен"
 
+# ─── 2b. VK User Long Poll (личные сообщения) ────
+echo ""
+echo "--- Шаг 2b: VK User Long Poll (личка) ---"
+
+if [ -n "${VK_USER_TOKEN:-}" ]; then
+  mkdir -p /opt/vk-user-longpoll
+  cp "$PROJECT_DIR/vk-user-longpoll/listener.js" /opt/vk-user-longpoll/
+  cp "$PROJECT_DIR/vk-user-longpoll/package.json" /opt/vk-user-longpoll/
+
+  cat > /opt/vk-user-longpoll/.env << ENVEOF
+VK_USER_TOKEN=${VK_USER_TOKEN}
+N8N_WEBHOOK_URL=${N8N_WEBHOOK_BASE_URL:-http://localhost:5678/webhook}/vk-user-messages
+VK_API_VERSION=${VK_API_VERSION:-5.199}
+HEALTH_PORT=3101
+ENVEOF
+
+  log "VK User Long Poll файлы скопированы"
+
+  cat > /etc/systemd/system/vk-user-longpoll.service << 'UNIT'
+[Unit]
+Description=VK User Long Poll — личные сообщения в реальном времени
+After=network.target n8n.service
+Wants=n8n.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vk-user-longpoll
+EnvironmentFile=/opt/vk-user-longpoll/.env
+ExecStart=/usr/bin/node /opt/vk-user-longpoll/listener.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vk-user-longpoll
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+  systemctl daemon-reload
+  systemctl enable vk-user-longpoll
+  systemctl restart vk-user-longpoll
+  log "VK User Long Poll сервис запущен"
+else
+  warn "VK_USER_TOKEN не задан — User Long Poll (личка) пропущен"
+  echo "  Для чтения личных сообщений добавьте VK_USER_TOKEN в .env"
+fi
+
 # ─── 3. Telegram Bot Test ────────────────────────
 echo ""
 echo "--- Шаг 3: Telegram Bot ---"
@@ -238,6 +286,16 @@ else
   warn "VK Long Poll: может потребоваться несколько секунд для запуска"
 fi
 
+# User Long Poll
+if [ -n "${VK_USER_TOKEN:-}" ]; then
+  if curl -s http://127.0.0.1:3101/health &>/dev/null; then
+    LP_MSGS=$(curl -s http://127.0.0.1:3101/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('messages_received',0))" 2>/dev/null || echo "?")
+    log "User LongPoll: работает (msgs: $LP_MSGS)"
+  else
+    warn "User LongPoll: может потребоваться несколько секунд для запуска"
+  fi
+fi
+
 # Telegram
 if echo "$TG_RESPONSE" | grep -q '"ok":true'; then
   log "Telegram:     работает"
@@ -258,6 +316,7 @@ echo "  5. Активируйте P0-04_Health_Check"
 echo "  6. Проведите тест: напишите комментарий в группе VK"
 echo ""
 echo "  Логи: journalctl -u vk-longpoll -f"
+echo "         journalctl -u vk-user-longpoll -f"
 echo "         journalctl -u n8n -f"
 echo ""
 log "Deploy завершён!"
