@@ -22,12 +22,13 @@ from typing import Optional
 DB_FILE = os.environ.get("RAG_DB", "rag_memory.db")
 DEFAULT_PROJECT = "default"
 
-CATEGORIES = ("step", "devops", "knowledge", "wiki")
+CATEGORIES = ("step", "devops", "knowledge", "wiki", "crm")
 KINDS = {
     "devops": ("command", "config", "incident", "runbook", "deploy", "monitor"),
     "knowledge": ("adr", "pattern", "decision", "lesson", "dependency"),
     "wiki": ("note", "link", "snippet", "howto", "reference"),
     "step": ("action",),
+    "crm": ("customer", "order", "message", "event", "status_update", "tag_event"),
 }
 
 

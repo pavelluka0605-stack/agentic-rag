@@ -40,6 +40,14 @@ Web:   python main.py --web [--port 8000]
   /critic    — Critic agent ревьюит шаги
   /plan      — Planner + Critic + Executor цепочка
 
+  === BlueSales CRM ===
+  /bs-test      — проверить подключение
+  /bs-sync      — синхронизация клиентов и заказов
+  /bs-customers — показать клиентов
+  /bs-orders    — показать заказы
+  /bs-send      — отправить сообщение клиенту
+  /bs-summary   — сводка CRM данных
+
   === Tools ===
   /export    — экспорт (markdown/bash/checklist)
   /git       — собрать git log в память
@@ -62,6 +70,7 @@ import auto_collect
 import devops_mem
 import knowledge_base
 import wiki
+import bluesales
 
 try:
     from rich.console import Console
@@ -147,7 +156,7 @@ def main():
         return
 
     print_info("=== Agentic RAG v3 ===")
-    print_info("Модули: Steps | DevOps | Knowledge | Wiki | Agents")
+    print_info("Модули: Steps | DevOps | Knowledge | Wiki | Agents | BlueSales CRM")
     print_info("Команды: /help для списка\n")
 
     while True:
@@ -376,6 +385,96 @@ def main():
             print_md("## Plan\n" + result["plan"])
             print_md("## Critique\n" + result["critique"])
             print_md("## Execution\n" + result["execution"])
+
+        # ─── BlueSales CRM ───
+        elif cmd == "/bs-test":
+            print_info("Проверяю подключение к BlueSales...")
+            result = bluesales.test_connection()
+            if result["ok"]:
+                print_ok(f"Подключение успешно! Менеджеров: {result['users_count']}")
+                for u in result.get("users", []):
+                    print(f"  - {u}")
+            else:
+                print_err(f"Ошибка: {result['error']}")
+
+        elif cmd == "/bs-sync":
+            days = int(_input("За сколько дней [30]") or "30")
+            print_info(f"Синхронизация BlueSales за {days} дней...")
+            try:
+                result = bluesales.sync_all_to_memory(project=_project, days_back=days)
+                print_ok(f"Синхронизировано: {result['customers_synced']} клиентов, {result['orders_synced']} заказов")
+            except bluesales.BlueSalesError as e:
+                print_err(f"Ошибка BlueSales: {e}")
+
+        elif cmd == "/bs-customers":
+            days = int(_input("За сколько дней [30]") or "30")
+            print_info(f"Загружаю клиентов за {days} дней...")
+            try:
+                from datetime import datetime, timedelta
+                date_from = datetime.now() - timedelta(days=days)
+                customers = bluesales.get_all_customers(first_contact_from=date_from, first_contact_to=datetime.now())
+                print_ok(f"Найдено клиентов: {len(customers)}")
+                for c in customers[:20]:
+                    name = f"{c.get('name', '')} {c.get('lastName', '')}".strip()
+                    vk = c.get("vkId", "")
+                    phone = c.get("phone", "")
+                    print(f"  #{c.get('id', '?')} {name}  VK:{vk}  Phone:{phone}")
+                if len(customers) > 20:
+                    print_info(f"  ... и ещё {len(customers) - 20}")
+            except bluesales.BlueSalesError as e:
+                print_err(f"Ошибка: {e}")
+
+        elif cmd == "/bs-orders":
+            days = int(_input("За сколько дней [30]") or "30")
+            print_info(f"Загружаю заказы за {days} дней...")
+            try:
+                from datetime import datetime, timedelta
+                date_from = datetime.now() - timedelta(days=days)
+                orders = bluesales.get_all_orders(date_from=date_from, date_to=datetime.now())
+                print_ok(f"Найдено заказов: {len(orders)}")
+                for o in orders[:20]:
+                    oid = o.get("id", o.get("internalNumber", "?"))
+                    status = o.get("status", {})
+                    status_name = status.get("name", "") if isinstance(status, dict) else str(status)
+                    total = o.get("totalPrice", o.get("total", 0))
+                    print(f"  #{oid}  Status: {status_name}  Total: {total}")
+                if len(orders) > 20:
+                    print_info(f"  ... и ещё {len(orders) - 20}")
+            except bluesales.BlueSalesError as e:
+                print_err(f"Ошибка: {e}")
+
+        elif cmd == "/bs-send":
+            customer_id = _input("ID клиента")
+            message = _input("Сообщение")
+            if not customer_id or not message:
+                print_err("Нужно указать ID клиента и сообщение.")
+            else:
+                print_info("Отправляю сообщение...")
+                try:
+                    result = bluesales.send_message(int(customer_id), message)
+                    print_ok("Сообщение отправлено!")
+                    memory_store.add_step(
+                        action=f"message sent: customer #{customer_id}",
+                        result=message[:500],
+                        status="success",
+                        context=f"BlueSales Remote Control | customer_id={customer_id}",
+                        tags=["bluesales", "message", "sent"],
+                        project=_project,
+                        source="bluesales",
+                        category="crm",
+                        kind="message",
+                    )
+                except bluesales.BlueSalesError as e:
+                    print_err(f"Ошибка: {e}")
+
+        elif cmd == "/bs-summary":
+            summary = bluesales.get_crm_summary(_project)
+            print_info("=== BlueSales CRM Summary ===")
+            print(f"  Всего записей: {summary['total_records']}")
+            print(f"  Клиентов: {summary['customers']}")
+            print(f"  Заказов: {summary['orders']}")
+            print(f"  Сообщений: {summary['messages']}")
+            print(f"  Webhook событий: {summary['webhook_events']}")
 
         # ─── Tools ───
         elif cmd == "/export":

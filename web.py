@@ -15,6 +15,7 @@ import agents
 import devops_mem
 import knowledge_base
 import wiki as wiki_mod
+import bluesales
 
 app = FastAPI(title="Agentic RAG", version="3.0")
 
@@ -194,6 +195,170 @@ def api_wiki_link(title: str, url: str, description: str = "", tags: str = "", p
 def api_wiki_snippet(title: str, code: str, language: str = "", description: str = "", tags: str = "", project: str = "default"):
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
     return wiki_mod.save_snippet(title, code, language, description, tag_list, project)
+
+
+# ─── BlueSales CRM Remote Control ─────────────────
+
+@app.get("/api/bluesales/test")
+def api_bluesales_test():
+    """Test BlueSales API connection."""
+    return bluesales.test_connection()
+
+
+@app.get("/api/bluesales/customers")
+def api_bluesales_customers(
+    days: int = 30,
+    tags: str = "",
+    count: int = 100,
+):
+    """Get customers from BlueSales CRM."""
+    from datetime import datetime, timedelta
+    try:
+        date_from = datetime.now() - timedelta(days=days)
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+        customers = bluesales.get_all_customers(
+            first_contact_from=date_from,
+            first_contact_to=datetime.now(),
+            tags=tag_list,
+        )
+        return {"count": len(customers), "customers": customers[:count]}
+    except bluesales.BlueSalesError as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/bluesales/orders")
+def api_bluesales_orders(days: int = 30, count: int = 100):
+    """Get orders from BlueSales CRM."""
+    from datetime import datetime, timedelta
+    try:
+        date_from = datetime.now() - timedelta(days=days)
+        orders = bluesales.get_all_orders(
+            date_from=date_from,
+            date_to=datetime.now(),
+        )
+        return {"count": len(orders), "orders": orders[:count]}
+    except bluesales.BlueSalesError as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/bluesales/users")
+def api_bluesales_users():
+    """Get BlueSales users (managers)."""
+    try:
+        return bluesales.get_users()
+    except bluesales.BlueSalesError as e:
+        return {"error": str(e)}
+
+
+@app.post("/api/bluesales/send")
+def api_bluesales_send(
+    customer_id: int,
+    message: str,
+    project: str = "default",
+):
+    """Send message to customer via BlueSales Remote Control."""
+    try:
+        result = bluesales.send_message(customer_id, message)
+        # Log the sent message to RAG memory
+        memory_store.add_step(
+            action=f"message sent: customer #{customer_id}",
+            result=message[:500],
+            status="success",
+            context=f"BlueSales Remote Control | customer_id={customer_id}",
+            tags=["bluesales", "message", "sent"],
+            project=project,
+            source="bluesales",
+            category="crm",
+            kind="message",
+        )
+        return {"ok": True, "result": result}
+    except bluesales.BlueSalesError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/bluesales/sync")
+def api_bluesales_sync(days: int = 30, project: str = "default"):
+    """Sync BlueSales data into RAG memory."""
+    try:
+        result = bluesales.sync_all_to_memory(project=project, days_back=days)
+        return {"ok": True, **result}
+    except bluesales.BlueSalesError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/bluesales/summary")
+def api_bluesales_summary(project: str = "default"):
+    """Get summary of BlueSales CRM data in RAG memory."""
+    return bluesales.get_crm_summary(project)
+
+
+@app.post("/api/bluesales/webhook")
+def api_bluesales_webhook(
+    payload: dict,
+    project: str = "default",
+):
+    """Receive webhook notifications from BlueSales.
+
+    Configure BlueSales to send webhooks to:
+    https://your-server/api/bluesales/webhook
+
+    Expected payload:
+    {
+        "event": "new_message|new_customer|status_change|new_order|...",
+        "data": { ... event-specific data ... }
+    }
+    """
+    return bluesales.process_webhook(payload, project)
+
+
+@app.post("/api/bluesales/customer")
+def api_bluesales_add_customer(customer: dict, project: str = "default"):
+    """Add a new customer to BlueSales."""
+    try:
+        result = bluesales.add_customer(customer)
+        return {"ok": True, "result": result}
+    except bluesales.BlueSalesError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.put("/api/bluesales/customer")
+def api_bluesales_update_customer(customer: dict):
+    """Update a customer in BlueSales."""
+    try:
+        result = bluesales.update_customer(customer)
+        return {"ok": True, "result": result}
+    except bluesales.BlueSalesError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.delete("/api/bluesales/customer/{customer_id}")
+def api_bluesales_delete_customer(customer_id: int):
+    """Delete a customer from BlueSales."""
+    try:
+        result = bluesales.delete_customer(customer_id)
+        return {"ok": True, "result": result}
+    except bluesales.BlueSalesError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/bluesales/order")
+def api_bluesales_add_order(order: dict):
+    """Add a new order to BlueSales."""
+    try:
+        result = bluesales.add_order(order)
+        return {"ok": True, "result": result}
+    except bluesales.BlueSalesError as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.put("/api/bluesales/order/status")
+def api_bluesales_set_order_status(order_id: int, status: str):
+    """Update order status in BlueSales."""
+    try:
+        result = bluesales.set_order_status(order_id, status)
+        return {"ok": True, "result": result}
+    except bluesales.BlueSalesError as e:
+        return {"ok": False, "error": str(e)}
 
 
 # ─── Voice / Text intake (for iOS Shortcuts → n8n → here) ────
@@ -504,6 +669,7 @@ HTML = """<!DOCTYPE html>
   .cat-badge.knowledge { background: #1a2e1a; color: #34d399; }
   .cat-badge.wiki { background: #2e2a1a; color: #fbbf24; }
   .cat-badge.step { background: #1a2e2e; color: #67e8f9; }
+  .cat-badge.crm { background: #1a1a3e; color: #60a5fa; }
   .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
   .status-badge.success { background: #0d2818; color: #3fb950; }
   .status-badge.error { background: #2d1315; color: #f85149; }
@@ -556,7 +722,7 @@ HTML = """<!DOCTYPE html>
 <body>
 <div class="container">
   <h1>Agentic RAG v3</h1>
-  <p class="subtitle">Steps + DevOps + Knowledge Base + Wiki + AI Agents</p>
+  <p class="subtitle">Steps + DevOps + Knowledge Base + Wiki + AI Agents + BlueSales CRM</p>
 
   <div class="stats" id="stats"></div>
 
@@ -566,12 +732,14 @@ HTML = """<!DOCTYPE html>
     <button onclick="showCat('devops')" id="btn-devops">DevOps</button>
     <button onclick="showCat('knowledge')" id="btn-knowledge">Knowledge</button>
     <button onclick="showCat('wiki')" id="btn-wiki">Wiki</button>
+    <button onclick="showCat('crm')" id="btn-crm">CRM</button>
     <div class="sep"></div>
     <button onclick="showPanel('golden')" id="btn-golden">Golden Path</button>
     <button onclick="showPanel('search')" id="btn-search">Search</button>
     <button onclick="showPanel('agents')" id="btn-agents">Agents</button>
     <button onclick="showPanel('export')" id="btn-export">Export</button>
     <button onclick="showPanel('voice')" id="btn-voice" style="background:#da3633;border-color:#da3633;color:#fff">Voice</button>
+    <button onclick="showPanel('bluesales')" id="btn-bluesales" style="background:#1a73e8;border-color:#1a73e8;color:#fff">BlueSales</button>
     <button onclick="loadDemo()" style="margin-left:auto;background:#1f6feb;color:#fff">Demo</button>
   </div>
 
@@ -626,6 +794,25 @@ HTML = """<!DOCTYPE html>
     <div id="voiceHistory"></div>
   </div>
 
+  <!-- BlueSales CRM -->
+  <div id="panel-bluesales" class="hidden">
+    <div class="nav">
+      <button onclick="bsTest()" style="background:#238636;color:#fff">Test Connection</button>
+      <button onclick="bsSync()">Sync Data</button>
+      <button onclick="bsCustomers()">Customers</button>
+      <button onclick="bsOrders()">Orders</button>
+      <button onclick="bsSummary()">Summary</button>
+    </div>
+    <div style="margin-top:12px">
+      <div class="input-bar">
+        <input id="bs-customer-id" placeholder="Customer ID" style="max-width:150px" />
+        <input id="bs-message" placeholder="Message text..." />
+        <button onclick="bsSend()" style="background:#1a73e8">Send Message</button>
+      </div>
+    </div>
+    <div class="result-panel" id="bs-result" style="margin-top:12px">BlueSales CRM Remote Control. Click "Test Connection" to start.</div>
+  </div>
+
   <!-- Export -->
   <div id="panel-export" class="hidden">
     <div class="nav">
@@ -672,6 +859,7 @@ async function loadStats() {
     <div class="stat-card"><div class="num" style="color:#a78bfa">${bc.devops||0}</div><div class="label">DevOps</div></div>
     <div class="stat-card"><div class="num" style="color:#34d399">${bc.knowledge||0}</div><div class="label">Knowledge</div></div>
     <div class="stat-card"><div class="num" style="color:#fbbf24">${bc.wiki||0}</div><div class="label">Wiki</div></div>
+    <div class="stat-card"><div class="num" style="color:#60a5fa">${bc.crm||0}</div><div class="label">CRM</div></div>
     <div class="stat-card"><div class="num" style="color:#3fb950">${bs.success||0}</div><div class="label">OK</div></div>
     <div class="stat-card"><div class="num" style="color:#f85149">${bs.error||0}</div><div class="label">Err</div></div>
   `;
@@ -744,6 +932,103 @@ async function runCritic() {
 async function doExport(fmt) {
   const text = await (await fetch(`${API}/api/export/${fmt}`)).text();
   document.getElementById('export-result').textContent = text;
+}
+
+// ─── BlueSales CRM ──────────────────────────────
+async function bsTest() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Testing connection...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/test`);
+  if (r.ok) {
+    document.getElementById('bs-result').textContent =
+      'Connection OK! Managers: ' + (r.users || []).join(', ');
+  } else {
+    document.getElementById('bs-result').textContent = 'Error: ' + (r.error || 'Unknown');
+  }
+}
+
+async function bsSync() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Syncing data (this may take a while)...</p>';
+  const r = await (await fetch(`${API}/api/bluesales/sync?days=30&project=default`, {method:'POST'})).json();
+  if (r.ok) {
+    document.getElementById('bs-result').textContent =
+      `Synced! Customers: ${r.customers_synced}, Orders: ${r.orders_synced}, Total: ${r.total}`;
+    loadStats(); loadTimeline(currentCat);
+  } else {
+    document.getElementById('bs-result').textContent = 'Error: ' + (r.error || 'Unknown');
+  }
+}
+
+async function bsCustomers() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Loading customers...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/customers?days=30&count=50`);
+  if (r.error) {
+    document.getElementById('bs-result').textContent = 'Error: ' + r.error;
+    return;
+  }
+  let html = `<strong>Customers (${r.count})</strong><br><br>`;
+  (r.customers || []).forEach(c => {
+    const name = ((c.name || '') + ' ' + (c.lastName || '')).trim() || 'N/A';
+    const vk = c.vkId || '';
+    const phone = c.phone || '';
+    const id = c.id || '?';
+    html += `<div style="padding:4px 0;border-bottom:1px solid #30363d">
+      <strong>#${id}</strong> ${name}
+      ${vk ? ' | VK:'+vk : ''} ${phone ? ' | Phone:'+phone : ''}
+    </div>`;
+  });
+  document.getElementById('bs-result').innerHTML = html;
+}
+
+async function bsOrders() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Loading orders...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/orders?days=30&count=50`);
+  if (r.error) {
+    document.getElementById('bs-result').textContent = 'Error: ' + r.error;
+    return;
+  }
+  let html = `<strong>Orders (${r.count})</strong><br><br>`;
+  (r.orders || []).forEach(o => {
+    const oid = o.id || o.internalNumber || '?';
+    const st = (o.status && o.status.name) ? o.status.name : '';
+    const total = o.totalPrice || o.total || 0;
+    html += `<div style="padding:4px 0;border-bottom:1px solid #30363d">
+      <strong>#${oid}</strong> Status: ${st} | Total: ${total}
+    </div>`;
+  });
+  document.getElementById('bs-result').innerHTML = html;
+}
+
+async function bsSend() {
+  const cid = document.getElementById('bs-customer-id').value;
+  const msg = document.getElementById('bs-message').value;
+  if (!cid || !msg) {
+    document.getElementById('bs-result').textContent = 'Enter Customer ID and Message';
+    return;
+  }
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Sending...</p>';
+  const r = await (await fetch(
+    `${API}/api/bluesales/send?customer_id=${cid}&message=${encodeURIComponent(msg)}&project=default`,
+    {method:'POST'}
+  )).json();
+  if (r.ok) {
+    document.getElementById('bs-result').textContent = 'Message sent!';
+    document.getElementById('bs-message').value = '';
+    loadStats();
+  } else {
+    document.getElementById('bs-result').textContent = 'Error: ' + (r.error || 'Unknown');
+  }
+}
+
+async function bsSummary() {
+  document.getElementById('bs-result').innerHTML = '<p class="loading">Loading summary...</p>';
+  const r = await fetchJSON(`${API}/api/bluesales/summary`);
+  document.getElementById('bs-result').innerHTML =
+    `<strong>BlueSales CRM Summary</strong><br><br>` +
+    `Total CRM records: <strong>${r.total_records}</strong><br>` +
+    `Customers: <strong>${r.customers}</strong><br>` +
+    `Orders: <strong>${r.orders}</strong><br>` +
+    `Messages: <strong>${r.messages}</strong><br>` +
+    `Webhook events: <strong>${r.webhook_events}</strong>`;
 }
 
 // ─── Voice Recording ─────────────────────────────
