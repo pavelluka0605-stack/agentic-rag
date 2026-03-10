@@ -1,0 +1,322 @@
+{
+  "name": "P0-01_Init_Google_Sheets",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $env.GOOGLE_SPREADSHEET_ID }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"requests\": [\n    {\n      \"addSheet\": {\n        \"properties\": {\n          \"title\": \"Товары\",\n          \"gridProperties\": { \"frozenRowCount\": 1 }\n        }\n      }\n    },\n    {\n      \"addSheet\": {\n        \"properties\": {\n          \"title\": \"Спрос\",\n          \"gridProperties\": { \"frozenRowCount\": 1 }\n        }\n      }\n    },\n    {\n      \"addSheet\": {\n        \"properties\": {\n          \"title\": \"Заказы_поставщику\",\n          \"gridProperties\": { \"frozenRowCount\": 1 }\n        }\n      }\n    },\n    {\n      \"addSheet\": {\n        \"properties\": {\n          \"title\": \"Заказы_клиентов\",\n          \"gridProperties\": { \"frozenRowCount\": 1 }\n        }\n      }\n    },\n    {\n      \"addSheet\": {\n        \"properties\": {\n          \"title\": \"Сводка_спроса\",\n          \"gridProperties\": { \"frozenRowCount\": 1 }\n        }\n      }\n    },\n    {\n      \"addSheet\": {\n        \"properties\": {\n          \"title\": \"Логи_N8N\",\n          \"gridProperties\": { \"frozenRowCount\": 1 }\n        }\n      }\n    }\n  ]\n}"
+      },
+      "id": "create-sheets",
+      "name": "Create Sheets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Товары"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {"id": "A", "displayName": "ID_поста_VK", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "B", "displayName": "Название", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "C", "displayName": "Цвет", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "D", "displayName": "Размеры", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "E", "displayName": "Цена_закупки", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "F", "displayName": "Цена_продажи", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "G", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "H", "displayName": "Дата_публикации", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "I", "displayName": "Дата_прихода", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "J", "displayName": "Номер_контейнера", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "K", "displayName": "URL_поста", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "L", "displayName": "Фото_URL", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "headers-tovary",
+      "name": "Headers: Товары",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Спрос"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {"id": "A", "displayName": "ID_записи", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "B", "displayName": "ID_поста_VK", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "C", "displayName": "VK_ID_клиента", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "D", "displayName": "Имя_клиента", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "E", "displayName": "Размер", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "F", "displayName": "Количество", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "G", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "H", "displayName": "Номер_в_очереди", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "I", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "J", "displayName": "Источник", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "K", "displayName": "Текст_комментария", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "L", "displayName": "Дата_обновления", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "headers-spros",
+      "name": "Headers: Спрос",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 250],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Заказы_поставщику"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {"id": "A", "displayName": "ID_заказа", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "B", "displayName": "ID_поста_VK", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "C", "displayName": "Размер", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "D", "displayName": "Заказано_шт", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "E", "displayName": "Получено_шт", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "F", "displayName": "Цена_за_шт", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "G", "displayName": "Сумма", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "H", "displayName": "Дата_заказа", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "I", "displayName": "Дата_оплаты", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "J", "displayName": "Дата_прихода", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "K", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "headers-orders-supplier",
+      "name": "Headers: Заказы_поставщику",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 400],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Заказы_клиентов"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {"id": "A", "displayName": "ID_сделки", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "B", "displayName": "VK_ID_клиента", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "C", "displayName": "Имя_клиента", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "D", "displayName": "Состав_заказа", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "E", "displayName": "Сумма_товаров", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "F", "displayName": "Сумма_доставки", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "G", "displayName": "Итого", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "H", "displayName": "Способ_доставки", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "I", "displayName": "Трек_номер", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "J", "displayName": "Адрес_доставки", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "K", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "L", "displayName": "Дата_создания", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "M", "displayName": "Дата_отправки", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "N", "displayName": "Расч_дата_доставки", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "O", "displayName": "Факт_дата_получения", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "P", "displayName": "Ждёт_сборную", "required": false, "defaultMatch": false, "display": true, "type": "boolean", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "headers-orders-clients",
+      "name": "Headers: Заказы_клиентов",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 550],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {"id": "A", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "B", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "C", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "D", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "E", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "F", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "headers-logs",
+      "name": "Headers: Логи_N8N",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 700],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=✅ Google Sheets инициализирован!\n\nСозданы листы:\n• Товары (12 колонок)\n• Спрос (12 колонок)\n• Заказы_поставщику (11 колонок)\n• Заказы_клиентов (16 колонок)\n• Сводка_спроса (формулы)\n• Логи_N8N (6 колонок)\n\n📊 Таблица готова к работе.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "telegram-notify",
+      "name": "Telegram: Готово",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [900, 400],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          { "node": "Create Sheets", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Create Sheets": {
+      "main": [
+        [
+          { "node": "Headers: Товары", "type": "main", "index": 0 },
+          { "node": "Headers: Спрос", "type": "main", "index": 0 },
+          { "node": "Headers: Заказы_поставщику", "type": "main", "index": 0 },
+          { "node": "Headers: Заказы_клиентов", "type": "main", "index": 0 },
+          { "node": "Headers: Логи_N8N", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Headers: Товары": {
+      "main": [[ { "node": "Telegram: Готово", "type": "main", "index": 0 } ]]
+    },
+    "Headers: Спрос": {
+      "main": [[ { "node": "Telegram: Готово", "type": "main", "index": 0 } ]]
+    },
+    "Headers: Заказы_поставщику": {
+      "main": [[ { "node": "Telegram: Готово", "type": "main", "index": 0 } ]]
+    },
+    "Headers: Заказы_клиентов": {
+      "main": [[ { "node": "Telegram: Готово", "type": "main", "index": 0 } ]]
+    },
+    "Headers: Логи_N8N": {
+      "main": [[ { "node": "Telegram: Готово", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [{ "name": "P0-Foundation" }]
+}

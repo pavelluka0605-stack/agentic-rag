@@ -1,0 +1,375 @@
+{
+  "name": "P0-03_VK_Event_Receiver",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vk-events",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-vk",
+      "name": "Webhook: VK Events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "vk-events"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            { "outputKey": "message_new", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-msg", "leftValue": "={{ $json.type }}", "rightValue": "message_new", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+            { "outputKey": "wall_reply_new", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-comment", "leftValue": "={{ $json.type }}", "rightValue": "wall_reply_new", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+            { "outputKey": "wall_reply_edit", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-edit", "leftValue": "={{ $json.type }}", "rightValue": "wall_reply_edit", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+            { "outputKey": "system", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-sys", "leftValue": "={{ $json.type }}", "rightValue": "system", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } }
+          ],
+          "fallbackOutput": "extra"
+        },
+        "options": {}
+      },
+      "id": "switch-type",
+      "name": "Switch: Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "set-from", "name": "from_id", "value": "={{ $json.message.from_id }}", "type": "number" },
+            { "id": "set-text", "name": "text", "value": "={{ $json.message.text }}", "type": "string" },
+            { "id": "set-peer", "name": "peer_id", "value": "={{ $json.message.peer_id }}", "type": "number" },
+            { "id": "set-date", "name": "date", "value": "={{ $json.received_at }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-message-fields",
+      "name": "Extract: Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Workflow": "VK_Event_Receiver",
+            "Тип": "info",
+            "Событие": "Новое ЛС",
+            "Детали": "={{ JSON.stringify({from_id: $json.from_id, text: $json.text, peer_id: $json.peer_id}) }}",
+            "Статус": "success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Тип", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Событие", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Детали", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-message",
+      "name": "Log: Message",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 150],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=📩 <b>Новое ЛС в группу</b>\n\nОт: <a href=\"https://vk.com/id{{ $('Extract: Message').item.json.from_id }}\">VK ID {{ $('Extract: Message').item.json.from_id }}</a>\nТекст: {{ $('Extract: Message').item.json.text }}\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "tg-alert-message",
+      "name": "Telegram: New DM",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 150],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "set-commentid", "name": "comment_id", "value": "={{ $json.comment.id }}", "type": "number" },
+            { "id": "set-from2", "name": "from_id", "value": "={{ $json.comment.from_id }}", "type": "number" },
+            { "id": "set-postid", "name": "post_id", "value": "={{ $json.comment.post_id }}", "type": "number" },
+            { "id": "set-text2", "name": "text", "value": "={{ $json.comment.text }}", "type": "string" },
+            { "id": "set-date2", "name": "date", "value": "={{ $json.received_at }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-comment-fields",
+      "name": "Extract: Comment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Workflow": "VK_Event_Receiver",
+            "Тип": "info",
+            "Событие": "Новый комментарий",
+            "Детали": "={{ JSON.stringify({from_id: $json.from_id, post_id: $json.post_id, text: $json.text}) }}",
+            "Статус": "success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Тип", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Событие", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Детали", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-comment",
+      "name": "Log: Comment",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 350],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=💬 <b>Новый комментарий</b>\n\nПост: wall-{{ $env.VK_GROUP_ID }}_{{ $('Extract: Comment').item.json.post_id }}\nОт: <a href=\"https://vk.com/id{{ $('Extract: Comment').item.json.from_id }}\">VK ID {{ $('Extract: Comment').item.json.from_id }}</a>\nТекст: {{ $('Extract: Comment').item.json.text }}\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "tg-alert-comment",
+      "name": "Telegram: New Comment",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 350],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "cond-err", "leftValue": "={{ $json.event }}", "rightValue": "longpoll_error", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-system-error",
+      "name": "IF: LP Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=⚠️ <b>VK Long Poll ошибка</b>\n\n{{ $json.error }}\n\nАвтоматический перезапуск...\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "tg-alert-error",
+      "name": "Telegram: LP Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [900, 550],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=✅ <b>VK Long Poll запущен</b>\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "tg-alert-started",
+      "name": "Telegram: LP Started",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [900, 700],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Workflow": "VK_Event_Receiver",
+            "Тип": "info",
+            "Событие": "={{ $json.type }}",
+            "Детали": "={{ JSON.stringify($json) }}",
+            "Статус": "success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Тип", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Событие", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Детали", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-default",
+      "name": "Log: Other Event",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 800],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"ok\"}"
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 400]
+    }
+  ],
+  "connections": {
+    "Webhook: VK Events": {
+      "main": [[ { "node": "Switch: Event Type", "type": "main", "index": 0 } ]]
+    },
+    "Switch: Event Type": {
+      "main": [
+        [{ "node": "Extract: Message", "type": "main", "index": 0 }],
+        [{ "node": "Extract: Comment", "type": "main", "index": 0 }],
+        [{ "node": "Extract: Comment", "type": "main", "index": 0 }],
+        [{ "node": "IF: LP Error?", "type": "main", "index": 0 }],
+        [{ "node": "Log: Other Event", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract: Message": {
+      "main": [[ { "node": "Log: Message", "type": "main", "index": 0 } ]]
+    },
+    "Log: Message": {
+      "main": [[ { "node": "Telegram: New DM", "type": "main", "index": 0 } ]]
+    },
+    "Telegram: New DM": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    },
+    "Extract: Comment": {
+      "main": [[ { "node": "Log: Comment", "type": "main", "index": 0 } ]]
+    },
+    "Log: Comment": {
+      "main": [[ { "node": "Telegram: New Comment", "type": "main", "index": 0 } ]]
+    },
+    "Telegram: New Comment": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    },
+    "IF: LP Error?": {
+      "main": [
+        [{ "node": "Telegram: LP Error", "type": "main", "index": 0 }],
+        [{ "node": "Telegram: LP Started", "type": "main", "index": 0 }]
+      ]
+    },
+    "Telegram: LP Error": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    },
+    "Telegram: LP Started": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    },
+    "Log: Other Event": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true,
+  "tags": [{ "name": "P0-Foundation" }]
+}

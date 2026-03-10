@@ -1,0 +1,46 @@
+{
+  "name": "P0-02_Test_Telegram",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=✅ <b>Telegram подключён к N8N</b>\n\n🔧 Тестовое сообщение от системы автоматизации.\nЕсли вы это видите — Telegram-бот работает!\n\n⏰ Время: {{ $now.format('dd.MM.yyyy HH:mm:ss') }}\n🖥 Сервер: Frankfurt VPS",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "telegram-test",
+      "name": "Telegram: Test",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [460, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          { "node": "Telegram: Test", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "P0-Foundation" }]
+}

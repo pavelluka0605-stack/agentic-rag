@@ -1,0 +1,165 @@
+{
+  "name": "P0-04_Health_Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 30 }]
+        }
+      },
+      "id": "cron-30min",
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vk.com/method/groups.getById",
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "=group_id={{ $env.VK_GROUP_ID }}&access_token={{ $env.VK_TOKEN }}&v=5.199",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "check-vk",
+      "name": "Check: VK API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 200],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:3100/health",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "check-longpoll",
+      "name": "Check: Long Poll",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 400],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "options": {
+          "range": "A1:F2"
+        }
+      },
+      "id": "check-sheets",
+      "name": "Check: Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 600],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect health check results\nconst vkResult = $('Check: VK API').first();\nconst lpResult = $('Check: Long Poll').first();\nconst sheetsResult = $('Check: Google Sheets').first();\n\nconst errors = [];\n\n// Check VK\nif (vkResult.json?.error) {\n  errors.push(`VK API: ${JSON.stringify(vkResult.json.error)}`);\n}\n\n// Check Long Poll\nif (!lpResult.json?.status || lpResult.json.status !== 'ok') {\n  errors.push('Long Poll: демон не отвечает на /health');\n}\n\n// Check Sheets  \nif (sheetsResult.json?.error) {\n  errors.push(`Google Sheets: ${sheetsResult.json.error}`);\n}\n\nreturn [{\n  json: {\n    hasErrors: errors.length > 0,\n    errors,\n    summary: errors.length === 0 \n      ? 'All systems OK' \n      : `${errors.length} problem(s) found`,\n    lp_stats: lpResult.json || {},\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "cond-errors", "leftValue": "={{ $json.hasErrors }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-errors",
+      "name": "IF: Has Errors?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=🔴 <b>Health Check FAILED</b>\n\n{{ $json.errors.join('\\n') }}\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "tg-alert-fail",
+      "name": "Telegram: HC Failed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "noop-ok",
+      "name": "All OK (no action)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 500]
+    }
+  ],
+  "connections": {
+    "Every 30 min": {
+      "main": [[
+        { "node": "Check: VK API", "type": "main", "index": 0 },
+        { "node": "Check: Long Poll", "type": "main", "index": 0 },
+        { "node": "Check: Google Sheets", "type": "main", "index": 0 }
+      ]]
+    },
+    "Check: VK API": {
+      "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
+    },
+    "Check: Long Poll": {
+      "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
+    },
+    "Check: Google Sheets": {
+      "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
+    },
+    "Aggregate Results": {
+      "main": [[ { "node": "IF: Has Errors?", "type": "main", "index": 0 } ]]
+    },
+    "IF: Has Errors?": {
+      "main": [
+        [{ "node": "Telegram: HC Failed", "type": "main", "index": 0 }],
+        [{ "node": "All OK (no action)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true,
+  "tags": [{ "name": "P0-Foundation" }]
+}

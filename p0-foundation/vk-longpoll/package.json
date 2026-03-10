@@ -1,0 +1,13 @@
+{
+  "name": "vk-longpoll-listener",
+  "version": "1.0.0",
+  "description": "VK Groups Long Poll Listener → N8N webhook bridge",
+  "main": "listener.js",
+  "scripts": {
+    "start": "node listener.js",
+    "health": "curl -s http://127.0.0.1:3100/health | jq ."
+  },
+  "keywords": ["vk", "longpoll", "n8n"],
+  "license": "UNLICENSED",
+  "private": true
+}

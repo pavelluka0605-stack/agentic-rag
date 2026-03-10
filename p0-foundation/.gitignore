@@ -1,0 +1,5 @@
+# Credentials — НИКОГДА не коммитить!
+.env
+credentials/
+*.json.key
+google-service-account.json
