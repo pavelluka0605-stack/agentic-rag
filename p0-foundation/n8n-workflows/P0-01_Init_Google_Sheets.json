@@ -260,6 +260,73 @@
     },
     {
       "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Сводка_спроса"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {"id": "A", "displayName": "Название_товара", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "B", "displayName": "ID_поста", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "C", "displayName": "XS", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "D", "displayName": "S", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "E", "displayName": "M", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "F", "displayName": "L", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "G", "displayName": "XL", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "H", "displayName": "XXL", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "I", "displayName": "Итого", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "J", "displayName": "Статус_товара", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "headers-svodka",
+      "name": "Headers: Сводка_спроса",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 850],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $env.GOOGLE_SPREADSHEET_ID }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"requests\": [\n    {\n      \"repeatCell\": {\n        \"range\": {\n          \"sheetId\": {{ $('Create Sheets').item.json.replies[4].addSheet.properties.sheetId }},\n          \"startRowIndex\": 1,\n          \"endRowIndex\": 50,\n          \"startColumnIndex\": 0,\n          \"endColumnIndex\": 1\n        },\n        \"cell\": {\n          \"userEnteredValue\": {\n            \"formulaValue\": \"=IFERROR(INDEX(Товары!B:B,MATCH(SMALL(IF(COUNTIF($A$1:A1,Товары!B$2:B$100)=0,ROW(Товары!B$2:B$100)),1),ROW(Товары!B$2:B$100),0)),\\\"\\\")\"\n          }\n        },\n        \"fields\": \"userEnteredValue\"\n      }\n    }\n  ]\n}"
+      },
+      "id": "formulas-svodka",
+      "name": "Формулы: Сводка_спроса",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 850],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      },
+      "notes": "Формулы Сводка_спроса лучше вписать вручную:\nA2: =UNIQUE(Товары!B2:B)\nB2: =VLOOKUP(A2,Товары!B:A,1,FALSE) или вручную\nC2: =COUNTIFS(Спрос!B:B,B2,Спрос!E:E,\"XS\",Спрос!I:I,\"<>отменено\")\nD2-H2: аналогично для S,M,L,XL,XXL\nI2: =SUM(C2:H2)\nJ2: =VLOOKUP(B2,Товары!A:G,7,FALSE)"
+    },
+    {
+      "parameters": {
         "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
         "text": "=✅ Google Sheets инициализирован!\n\nСозданы листы:\n• Товары (12 колонок)\n• Спрос (12 колонок)\n• Заказы_поставщику (11 колонок)\n• Заказы_клиентов (16 колонок)\n• Сводка_спроса (формулы)\n• Логи_N8N (6 колонок)\n\n📊 Таблица готова к работе.",
         "additionalFields": {
@@ -311,6 +378,12 @@
       "main": [[ { "node": "Telegram: Готово", "type": "main", "index": 0 } ]]
     },
     "Headers: Логи_N8N": {
+      "main": [[ { "node": "Headers: Сводка_спроса", "type": "main", "index": 0 } ]]
+    },
+    "Headers: Сводка_спроса": {
+      "main": [[ { "node": "Формулы: Сводка_спроса", "type": "main", "index": 0 } ]]
+    },
+    "Формулы: Сводка_спроса": {
       "main": [[ { "node": "Telegram: Готово", "type": "main", "index": 0 } ]]
     }
   },

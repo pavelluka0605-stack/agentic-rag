@@ -22,6 +22,7 @@
             { "outputKey": "message_new", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-msg", "leftValue": "={{ $json.type }}", "rightValue": "message_new", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
             { "outputKey": "wall_reply_new", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-comment", "leftValue": "={{ $json.type }}", "rightValue": "wall_reply_new", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
             { "outputKey": "wall_reply_edit", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-edit", "leftValue": "={{ $json.type }}", "rightValue": "wall_reply_edit", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+            { "outputKey": "wall_post_new", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-post", "leftValue": "={{ $json.type }}", "rightValue": "wall_post_new", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
             { "outputKey": "system", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "cond-sys", "leftValue": "={{ $json.type }}", "rightValue": "system", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } }
           ],
           "fallbackOutput": "extra"
@@ -207,6 +208,73 @@
     },
     {
       "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Workflow": "VK_Event_Receiver",
+            "Тип": "info",
+            "Событие": "Новый пост на стене",
+            "Детали": "={{ JSON.stringify($json) }}",
+            "Статус": "success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Тип", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Событие", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Детали", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-post",
+      "name": "Log: New Post",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 1000],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=📝 <b>Новый пост на стене</b>\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "tg-alert-post",
+      "name": "Telegram: New Post",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [900, 1000],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
+    },
+    {
+      "parameters": {
         "conditions": {
           "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [
@@ -329,6 +397,7 @@
         [{ "node": "Extract: Message", "type": "main", "index": 0 }],
         [{ "node": "Extract: Comment", "type": "main", "index": 0 }],
         [{ "node": "Extract: Comment", "type": "main", "index": 0 }],
+        [{ "node": "Log: New Post", "type": "main", "index": 0 }],
         [{ "node": "IF: LP Error?", "type": "main", "index": 0 }],
         [{ "node": "Log: Other Event", "type": "main", "index": 0 }]
       ]
@@ -349,6 +418,12 @@
       "main": [[ { "node": "Telegram: New Comment", "type": "main", "index": 0 } ]]
     },
     "Telegram: New Comment": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    },
+    "Log: New Post": {
+      "main": [[ { "node": "Telegram: New Post", "type": "main", "index": 0 } ]]
+    },
+    "Telegram: New Post": {
       "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
     },
     "IF: LP Error?": {

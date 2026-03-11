@@ -28,7 +28,7 @@
       "name": "Check: VK API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 200],
+      "position": [460, 150],
       "onError": "continueRegularOutput"
     },
     {
@@ -42,7 +42,21 @@
       "name": "Check: Long Poll",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 400],
+      "position": [460, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:3101/health",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "check-user-longpoll",
+      "name": "Check: User Long Poll",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 450],
       "onError": "continueRegularOutput"
     },
     {
@@ -77,7 +91,18 @@
     },
     {
       "parameters": {
-        "jsCode": "// Collect health check results\nconst vkResult = $('Check: VK API').first();\nconst lpResult = $('Check: Long Poll').first();\nconst sheetsResult = $('Check: Google Sheets').first();\n\nconst errors = [];\n\n// Check VK\nif (vkResult.json?.error) {\n  errors.push(`VK API: ${JSON.stringify(vkResult.json.error)}`);\n}\n\n// Check Long Poll\nif (!lpResult.json?.status || lpResult.json.status !== 'ok') {\n  errors.push('Long Poll: демон не отвечает на /health');\n}\n\n// Check Sheets  \nif (sheetsResult.json?.error) {\n  errors.push(`Google Sheets: ${sheetsResult.json.error}`);\n}\n\nreturn [{\n  json: {\n    hasErrors: errors.length > 0,\n    errors,\n    summary: errors.length === 0 \n      ? 'All systems OK' \n      : `${errors.length} problem(s) found`,\n    lp_stats: lpResult.json || {},\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "command": "systemctl is-active vk-longpoll 2>/dev/null || echo 'inactive'"
+      },
+      "id": "check-systemd-lp",
+      "name": "Check: systemctl LP",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [460, 750],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect health check results\nconst vkResult = $('Check: VK API').first();\nconst lpResult = $('Check: Long Poll').first();\nconst userLpResult = $('Check: User Long Poll').first();\nconst sheetsResult = $('Check: Google Sheets').first();\nconst systemdResult = $('Check: systemctl LP').first();\n\nconst errors = [];\n\n// Check VK API\nif (vkResult.json?.error) {\n  errors.push(`VK API: ${JSON.stringify(vkResult.json.error)}`);\n}\n\n// Check Long Poll (Groups)\nif (!lpResult.json?.status || lpResult.json.status !== 'ok') {\n  errors.push('VK Long Poll (Groups): демон не отвечает на /health');\n}\n\n// Check User Long Poll (optional — не считать ошибкой если не запущен)\nconst userLpOk = userLpResult.json?.status === 'ok';\n\n// Check Google Sheets\nif (sheetsResult.json?.error) {\n  errors.push(`Google Sheets: ${sheetsResult.json.error}`);\n}\n\n// Check systemd service\nconst systemdStatus = (systemdResult.json?.stdout || '').trim();\nif (systemdStatus !== 'active') {\n  errors.push(`Long Poll сервис: ${systemdStatus} (не active)`);\n}\n\nreturn [{\n  json: {\n    hasErrors: errors.length > 0,\n    errors,\n    summary: errors.length === 0\n      ? 'All systems OK'\n      : `${errors.length} problem(s) found`,\n    lp_stats: lpResult.json || {},\n    user_lp_stats: userLpOk ? userLpResult.json : { status: 'not running' },\n    systemd_status: systemdStatus,\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "aggregate-results",
       "name": "Aggregate Results",
@@ -128,6 +153,76 @@
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [1120, 500]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 6 }]
+        }
+      },
+      "id": "cron-6h",
+      "name": "Every 6 hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 900]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "options": {}
+      },
+      "id": "read-logs-6h",
+      "name": "Read: All Logs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 900],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_CRED_ID",
+          "name": "Google Sheets - Склад"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Count events in last 6 hours\nconst items = $input.all();\nconst sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);\n\nlet totalEvents = 0;\nlet recentEvents = 0;\nconst byType = {};\n\nfor (const item of items) {\n  totalEvents++;\n  const ts = item.json.Timestamp;\n  if (ts) {\n    const eventDate = new Date(ts);\n    if (eventDate >= sixHoursAgo) {\n      recentEvents++;\n      const eventType = item.json.Событие || 'unknown';\n      byType[eventType] = (byType[eventType] || 0) + 1;\n    }\n  }\n}\n\nconst breakdown = Object.entries(byType)\n  .sort((a, b) => b[1] - a[1])\n  .map(([k, v]) => `  ${k}: ${v}`)\n  .join('\\n');\n\nreturn [{\n  json: {\n    totalEvents,\n    recentEvents,\n    breakdown,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "count-events-6h",
+      "name": "Count Events (6h)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 900]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
+        "text": "=✅ <b>Система работает</b>\n\n📊 Событий за 6ч: {{ $json.recentEvents }}\nВсего в логах: {{ $json.totalEvents }}\n\n{{ $json.breakdown ? '📋 Разбивка:\\n' + $json.breakdown : '' }}\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "tg-6h-report",
+      "name": "Telegram: 6h Report",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [900, 900],
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot - Алерты"
+        }
+      }
     }
   ],
   "connections": {
@@ -135,7 +230,9 @@
       "main": [[
         { "node": "Check: VK API", "type": "main", "index": 0 },
         { "node": "Check: Long Poll", "type": "main", "index": 0 },
-        { "node": "Check: Google Sheets", "type": "main", "index": 0 }
+        { "node": "Check: User Long Poll", "type": "main", "index": 0 },
+        { "node": "Check: Google Sheets", "type": "main", "index": 0 },
+        { "node": "Check: systemctl LP", "type": "main", "index": 0 }
       ]]
     },
     "Check: VK API": {
@@ -144,7 +241,13 @@
     "Check: Long Poll": {
       "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
     },
+    "Check: User Long Poll": {
+      "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
+    },
     "Check: Google Sheets": {
+      "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
+    },
+    "Check: systemctl LP": {
       "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
     },
     "Aggregate Results": {
@@ -155,6 +258,15 @@
         [{ "node": "Telegram: HC Failed", "type": "main", "index": 0 }],
         [{ "node": "All OK (no action)", "type": "main", "index": 0 }]
       ]
+    },
+    "Every 6 hours": {
+      "main": [[ { "node": "Read: All Logs", "type": "main", "index": 0 } ]]
+    },
+    "Read: All Logs": {
+      "main": [[ { "node": "Count Events (6h)", "type": "main", "index": 0 } ]]
+    },
+    "Count Events (6h)": {
+      "main": [[ { "node": "Telegram: 6h Report", "type": "main", "index": 0 } ]]
     }
   },
   "settings": {
