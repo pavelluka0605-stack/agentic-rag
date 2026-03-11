@@ -98,6 +98,32 @@ agentic-rag/
 - **Кириллица в workflow_dispatch inputs** — при передаче через API могут быть проблемы с encoding.
   Решение: использовать `delete-sheet-by-id` с числовым ID вместо имени листа.
 
+## Выполненные задачи
+
+- [x] Создан CLAUDE.md как база знаний проекта
+- [x] Настроены все секреты GitHub Actions
+- [x] Google Sheets API включён, SA расшарен на таблицу
+- [x] Удалён "Лист 1" из Google Sheets (через delete-sheet-by-id)
+- [x] Workflow sheets-manage.yml поддерживает base64 GOOGLE_SA_JSON
+- [x] Classic GitHub PAT с scopes repo + workflow
+- [x] .google-sa.json добавлен в .gitignore
+
+## Оставшиеся задачи (по порядку)
+
+1. **Уточнить BLUESALES_REMOTE_URL** — нужен реальный URL или убрать секрет?
+2. **Проверить готовность VPS** — запустить healthcheck.yml
+3. **Запустить полный деплой** — deploy-p0.yml (N8N + VK Long Poll + workflows)
+4. **Настроить N8N workflows** — импортировать P0-01..P0-04
+5. **Настроить BlueSales ↔ Google Sheets синхронизацию**
+6. **Протестировать полную цепочку** — VK → N8N → Sheets → Telegram уведомление
+
+## Что нужно от владельца для автономной работы
+
+- [ ] Подтвердить готовность VPS (Ubuntu, Node.js установлен?)
+- [ ] Подтвердить что VK Long Poll API включён в настройках сообщества
+- [ ] Уточнить статус N8N на VPS (установлен или ставить с нуля?)
+- [ ] Уточнить BLUESALES_REMOTE_URL (реальный URL или не нужен?)
+
 ## История ключевых решений
 
 - Деплой через GitHub Actions → SSH на VPS
