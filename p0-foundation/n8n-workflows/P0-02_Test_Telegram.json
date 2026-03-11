@@ -11,23 +11,18 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=✅ <b>Telegram подключён к N8N</b>\n\n🔧 Тестовое сообщение от системы автоматизации.\nЕсли вы это видите — Telegram-бот работает!\n\n⏰ Время: {{ $now.format('dd.MM.yyyy HH:mm:ss') }}\n🖥 Сервер: Frankfurt VPS",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"✅ <b>Telegram подключён к N8N</b>\\n\\n🔧 Тестовое сообщение от системы автоматизации.\\nЕсли вы это видите — Telegram-бот работает!\\n\\n⏰ Время: {{ $now.format('dd.MM.yyyy HH:mm:ss') }}\\n🖥 Сервер: Frankfurt VPS\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "telegram-test",
       "name": "Telegram: Test",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [460, 300],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
     }
   ],
   "connections": {
@@ -41,6 +36,5 @@
   },
   "settings": {
     "executionOrder": "v1"
-  },
-  "tags": [{ "name": "P0-Foundation" }]
+  }
 }

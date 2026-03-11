@@ -366,74 +366,65 @@ jobs:
           " 2>/dev/null
           }
 
-          # ─── Активировать P0-03 (webhook receiver — должен быть всегда active) ───
-          WF_ID=$(get_wf_id "P0-03_VK_Event_Receiver")
-          if [ -n "$WF_ID" ]; then
-            echo "Activating P0-03_VK_Event_Receiver (ID: $WF_ID)..."
+          # Функция: активировать workflow через GET+PUT (N8N PUT требует полный body с name)
+          activate_workflow() {
+            local WF_NAME="$1"
+            local WF_ID=$(get_wf_id "$WF_NAME")
+            if [ -z "$WF_ID" ]; then
+              echo "  ✗ $WF_NAME: not found"
+              return 1
+            fi
+            echo "Activating $WF_NAME (ID: $WF_ID)..."
+
+            # Сначала попробовать POST /activate
             resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/activate" \
               -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
               -H "Content-Type: application/json")
             if echo "$resp" | grep -q '"active":true'; then
-              echo "  ✓ P0-03 активирован"
-            else
-              # Fallback: попробовать PUT с active=true
+              echo "  ✓ $WF_NAME активирован"
+              return 0
+            fi
+
+            # Fallback: GET workflow, потом PUT с active=true
+            wf_body=$(curl -s "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+            updated_body=$(echo "$wf_body" | python3 -c "
+          import sys, json
+          wf = json.load(sys.stdin)
+          wf['active'] = True
+          # Убрать поля которые N8N не принимает в PUT
+          for key in ['id', 'createdAt', 'updatedAt', 'versionId', 'homeProject', 'sharedWithProjects']:
+              wf.pop(key, None)
+          print(json.dumps(wf))
+          " 2>/dev/null)
+
+            if [ -n "$updated_body" ]; then
               resp2=$(curl -s -X PUT "${N8N_URL}/api/v1/workflows/${WF_ID}" \
                 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
                 -H "Content-Type: application/json" \
-                -d '{"active": true}')
+                -d "$updated_body")
               if echo "$resp2" | grep -q '"active":true'; then
-                echo "  ✓ P0-03 активирован (via PUT)"
-              else
-                echo "  ✗ P0-03 activate: $(echo "$resp" | head -c 150)"
-                echo "  ✗ P0-03 PUT:      $(echo "$resp2" | head -c 150)"
+                echo "  ✓ $WF_NAME активирован (via PUT)"
+                return 0
               fi
+              echo "  ✗ $WF_NAME PUT: $(echo "$resp2" | head -c 200)"
+            else
+              echo "  ✗ $WF_NAME: failed to parse workflow body"
             fi
-          fi
+            echo "  ✗ $WF_NAME activate: $(echo "$resp" | head -c 200)"
+            return 1
+          }
+
+          # ─── Активировать P0-03 (webhook receiver — должен быть всегда active) ───
+          activate_workflow "P0-03_VK_Event_Receiver"
 
           # ─── Активировать P0-04 (health check каждые 30 мин) ───
-          WF_ID=$(get_wf_id "P0-04_Health_Check")
-          if [ -n "$WF_ID" ]; then
-            echo "Activating P0-04_Health_Check (ID: $WF_ID)..."
-            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/activate" \
-              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              -H "Content-Type: application/json")
-            if echo "$resp" | grep -q '"active":true'; then
-              echo "  ✓ P0-04 активирован"
-            else
-              resp2=$(curl -s -X PUT "${N8N_URL}/api/v1/workflows/${WF_ID}" \
-                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-                -H "Content-Type: application/json" \
-                -d '{"active": true}')
-              if echo "$resp2" | grep -q '"active":true'; then
-                echo "  ✓ P0-04 активирован (via PUT)"
-              else
-                echo "  ✗ P0-04 activate: $(echo "$resp" | head -c 150)"
-                echo "  ✗ P0-04 PUT:      $(echo "$resp2" | head -c 150)"
-              fi
-            fi
-          fi
+          activate_workflow "P0-04_Health_Check"
 
-          # ─── Запустить P0-02 (тест Telegram) один раз ───
-          WF_ID=$(get_wf_id "P0-02_Test_Telegram")
-          if [ -n "$WF_ID" ]; then
-            echo "Executing P0-02_Test_Telegram (ID: $WF_ID)..."
-            resp=$(curl -s -X POST "${N8N_URL}/api/v1/executions" \
-              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "{\"workflowId\": \"$WF_ID\"}")
-            echo "  P0-02 result: $(echo "$resp" | head -c 200)"
-          fi
-
-          # ─── Запустить P0-01 (init Google Sheets) один раз ───
-          WF_ID=$(get_wf_id "P0-01_Init_Google_Sheets")
-          if [ -n "$WF_ID" ]; then
-            echo "Executing P0-01_Init_Google_Sheets (ID: $WF_ID)..."
-            resp=$(curl -s -X POST "${N8N_URL}/api/v1/executions" \
-              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "{\"workflowId\": \"$WF_ID\"}")
-            echo "  P0-01 result: $(echo "$resp" | head -c 200)"
-          fi
+          # ─── P0-01 и P0-02 используют Manual Trigger — запустите вручную в UI N8N ───
+          echo ""
+          echo "ℹ️  P0-01_Init_Google_Sheets и P0-02_Test_Telegram используют Manual Trigger."
+          echo "    Запустите их вручную в N8N UI: ${N8N_URL}"
 
       # ─── 9. Health Check ──────────────────────
       - name: Health Check

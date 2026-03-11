@@ -24,12 +24,6 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [460, 300],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
     },
     {
       "parameters": {
@@ -70,12 +64,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [680, 100],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
     },
     {
       "parameters": {
@@ -116,12 +104,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [680, 250],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
     },
     {
       "parameters": {
@@ -161,12 +143,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [680, 400],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
     },
     {
       "parameters": {
@@ -211,12 +187,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [680, 550],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
     },
     {
       "parameters": {
@@ -251,12 +221,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [680, 700],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
     },
     {
       "parameters": {
@@ -295,12 +259,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [680, 850],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
     },
     {
       "parameters": {
@@ -327,23 +285,18 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=✅ Google Sheets инициализирован!\n\nСозданы листы:\n• Товары (12 колонок)\n• Спрос (12 колонок)\n• Заказы_поставщику (11 колонок)\n• Заказы_клиентов (16 колонок)\n• Сводка_спроса (формулы)\n• Логи_N8N (6 колонок)\n\n📊 Таблица готова к работе.",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"✅ Google Sheets инициализирован!\\n\\nСозданы листы:\\n• Товары (12 колонок)\\n• Спрос (12 колонок)\\n• Заказы_поставщику (11 колонок)\\n• Заказы_клиентов (16 колонок)\\n• Сводка_спроса (формулы)\\n• Логи_N8N (6 колонок)\\n\\n📊 Таблица готова к работе.\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "telegram-notify",
       "name": "Telegram: Готово",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [900, 400],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400]
     }
   ],
   "connections": {
@@ -390,6 +343,5 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
-  "tags": [{ "name": "P0-Foundation" }]
+  "staticData": null
 }
