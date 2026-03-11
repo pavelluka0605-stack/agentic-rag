@@ -1,0 +1,222 @@
+{
+  "name": "P0-06_BlueSales_Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bluesales-webhook",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-bs",
+      "name": "Webhook: BlueSales",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "bluesales-webhook"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.event }}",
+        "rules": {
+          "rules": [
+            { "value2": "new_message" },
+            { "value2": "new_customer" },
+            { "value2": "new_order" },
+            { "value2": "status_change" },
+            { "value2": "order_status_change" }
+          ]
+        }
+      },
+      "id": "switch-event",
+      "name": "Switch: Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "set-custid", "name": "customer_id", "value": "={{ $json.data.customer.id || $json.data.customerId || '' }}", "type": "string" },
+            { "id": "set-custname", "name": "customer_name", "value": "={{ ($json.data.customer ? ($json.data.customer.name || '') + ' ' + ($json.data.customer.lastName || '') : $json.data.customerName || '').trim() }}", "type": "string" },
+            { "id": "set-msg", "name": "message", "value": "={{ $json.data.message || '' }}", "type": "string" },
+            { "id": "set-event", "name": "event", "value": "={{ $json.event }}", "type": "string" },
+            { "id": "set-ts", "name": "timestamp", "value": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-message",
+      "name": "Extract: Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "set-custid2", "name": "customer_id", "value": "={{ $json.data.customer.id || '' }}", "type": "string" },
+            { "id": "set-name", "name": "customer_name", "value": "={{ ($json.data.customer.name || '') + ' ' + ($json.data.customer.lastName || '') }}", "type": "string" },
+            { "id": "set-vkid", "name": "vk_id", "value": "={{ $json.data.customer.vkId || '' }}", "type": "string" },
+            { "id": "set-phone", "name": "phone", "value": "={{ $json.data.customer.phone || '' }}", "type": "string" },
+            { "id": "set-source", "name": "source", "value": "={{ $json.data.customer.source || '' }}", "type": "string" },
+            { "id": "set-event2", "name": "event", "value": "={{ $json.event }}", "type": "string" },
+            { "id": "set-ts2", "name": "timestamp", "value": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-customer",
+      "name": "Extract: Customer",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "set-oid", "name": "order_id", "value": "={{ $json.data.order.id || $json.data.orderId || '' }}", "type": "string" },
+            { "id": "set-custid3", "name": "customer_id", "value": "={{ $json.data.customerId || $json.data.order.customerId || '' }}", "type": "string" },
+            { "id": "set-custname3", "name": "customer_name", "value": "={{ $json.data.customerName || '' }}", "type": "string" },
+            { "id": "set-total", "name": "total", "value": "={{ $json.data.order.totalSum || $json.data.totalSum || 0 }}", "type": "number" },
+            { "id": "set-status", "name": "status", "value": "={{ $json.data.order.status || $json.data.status || '' }}", "type": "string" },
+            { "id": "set-event3", "name": "event", "value": "={{ $json.event }}", "type": "string" },
+            { "id": "set-ts3", "name": "timestamp", "value": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-order",
+      "name": "Extract: Order",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "set-custid4", "name": "customer_id", "value": "={{ $json.data.customerId || '' }}", "type": "string" },
+            { "id": "set-custname4", "name": "customer_name", "value": "={{ $json.data.customerName || '' }}", "type": "string" },
+            { "id": "set-old", "name": "old_status", "value": "={{ $json.data.oldStatus || '' }}", "type": "string" },
+            { "id": "set-new", "name": "new_status", "value": "={{ $json.data.status || $json.data.newStatus || '' }}", "type": "string" },
+            { "id": "set-event4", "name": "event", "value": "={{ $json.event }}", "type": "string" },
+            { "id": "set-ts4", "name": "timestamp", "value": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-status",
+      "name": "Extract: Status Change",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 800]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "\u041b\u043e\u0433\u0438_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.timestamp }}",
+            "Workflow": "BlueSales_Webhook",
+            "\u0422\u0438\u043f": "info",
+            "\u0421\u043e\u0431\u044b\u0442\u0438\u0435": "={{ $json.event }}",
+            "\u0414\u0435\u0442\u0430\u043b\u0438": "={{ JSON.stringify($json) }}",
+            "\u0421\u0442\u0430\u0442\u0443\u0441": "success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "\u0422\u0438\u043f", "displayName": "\u0422\u0438\u043f", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "\u0421\u043e\u0431\u044b\u0442\u0438\u0435", "displayName": "\u0421\u043e\u0431\u044b\u0442\u0438\u0435", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "\u0414\u0435\u0442\u0430\u043b\u0438", "displayName": "\u0414\u0435\u0442\u0430\u043b\u0438", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "\u0421\u0442\u0430\u0442\u0443\u0441", "displayName": "\u0421\u0442\u0430\u0442\u0443\u0441", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-webhook",
+      "name": "Log: Webhook",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"\ud83d\udd14 <b>BlueSales: {{ $json.event }}</b>\\n\\n{{ JSON.stringify($json).substring(0, 500) }}\\n\\n\u23f0 {{ $json.timestamp }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
+      },
+      "id": "tg-notify",
+      "name": "Telegram: Notify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"ok\"}"
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 400]
+    }
+  ],
+  "connections": {
+    "Webhook: BlueSales": {
+      "main": [[ { "node": "Switch: Event Type", "type": "main", "index": 0 } ]]
+    },
+    "Switch: Event Type": {
+      "main": [
+        [{ "node": "Extract: Message", "type": "main", "index": 0 }],
+        [{ "node": "Extract: Customer", "type": "main", "index": 0 }],
+        [{ "node": "Extract: Order", "type": "main", "index": 0 }],
+        [{ "node": "Extract: Status Change", "type": "main", "index": 0 }],
+        [{ "node": "Extract: Status Change", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract: Message": {
+      "main": [[ { "node": "Log: Webhook", "type": "main", "index": 0 } ]]
+    },
+    "Extract: Customer": {
+      "main": [[ { "node": "Log: Webhook", "type": "main", "index": 0 } ]]
+    },
+    "Extract: Order": {
+      "main": [[ { "node": "Log: Webhook", "type": "main", "index": 0 } ]]
+    },
+    "Extract: Status Change": {
+      "main": [[ { "node": "Log: Webhook", "type": "main", "index": 0 } ]]
+    },
+    "Log: Webhook": {
+      "main": [[ { "node": "Telegram: Notify", "type": "main", "index": 0 } ]]
+    },
+    "Telegram: Notify": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
