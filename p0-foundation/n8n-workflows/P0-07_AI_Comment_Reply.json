@@ -19,8 +19,19 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/chat/completions",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"temperature\": 0.3,\n  \"max_tokens\": 600,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Ты — AI-консультант мебельного магазина marbomebel.ru. Мы продаём мебель (диваны, кровати, шкафы, столы, стулья, комоды и т.д.).\\n\\nТвоя задача — проанализировать комментарий клиента под постом VK и определить его намерение.\\n\\nОтветь СТРОГО в формате JSON (без markdown):\\n{\\n  \\\"intent\\\": \\\"consultation\\\" | \\\"clarify\\\" | \\\"deal\\\",\\n  \\\"reply\\\": \\\"текст ответа клиенту на русском\\\",\\n  \\\"product\\\": \\\"название товара если понятно, иначе пустая строка\\\",\\n  \\\"details\\\": \\\"дополнительные детали заказа если есть\\\"\\n}\\n\\nПравила классификации:\\n- \\\"consultation\\\" — комментарий НЕ связан с покупкой (вопрос о материалах, уходе, доставке, общий вопрос). Дай полезный ответ.\\n- \\\"clarify\\\" — клиент ХОЧЕТ купить, но не хватает информации (не указан размер, цвет, количество, адрес). Вежливо уточни недостающее.\\n- \\\"deal\\\" — клиент чётко хочет купить, указал достаточно деталей (товар + размер/цвет/количество). Подтверди заказ.\\n\\nОтвечай кратко, дружелюбно, на русском языке. Максимум 2-3 предложения.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Комментарий клиента: {{ $json.text }}\"\n    }\n  ]\n}",
@@ -32,13 +43,7 @@
       "name": "OpenAI: Classify",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 400],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "openai-header",
-          "name": "OpenAI API Key"
-        }
-      }
+      "position": [480, 400]
     },
     {
       "parameters": {
