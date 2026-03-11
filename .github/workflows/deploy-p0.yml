@@ -35,6 +35,7 @@ on:
 # SPREADSHEET_ID  — ID Google-таблицы
 # BLUESALES_LOGIN — логин BlueSales
 # BLUESALES_PASS  — пароль BlueSales
+# VK_USER_TOKEN   — Personal user token для чтения личных сообщений
 
 jobs:
   deploy:
@@ -74,6 +75,7 @@ jobs:
           GOOGLE_SPREADSHEET_ID=${{ secrets.SPREADSHEET_ID }}
           N8N_URL=http://localhost:5678
           N8N_WEBHOOK_BASE_URL=http://localhost:5678/webhook
+          VK_USER_TOKEN=${{ secrets.VK_USER_TOKEN }}
           BLUESALES_LOGIN=${{ secrets.BLUESALES_LOGIN }}
           BLUESALES_PASSWORD=${{ secrets.BLUESALES_PASS }}
           ENVEOF
@@ -99,6 +101,7 @@ jobs:
         run: |
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
             p0-foundation/vk-longpoll \
+            p0-foundation/vk-user-longpoll \
             p0-foundation/n8n-workflows \
             p0-foundation/scripts \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/p0-foundation/
@@ -214,6 +217,61 @@ jobs:
           fi
           REMOTE_SCRIPT
 
+      # ─── 7b. VK User Long Poll (личные сообщения) ──
+      - name: Deploy VK User Long Poll Listener
+        if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'longpoll' || github.event.inputs.action == '' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
+
+          source /opt/p0-foundation/.env
+
+          if [ -z "${VK_USER_TOKEN:-}" ]; then
+            echo "! VK_USER_TOKEN не задан — User Long Poll пропущен"
+            exit 0
+          fi
+
+          mkdir -p /opt/vk-user-longpoll
+          cp /opt/p0-foundation/vk-user-longpoll/listener.js /opt/vk-user-longpoll/
+          cp /opt/p0-foundation/vk-user-longpoll/package.json /opt/vk-user-longpoll/
+
+          cat > /opt/vk-user-longpoll/.env << ENVEOF
+          VK_USER_TOKEN=${VK_USER_TOKEN}
+          VK_API_VERSION=${VK_API_VERSION:-5.199}
+          N8N_WEBHOOK_URL=http://localhost:5678/webhook/vk-user-messages
+          HEALTH_PORT=3101
+          ENVEOF
+
+          cat > /etc/systemd/system/vk-user-longpoll.service << 'UNIT'
+          [Unit]
+          Description=VK User Long Poll — личные сообщения
+          After=network.target n8n.service
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/vk-user-longpoll
+          EnvironmentFile=/opt/vk-user-longpoll/.env
+          ExecStart=/usr/bin/node /opt/vk-user-longpoll/listener.js
+          Restart=always
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          systemctl daemon-reload
+          systemctl enable vk-user-longpoll
+          systemctl restart vk-user-longpoll
+          sleep 3
+
+          if systemctl is-active --quiet vk-user-longpoll; then
+            echo "✓ VK User Long Poll running"
+          else
+            echo "✗ VK User Long Poll failed to start"
+            journalctl -u vk-user-longpoll -n 10 --no-pager
+          fi
+          REMOTE_SCRIPT
+
       # ─── 8. Импорт N8N Workflows ──────────────
       - name: Import N8N workflows
         if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}
@@ -264,6 +322,15 @@ jobs:
             echo "✓ VK Long Poll: OK (events: $events)"
           else
             echo "✗ VK Long Poll: DOWN"
+          fi
+
+          # VK User Long Poll
+          if curl -s http://127.0.0.1:3101/health &>/dev/null; then
+            stats=$(curl -s http://127.0.0.1:3101/health)
+            msgs=$(echo "$stats" | python3 -c "import sys,json; print(json.load(sys.stdin).get('messages_received',0))" 2>/dev/null)
+            echo "✓ User LongPoll: OK (msgs: $msgs)"
+          else
+            echo "- User LongPoll: not running (VK_USER_TOKEN may not be set)"
           fi
 
           # Telegram

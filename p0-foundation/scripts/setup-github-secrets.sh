@@ -76,6 +76,13 @@ read -p "VK Group ID: " VK_GROUP_ID
 
 gh secret set VK_TOKEN --repo "$REPO" --body "$VK_TOKEN"
 gh secret set VK_GROUP_ID --repo "$REPO" --body "$VK_GROUP_ID"
+
+echo ""
+read -p "VK User Token (личные сообщения, Enter чтобы пропустить): " VK_USER_TOKEN
+if [ -n "$VK_USER_TOKEN" ]; then
+  gh secret set VK_USER_TOKEN --repo "$REPO" --body "$VK_USER_TOKEN"
+  echo "✓ VK User Token set"
+fi
 echo "✓ VK secrets set"
 
 # ─── Telegram ────────────────────────────────────
