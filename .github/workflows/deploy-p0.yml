@@ -706,13 +706,19 @@ PYEOF
               write_headers() {
                 local SHEET="$1"
                 shift
-                local HEADERS="$@"
-                local VALUES=$(python3 -c "print('[' + ','.join(['\"' + h + '\"' for h in '$HEADERS'.split(',')]) + ']')")
+                local HEADERS="$*"
+                # Build proper JSON: {"values":[["H1","H2",...]]}
+                local BODY
+                BODY=$(python3 -c "
+import json, sys
+headers = sys.argv[1].split(',')
+print(json.dumps({'values': [headers]}))
+" "$HEADERS")
                 curl -s -X PUT \
                   "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${SHEET}!1:1?valueInputOption=RAW" \
                   -H "Authorization: Bearer ${ACCESS_TOKEN}" \
                   -H "Content-Type: application/json" \
-                  -d "{\"values\":[${VALUES}]}" > /tmp/gs_h.json 2>&1
+                  -d "$BODY" > /tmp/gs_h.json 2>&1
                 if grep -q "updatedRows" /tmp/gs_h.json 2>/dev/null; then
                   echo "    ✓ $SHEET headers OK"
                 else
