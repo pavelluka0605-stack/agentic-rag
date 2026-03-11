@@ -534,29 +534,51 @@ jobs:
 
           SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
 
-          if [ -n "$P02_ID" ] || [ -n "$P01_ID" ]; then
-            echo "Stopping n8n to free port for CLI execute..."
-            $SSH_CMD "systemctl stop n8n && sleep 2 && echo 'n8n stopped'"
+          run_via_api() {
+            local WF_NAME="$1"
+            local WF_ID="$2"
+            if [ -z "$WF_ID" ]; then
+              echo "  ⚠ $WF_NAME: not found"
+              return 0
+            fi
+            echo "Running $WF_NAME (ID: $WF_ID)..."
 
-            # Run P0-02 (Telegram test)
-            if [ -n "$P02_ID" ]; then
-              echo "Running P0-02_Test_Telegram (ID: $P02_ID) via n8n CLI..."
-              $SSH_CMD "cd /root && set -a && source /opt/p0-foundation/.env && set +a && n8n execute --id=$P02_ID 2>&1 | tail -15" || echo "  ⚠ P0-02 CLI returned non-zero"
-              echo "  ✓ P0-02 done"
+            # Method 1: POST /api/v1/workflows/{id}/run (localhost, n8n >= 1.94)
+            local API_KEY="${N8N_API_KEY}"
+            resp=$($SSH_CMD "curl -s -w '\n%{http_code}' -X POST 'http://localhost:5678/api/v1/workflows/${WF_ID}/run' -H 'X-N8N-API-KEY: ${API_KEY}' -H 'Content-Type: application/json' -d '{}' 2>&1")
+            http_code=$(echo "$resp" | tail -1)
+            body=$(echo "$resp" | head -n -1)
+            echo "  Method 1 (POST /run): HTTP $http_code"
+
+            if [ "$http_code" = "200" ] || echo "$body" | grep -q '"executionId\|"finished\|"success'; then
+              echo "  ✓ $WF_NAME executed via API /run"
+              return 0
             fi
 
-            # Run P0-01 (Init Google Sheets)
-            if [ -n "$P01_ID" ]; then
-              echo "Running P0-01_Init_Google_Sheets (ID: $P01_ID) via n8n CLI..."
-              $SSH_CMD "cd /root && set -a && source /opt/p0-foundation/.env && set +a && n8n execute --id=$P01_ID 2>&1 | tail -20" || echo "  ⚠ P0-01 CLI returned non-zero"
-              echo "  ✓ P0-01 done"
+            # Method 2: POST /rest/workflows/run (internal UI endpoint)
+            resp2=$($SSH_CMD "curl -s -w '\n%{http_code}' -X POST 'http://localhost:5678/rest/workflows/${WF_ID}/run' -H 'X-N8N-API-KEY: ${API_KEY}' -H 'Content-Type: application/json' -d '{\"startNodes\":[\"Manual Trigger\"]}' 2>&1")
+            http_code2=$(echo "$resp2" | tail -1)
+            body2=$(echo "$resp2" | head -n -1)
+            echo "  Method 2 (POST /rest/.../run): HTTP $http_code2"
+
+            if [ "$http_code2" = "200" ] || echo "$body2" | grep -q '"executionId\|"finished\|"success'; then
+              echo "  ✓ $WF_NAME executed via internal API"
+              return 0
             fi
 
-            echo "Restarting n8n..."
-            $SSH_CMD "systemctl start n8n && sleep 5 && systemctl is-active n8n && echo 'n8n restarted OK'"
-          else
-            echo "  ⚠ Neither P0-01 nor P0-02 found in API"
-          fi
+            # Method 3: n8n execute --file (works for workflows without DB credentials)
+            echo "  Methods 1-2 failed, trying n8n execute --file..."
+            local WF_FILE="/opt/n8n-workflows/$(echo "$WF_NAME" | sed 's/ /_/g').json"
+            $SSH_CMD "systemctl stop n8n 2>/dev/null; sleep 2; set -a && source /opt/p0-foundation/.env && set +a && n8n execute --file=${WF_FILE} 2>&1 | tail -15; systemctl start n8n; sleep 5" || true
+            echo "  ✓ $WF_NAME attempted via --file"
+            return 0
+          }
+
+          run_via_api "P0-02_Test_Telegram" "$P02_ID"
+          run_via_api "P0-01_Init_Google_Sheets" "$P01_ID"
+
+          # Ensure n8n is running after all attempts
+          $SSH_CMD "systemctl is-active n8n || systemctl start n8n"
 
       # ─── 9. Health Check ──────────────────────
       - name: Health Check
