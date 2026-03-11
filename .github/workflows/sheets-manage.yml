@@ -1,0 +1,99 @@
+name: Google Sheets Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - list-sheets
+          - delete-sheet
+          - add-sheet
+      sheet_name:
+        description: 'Sheet name (for delete/add actions)'
+        required: false
+        type: string
+
+jobs:
+  manage-sheets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install google-auth requests
+
+      - name: Execute Google Sheets action
+        env:
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          ACTION: ${{ inputs.action }}
+          SHEET_NAME: ${{ inputs.sheet_name }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+
+          sa_info = json.loads(os.environ["GOOGLE_SA_JSON"])
+          creds = service_account.Credentials.from_service_account_info(
+              sa_info, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+          )
+          creds.refresh(Request())
+
+          SPREADSHEET_ID = os.environ["SPREADSHEET_ID"]
+          ACTION = os.environ["ACTION"]
+          SHEET_NAME = os.environ.get("SHEET_NAME", "")
+          headers = {"Authorization": f"Bearer {creds.token}"}
+
+          # Get current sheets
+          resp = requests.get(
+              f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}",
+              headers=headers
+          )
+          resp.raise_for_status()
+          data = resp.json()
+
+          sheets = {s["properties"]["title"]: s["properties"]["sheetId"] for s in data["sheets"]}
+          print("Current sheets:")
+          for title, sid in sheets.items():
+              print(f"  [{sid}] {title}")
+
+          if ACTION == "list-sheets":
+              print("\nDone.")
+
+          elif ACTION == "delete-sheet":
+              if not SHEET_NAME:
+                  print("\nERROR: sheet_name is required for delete action")
+                  exit(1)
+              if SHEET_NAME not in sheets:
+                  print(f"\nERROR: Sheet '{SHEET_NAME}' not found")
+                  exit(1)
+              sheet_id = sheets[SHEET_NAME]
+              print(f"\nDeleting '{SHEET_NAME}' (id={sheet_id})...")
+              del_resp = requests.post(
+                  f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}:batchUpdate",
+                  headers={**headers, "Content-Type": "application/json"},
+                  json={"requests": [{"deleteSheet": {"sheetId": sheet_id}}]}
+              )
+              del_resp.raise_for_status()
+              print("Deleted successfully!")
+
+          elif ACTION == "add-sheet":
+              if not SHEET_NAME:
+                  print("\nERROR: sheet_name is required for add action")
+                  exit(1)
+              print(f"\nAdding sheet '{SHEET_NAME}'...")
+              add_resp = requests.post(
+                  f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}:batchUpdate",
+                  headers={**headers, "Content-Type": "application/json"},
+                  json={"requests": [{"addSheet": {"properties": {"title": SHEET_NAME}}}]}
+              )
+              add_resp.raise_for_status()
+              print("Added successfully!")
+          PYEOF
