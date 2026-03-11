@@ -87,13 +87,42 @@ jobs:
       # ─── 4. Google Service Account JSON ────────
       - name: Deploy Google SA credentials
         if: true
+        env:
+          SA_B64: ${{ secrets.GOOGLE_SA_JSON }}
         run: |
+          if [ -z "$SA_B64" ]; then
+            echo "⚠ GOOGLE_SA_JSON secret is empty — skipping"
+            exit 0
+          fi
+
+          # Decode on runner first to verify, then scp to VPS
+          echo "$SA_B64" | base64 -d > /tmp/sa_check.json 2>/dev/null || true
+
+          # If base64 decode failed (raw JSON?), try using as-is
+          if ! python3 -c "import json; json.load(open('/tmp/sa_check.json'))" 2>/dev/null; then
+            echo "base64 decode failed — trying as raw JSON..."
+            echo "$SA_B64" > /tmp/sa_check.json
+          fi
+
+          # Validate JSON
+          SA_EMAIL=$(python3 -c "import json; print(json.load(open('/tmp/sa_check.json')).get('client_email',''))" 2>/dev/null)
+          if [ -z "$SA_EMAIL" ]; then
+            echo "❌ GOOGLE_SA_JSON is neither valid base64(JSON) nor raw JSON"
+            echo "First 80 chars: $(head -c 80 /tmp/sa_check.json)"
+            exit 1
+          fi
+          echo "✓ SA validated: $SA_EMAIL"
+
+          # Copy to VPS
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            /tmp/sa_check.json \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/credentials/google-service-account.json
+
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << REMOTE_SCRIPT
-          echo '${{ secrets.GOOGLE_SA_JSON }}' | base64 -d > /opt/credentials/google-service-account.json
-          chmod 600 /opt/credentials/google-service-account.json
-          echo "✓ Google SA JSON deployed"
-          REMOTE_SCRIPT
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "chmod 600 /opt/credentials/google-service-account.json && echo '✓ SA deployed to VPS'"
+
+          rm -f /tmp/sa_check.json
 
       # ─── 5. Копирование файлов ────────────────
       - name: Copy project files to VPS
@@ -625,11 +654,15 @@ jobs:
             # SA_KEY must preserve newlines — write directly to temp file
             python3 -c "import json; f=open('/tmp/_sa_key.pem','w'); f.write(json.load(open('/opt/credentials/google-service-account.json'))['private_key']); f.close()"
 
-            echo "SA email: $SA_EMAIL"
+            echo "SA email: ${SA_EMAIL:-EMPTY}"
+            echo "Key file exists: $([ -f /tmp/_sa_key.pem ] && echo 'yes' || echo 'no')"
+            echo "Key file size: $(wc -c < /tmp/_sa_key.pem 2>/dev/null || echo 0)"
+            echo "SA JSON size: $(wc -c < /opt/credentials/google-service-account.json 2>/dev/null || echo 0)"
 
-            if [ -z "$SA_EMAIL" ] || [ ! -f "/tmp/_sa_key.pem" ]; then
+            if [ -z "$SA_EMAIL" ] || [ ! -s "/tmp/_sa_key.pem" ]; then
               echo "❌ Failed to read SA JSON fields"
-              RESULTS="${RESULTS}❌ Google Sheets: SA JSON нечитаем\n"
+              echo "SA JSON first 100 chars: $(head -c 100 /opt/credentials/google-service-account.json 2>/dev/null || echo 'FILE MISSING')"
+              RESULTS="${RESULTS}❌ Google Sheets: SA email=${SA_EMAIL:-пусто}, key=$(wc -c < /tmp/_sa_key.pem 2>/dev/null || echo 0)b\n"
             else
               # --- Build JWT ---
               NOW=$(date +%s)
