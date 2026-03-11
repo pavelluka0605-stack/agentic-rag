@@ -23,11 +23,12 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "TG_TOKEN=$TG_TOKEN" "TG_CHAT=$TG_CHAT" "RUN_URL=$RUN_URL" \
+            "TG_TOKEN=$TG_TOKEN" "TG_CHAT=$TG_CHAT" "RUN_URL=$RUN_URL" "N8N_API_KEY=$N8N_API_KEY" \
             'bash -s' << 'REMOTE'
 
           send_tg() {
@@ -52,21 +53,76 @@ jobs:
           LP_HEALTH=$(curl -s --max-time 3 http://127.0.0.1:3100/health 2>&1 || echo "NO_RESPONSE")
           add "LP Health: $LP_HEALTH"
 
-          # 3. LP Journal (last 10 lines, compact)
+          # 3. N8N Workflows via API (localhost)
           add ""
-          add "--- LP Journal ---"
-          JOURNAL=$(journalctl -u vk-longpoll -n 10 --no-pager -o short-iso 2>&1 | tail -10)
-          add "$JOURNAL"
+          add "--- N8N Workflows ---"
+          WF_LIST=$(curl -s --max-time 5 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "http://localhost:5678/api/v1/workflows?limit=100" 2>&1)
+          WF_INFO=$(echo "$WF_LIST" | python3 -c "
+          import sys,json
+          try:
+              data = json.load(sys.stdin).get('data', [])
+              for w in sorted(data, key=lambda x: x.get('name','')):
+                  st = 'ON' if w.get('active') else 'OFF'
+                  print(f'  {st} {w[\"name\"]} (id={w[\"id\"]})')
+          except Exception as e: print(f'ERR: {e}')
+          " 2>/dev/null || echo "API_ERR")
+          add "$WF_INFO"
 
-          # 4. Webhook test
+          # 4. Auto-activate inactive P0 workflows (especially P0-03 for webhook)
+          add ""
+          ACTIVATED=$(echo "$WF_LIST" | python3 -c "
+          import sys,json
+          data = json.load(sys.stdin).get('data', [])
+          inactive = [w for w in data if w.get('name','').startswith('P0-') and not w.get('active')]
+          for w in inactive:
+              print(w['id'], w['name'])
+          " 2>/dev/null)
+
+          if [ -n "$ACTIVATED" ]; then
+            add "Activating inactive P0 workflows..."
+            echo "$ACTIVATED" | while read -r wf_id wf_name; do
+              resp=$(curl -s -X POST "http://localhost:5678/api/v1/workflows/${wf_id}/activate" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" 2>&1)
+              if echo "$resp" | grep -q '"active":true'; then
+                add "  ✓ ${wf_name} activated"
+              else
+                # Fallback: PUT with active:true
+                wf_body=$(curl -s "http://localhost:5678/api/v1/workflows/${wf_id}" \
+                  -H "X-N8N-API-KEY: ${N8N_API_KEY}" 2>&1)
+                put_body=$(echo "$wf_body" | python3 -c "
+          import sys,json
+          wf=json.load(sys.stdin)
+          out={'name':wf['name'],'nodes':wf.get('nodes',[]),'connections':wf.get('connections',{}),'settings':wf.get('settings',{}),'active':True}
+          if 'staticData' in wf: out['staticData']=wf['staticData']
+          print(json.dumps(out))
+          " 2>/dev/null)
+                resp2=$(curl -s -X PUT "http://localhost:5678/api/v1/workflows/${wf_id}" \
+                  -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                  -H "Content-Type: application/json" \
+                  -d "$put_body" 2>&1)
+                if echo "$resp2" | grep -q '"active":true'; then
+                  add "  ✓ ${wf_name} activated (PUT)"
+                else
+                  add "  ✗ ${wf_name}: $(echo "$resp2" | head -c 150)"
+                fi
+              fi
+            done
+          else
+            add "All P0 workflows active"
+          fi
+
+          # 5. Webhook test (after activation)
           add ""
           WH=$(curl -s -w "HTTP:%{http_code}" --max-time 5 \
             -X POST http://localhost:5678/webhook/vk-events \
             -H "Content-Type: application/json" \
             -d "{\"type\":\"system\",\"event\":\"diag_test\"}" 2>&1)
-          add "Webhook: $WH"
+          WH_SHORT=$(echo "$WH" | head -c 200)
+          add "Webhook: $WH_SHORT"
 
-          # 5. VK LP Settings
+          # 6. VK LP Settings
           source /opt/p0-foundation/.env 2>/dev/null
           if [ -n "${VK_TOKEN:-}" ]; then
             LP_SET=$(curl -s --max-time 10 \
@@ -78,30 +134,16 @@ jobs:
           evts=[k for k,v in r.get('events',{}).items() if v]
           print(f'enabled={en} events={evts}')
           " 2>/dev/null || echo "PARSE_ERR")
-            add "LP Settings: $LP_SET"
-
-            # LP Server test
-            LP_SRV=$(curl -s --max-time 10 \
-              "https://api.vk.com/method/groups.getLongPollServer?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199" | \
-              python3 -c "
-          import sys,json
-          r=json.load(sys.stdin)
-          if 'response' in r: print('OK server='+r['response']['server'][:40])
-          else: print('ERR: '+str(r.get('error',{}).get('error_msg','?')))
-          " 2>/dev/null || echo "PARSE_ERR")
-            add "LP Server: $LP_SRV"
+            add "VK LP: $LP_SET"
           else
             add "VK: .env NOT LOADED"
           fi
 
-          # 6. VK LP .env webhook URL
+          # 7. LP Journal (last 5 lines)
           add ""
-          LP_URL=$(grep N8N_WEBHOOK_URL /opt/vk-longpoll/.env 2>/dev/null || echo "NOT_FOUND")
-          add "LP .env: $LP_URL"
-
-          # 7. Node processes
-          NODES=$(ps aux | grep "[n]ode" | awk '{print $11,$12}' | head -3)
-          add "Nodes: $NODES"
+          add "--- LP Journal ---"
+          JOURNAL=$(journalctl -u vk-longpoll -n 5 --no-pager -o short-iso 2>&1 | tail -5)
+          add "$JOURNAL"
 
           add ""
           add "Run: $RUN_URL"
