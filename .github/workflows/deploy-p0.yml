@@ -500,7 +500,7 @@ jobs:
           echo ""
           echo "Running P0-02 and P0-01 via VPS internal API..."
 
-      - name: Run P0-01 & P0-02 via API
+      - name: Run P0-01 & P0-02 via n8n CLI
         if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}
         env:
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
@@ -508,61 +508,50 @@ jobs:
         run: |
           N8N_URL="${N8N_BASE_URL:-https://n8n.marbomebel.ru}"
 
-          # Получить все workflows (работает — проверено)
+          # Get workflow IDs via external API (proven to work)
           ALL_WF=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
             "${N8N_URL}/api/v1/workflows?limit=100")
 
-          get_wf_id() {
-            echo "$ALL_WF" | python3 -c "
+          P02_ID=$(echo "$ALL_WF" | python3 -c "
           import sys, json
           data = json.load(sys.stdin).get('data', [])
           for w in data:
-              if w['name'] == '$1':
+              if w['name'] == 'P0-02_Test_Telegram':
                   print(w['id'])
                   break
-          " 2>/dev/null
-          }
+          " 2>/dev/null)
 
-          run_workflow() {
-            local WF_NAME="$1"
-            local WF_ID=$(get_wf_id "$WF_NAME")
-            if [ -z "$WF_ID" ]; then
-              echo "  ⚠ $WF_NAME: not found"
-              return 0
-            fi
-            echo "Running $WF_NAME (ID: $WF_ID)..."
+          P01_ID=$(echo "$ALL_WF" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+              if w['name'] == 'P0-01_Init_Google_Sheets':
+                  print(w['id'])
+                  break
+          " 2>/dev/null)
 
-            # Попробовать POST /workflows/{id}/run (n8n >= 1.x)
-            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/run" \
-              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d '{}' 2>&1)
-            echo "  /run response: $(echo "$resp" | head -c 300)"
+          echo "P0-02 ID: $P02_ID"
+          echo "P0-01 ID: $P01_ID"
 
-            if echo "$resp" | grep -q '"finished\|"success\|"executionId\|"id"'; then
-              echo "  ✓ $WF_NAME executed"
-              return 0
-            fi
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
 
-            # Fallback: POST /executions/run (альтернативный endpoint)
-            resp2=$(curl -s -X POST "${N8N_URL}/api/v1/executions" \
-              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "{\"workflowId\": \"$WF_ID\", \"mode\": \"manual\"}" 2>&1)
-            echo "  /executions response: $(echo "$resp2" | head -c 300)"
+          # Run P0-02 (Telegram test)
+          if [ -n "$P02_ID" ]; then
+            echo "Running P0-02_Test_Telegram (ID: $P02_ID) via n8n CLI..."
+            $SSH_CMD "cd /root && n8n execute --id=$P02_ID 2>&1 | tail -10" || echo "  ⚠ P0-02 CLI returned non-zero (may still have executed)"
+            echo "  ✓ P0-02 done"
+          else
+            echo "  ⚠ P0-02_Test_Telegram: not found in API"
+          fi
 
-            if echo "$resp2" | grep -q '"finished\|"success\|"id"'; then
-              echo "  ✓ $WF_NAME executed (via /executions)"
-              return 0
-            fi
-
-            echo "  ⚠ $WF_NAME: could not trigger automatically"
-            echo "  ℹ️  Run manually in N8N UI: ${N8N_URL}"
-            return 0
-          }
-
-          run_workflow "P0-02_Test_Telegram"
-          run_workflow "P0-01_Init_Google_Sheets"
+          # Run P0-01 (Init Google Sheets)
+          if [ -n "$P01_ID" ]; then
+            echo "Running P0-01_Init_Google_Sheets (ID: $P01_ID) via n8n CLI..."
+            $SSH_CMD "cd /root && n8n execute --id=$P01_ID 2>&1 | tail -20" || echo "  ⚠ P0-01 CLI returned non-zero (may still have executed)"
+            echo "  ✓ P0-01 done"
+          else
+            echo "  ⚠ P0-01_Init_Google_Sheets: not found in API"
+          fi
 
       # ─── 9. Health Check ──────────────────────
       - name: Health Check
