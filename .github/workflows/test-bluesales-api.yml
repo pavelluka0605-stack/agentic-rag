@@ -1,0 +1,112 @@
+name: "Test BlueSales API"
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "API command to run"
+        required: true
+        default: "customers.get"
+        type: choice
+        options:
+          - customers.get
+          - orders.get
+          - users.get
+      page_size:
+        description: "Number of records (1-500)"
+        required: false
+        default: "5"
+
+jobs:
+  test-api:
+    name: "Test BlueSales API"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Test BlueSales API
+        env:
+          BS_LOGIN: ${{ secrets.BLUESALES_LOGIN }}
+          BS_PASS: ${{ secrets.BLUESALES_PASS }}
+          BS_API_KEY: ${{ secrets.BLUESALES_API_KEY }}
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          echo "=== BlueSales API Test ==="
+          echo "Command: ${{ github.event.inputs.command }}"
+          echo "PageSize: ${{ github.event.inputs.page_size }}"
+
+          # Calculate MD5 hash of password (uppercase)
+          PASS_HASH=$(echo -n "${BS_PASS}" | md5sum | awk '{print toupper($1)}')
+          echo "Login: ${BS_LOGIN}"
+          echo "Pass hash: ${PASS_HASH:0:8}..."
+
+          # Make API call
+          RESPONSE=$(curl -s -X POST \
+            "https://bluesales.ru/app/Customers/WebServer.aspx?login=${BS_LOGIN}&password=${PASS_HASH}&command=${{ github.event.inputs.command }}" \
+            -H "Content-Type: application/json" \
+            -d '{"pageSize": ${{ github.event.inputs.page_size }}, "startRowNumber": 0}' \
+            --max-time 30)
+
+          echo ""
+          echo "=== Raw Response (first 2000 chars) ==="
+          echo "$RESPONSE" | head -c 2000
+
+          echo ""
+          echo ""
+          echo "=== Parsed Response ==="
+          echo "$RESPONSE" | python3 -c "
+          import sys, json
+          try:
+              data = json.load(sys.stdin)
+              print(json.dumps(data, indent=2, ensure_ascii=False)[:3000])
+
+              if data.get('isValid') == True:
+                  print()
+                  print('STATUS: SUCCESS')
+                  if 'customers' in data:
+                      print(f'Customers returned: {data.get(\"count\", 0)}')
+                      print(f'Not returned (remaining): {data.get(\"notReturnedCount\", 0)}')
+                      for c in data.get('customers', [])[:5]:
+                          name = f\"{c.get('firstName','')} {c.get('lastName','')}\".strip()
+                          vk = c.get('vkId', '')
+                          tags = ', '.join(t.get('name','') for t in c.get('tags', []))
+                          print(f'  - {name} (VK: {vk}) [{tags}]')
+                  elif 'orders' in data:
+                      print(f'Orders returned: {data.get(\"count\", 0)}')
+                      print(f'Not returned (remaining): {data.get(\"notReturnedCount\", 0)}')
+                      for o in data.get('orders', [])[:5]:
+                          cname = o.get('customerName', '?')
+                          total = o.get('totalSum', 0)
+                          status = o.get('status', '?')
+                          print(f'  - {cname}: {total} rub [{status}]')
+                  elif isinstance(data, list):
+                      print(f'Users: {len(data)}')
+                      for u in data[:10]:
+                          print(f'  - {u.get(\"login\",\"?\")} (id={u.get(\"id\",\"?\")})')
+              else:
+                  print()
+                  print(f'STATUS: FAILED')
+                  print(f'Error: {data.get(\"error\", \"unknown\")}')
+          except Exception as e:
+              print(f'Parse error: {e}')
+          "
+
+          # Send result summary to Telegram
+          SUMMARY=$(echo "$RESPONSE" | python3 -c "
+          import sys, json
+          try:
+              d = json.load(sys.stdin)
+              if d.get('isValid'):
+                  cnt = d.get('count', 0)
+                  total = cnt + d.get('notReturnedCount', 0)
+                  print(f'BlueSales API OK | ${{ github.event.inputs.command }} | {cnt}/{total} records')
+              else:
+                  print(f'BlueSales API FAIL | {d.get(\"error\",\"?\")[:200]}')
+          except:
+              print('BlueSales API: parse error')
+          " 2>/dev/null)
+
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            -d "text=${SUMMARY}" > /dev/null || true

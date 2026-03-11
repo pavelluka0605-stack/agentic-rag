@@ -12,6 +12,7 @@ on:
           - delete-sheet
           - delete-sheet-by-id
           - add-sheet
+          - setup-svodka-formulas
       sheet_name:
         description: 'Sheet name (for delete/add actions)'
         required: false
@@ -125,4 +126,45 @@ jobs:
               )
               add_resp.raise_for_status()
               print("Added successfully!")
+
+          elif ACTION == "setup-svodka-formulas":
+              print("\nSetting up formulas in Сводка_спроса...")
+              svodka_id = sheets.get("Сводка_спроса")
+              if svodka_id is None:
+                  print("ERROR: Sheet 'Сводка_спроса' not found")
+                  exit(1)
+
+              # Set header row
+              header_resp = requests.put(
+                  f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}/values/Сводка_спроса!A1:J1",
+                  headers={**headers, "Content-Type": "application/json"},
+                  params={"valueInputOption": "RAW"},
+                  json={"values": [["Название_товара", "ID_поста", "XS", "S", "M", "L", "XL", "XXL", "Итого", "Статус_товара"]]}
+              )
+              header_resp.raise_for_status()
+              print("  Headers set")
+
+              # Set formulas for rows 2-50
+              formulas = []
+              sizes = ["XS", "S", "M", "L", "XL", "XXL"]
+              for row in range(2, 51):
+                  row_formulas = [
+                      f'=IFERROR(INDEX(Товары!B:B,SMALL(IF(COUNTIF(INDIRECT("A1:A"&ROW()-1),Товары!B$2:B$500)=0,ROW(Товары!B$2:B$500)-1),1)),"")' if row == 2 else f'=IFERROR(INDEX(Товары!B:B,SMALL(IF(COUNTIF(INDIRECT("A1:A"&ROW()-1),Товары!B$2:B$500)=0,ROW(Товары!B$2:B$500)-1),1)),"")',
+                      f'=IFERROR(VLOOKUP(A{row},Товары!B:A,1,FALSE),"")',
+                  ]
+                  for size in sizes:
+                      row_formulas.append(f'=COUNTIFS(Спрос!B:B,B{row},Спрос!E:E,"{size}",Спрос!I:I,"<>отменено")')
+                  row_formulas.append(f'=SUM(C{row}:H{row})')
+                  row_formulas.append(f'=IFERROR(VLOOKUP(B{row},Товары!A:G,7,FALSE),"")')
+                  formulas.append(row_formulas)
+
+              formula_resp = requests.put(
+                  f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}/values/Сводка_спроса!A2:J50",
+                  headers={**headers, "Content-Type": "application/json"},
+                  params={"valueInputOption": "USER_ENTERED"},
+                  json={"values": formulas}
+              )
+              formula_resp.raise_for_status()
+              print("  Formulas set for rows 2-50")
+              print("Setup complete!")
           PYEOF
