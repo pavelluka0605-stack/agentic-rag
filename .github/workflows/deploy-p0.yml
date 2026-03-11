@@ -500,69 +500,69 @@ jobs:
           echo ""
           echo "Running P0-02 and P0-01 via VPS internal API..."
 
-      - name: Run P0-01 & P0-02 via VPS
+      - name: Run P0-01 & P0-02 via API
         if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}
         env:
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << REMOTE_RUN
-          N8N_KEY="${N8N_API_KEY}"
+          N8N_URL="${N8N_BASE_URL:-https://n8n.marbomebel.ru}"
 
-          # Получить ID workflows
-          ALL_WF=\$(curl -s -H "X-N8N-API-KEY: \${N8N_KEY}" \
-            "http://localhost:5678/api/v1/workflows?limit=100" 2>/dev/null)
+          # Получить все workflows (работает — проверено)
+          ALL_WF=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/workflows?limit=100")
 
-          get_id() {
-            echo "\$ALL_WF" | python3 -c "
+          get_wf_id() {
+            echo "$ALL_WF" | python3 -c "
           import sys, json
           data = json.load(sys.stdin).get('data', [])
           for w in data:
-              if w['name'] == '\$1':
+              if w['name'] == '$1':
                   print(w['id'])
                   break
           " 2>/dev/null
           }
 
-          # Запустить P0-02_Test_Telegram
-          WF_ID=\$(get_id "P0-02_Test_Telegram")
-          if [ -n "\$WF_ID" ]; then
-            echo "Running P0-02_Test_Telegram (ID: \$WF_ID)..."
-            # Попробовать несколько способов запуска
-            resp=\$(curl -s -X POST "http://localhost:5678/api/v1/workflows/\${WF_ID}/run" \
-              -H "X-N8N-API-KEY: \${N8N_KEY}" \
-              -H "Content-Type: application/json" \
-              -d '{}' 2>&1)
-            if echo "\$resp" | grep -q '"finished\|"success\|"id"'; then
-              echo "  ✓ P0-02 executed"
-            else
-              echo "  P0-02 /run result: \$(echo "\$resp" | head -c 200)"
-              # Fallback: попробовать через test webhook
-              resp2=\$(curl -s -X POST "http://localhost:5678/webhook-test/test-telegram" \
-                -H "Content-Type: application/json" -d '{}' 2>&1)
-              echo "  P0-02 webhook-test result: \$(echo "\$resp2" | head -c 200)"
+          run_workflow() {
+            local WF_NAME="$1"
+            local WF_ID=$(get_wf_id "$WF_NAME")
+            if [ -z "$WF_ID" ]; then
+              echo "  ⚠ $WF_NAME: not found"
+              return 0
             fi
-          else
-            echo "  ⚠ P0-02 not found"
-          fi
+            echo "Running $WF_NAME (ID: $WF_ID)..."
 
-          # Запустить P0-01_Init_Google_Sheets
-          WF_ID=\$(get_id "P0-01_Init_Google_Sheets")
-          if [ -n "\$WF_ID" ]; then
-            echo "Running P0-01_Init_Google_Sheets (ID: \$WF_ID)..."
-            resp=\$(curl -s -X POST "http://localhost:5678/api/v1/workflows/\${WF_ID}/run" \
-              -H "X-N8N-API-KEY: \${N8N_KEY}" \
+            # Попробовать POST /workflows/{id}/run (n8n >= 1.x)
+            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/run" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
               -H "Content-Type: application/json" \
               -d '{}' 2>&1)
-            if echo "\$resp" | grep -q '"finished\|"success\|"id"'; then
-              echo "  ✓ P0-01 executed"
-            else
-              echo "  P0-01 /run result: \$(echo "\$resp" | head -c 300)"
+            echo "  /run response: $(echo "$resp" | head -c 300)"
+
+            if echo "$resp" | grep -q '"finished\|"success\|"executionId\|"id"'; then
+              echo "  ✓ $WF_NAME executed"
+              return 0
             fi
-          else
-            echo "  ⚠ P0-01 not found"
-          fi
-          REMOTE_RUN
+
+            # Fallback: POST /executions/run (альтернативный endpoint)
+            resp2=$(curl -s -X POST "${N8N_URL}/api/v1/executions" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "{\"workflowId\": \"$WF_ID\", \"mode\": \"manual\"}" 2>&1)
+            echo "  /executions response: $(echo "$resp2" | head -c 300)"
+
+            if echo "$resp2" | grep -q '"finished\|"success\|"id"'; then
+              echo "  ✓ $WF_NAME executed (via /executions)"
+              return 0
+            fi
+
+            echo "  ⚠ $WF_NAME: could not trigger automatically"
+            echo "  ℹ️  Run manually in N8N UI: ${N8N_URL}"
+            return 0
+          }
+
+          run_workflow "P0-02_Test_Telegram"
+          run_workflow "P0-01_Init_Google_Sheets"
 
       # ─── 9. Health Check ──────────────────────
       - name: Health Check
