@@ -61,54 +61,13 @@
     },
     {
       "parameters": {
-        "operation": "read",
-        "documentId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
-        },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "Логи_N8N"
-        },
-        "options": {
-          "range": "A1:F2"
-        }
-      },
-      "id": "check-sheets",
-      "name": "Check: Google Sheets",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [460, 600],
-      "onError": "continueRegularOutput",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "command": "systemctl is-active vk-longpoll 2>/dev/null || echo 'inactive'"
-      },
-      "id": "check-systemd-lp",
-      "name": "Check: systemctl LP",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [460, 750],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Collect health check results\nconst vkResult = $('Check: VK API').first();\nconst lpResult = $('Check: Long Poll').first();\nconst userLpResult = $('Check: User Long Poll').first();\nconst sheetsResult = $('Check: Google Sheets').first();\nconst systemdResult = $('Check: systemctl LP').first();\n\nconst errors = [];\n\n// Check VK API\nif (vkResult.json?.error) {\n  errors.push(`VK API: ${JSON.stringify(vkResult.json.error)}`);\n}\n\n// Check Long Poll (Groups)\nif (!lpResult.json?.status || lpResult.json.status !== 'ok') {\n  errors.push('VK Long Poll (Groups): демон не отвечает на /health');\n}\n\n// Check User Long Poll (optional — не считать ошибкой если не запущен)\nconst userLpOk = userLpResult.json?.status === 'ok';\n\n// Check Google Sheets\nif (sheetsResult.json?.error) {\n  errors.push(`Google Sheets: ${sheetsResult.json.error}`);\n}\n\n// Check systemd service\nconst systemdStatus = (systemdResult.json?.stdout || '').trim();\nif (systemdStatus !== 'active') {\n  errors.push(`Long Poll сервис: ${systemdStatus} (не active)`);\n}\n\nreturn [{\n  json: {\n    hasErrors: errors.length > 0,\n    errors,\n    summary: errors.length === 0\n      ? 'All systems OK'\n      : `${errors.length} problem(s) found`,\n    lp_stats: lpResult.json || {},\n    user_lp_stats: userLpOk ? userLpResult.json : { status: 'not running' },\n    systemd_status: systemdStatus,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Collect health check results\nconst vkResult = $('Check: VK API').first();\nconst lpResult = $('Check: Long Poll').first();\nconst userLpResult = $('Check: User Long Poll').first();\n\nconst errors = [];\n\n// Check VK API\nif (vkResult.json?.error) {\n  errors.push(`VK API: ${JSON.stringify(vkResult.json.error)}`);\n}\n\n// Check Long Poll (Groups)\nif (!lpResult.json?.status || lpResult.json.status !== 'ok') {\n  errors.push('VK Long Poll (Groups): не отвечает на /health');\n}\n\n// Check User Long Poll (optional)\nconst userLpOk = userLpResult.json?.status === 'ok';\n\nreturn [{\n  json: {\n    hasErrors: errors.length > 0,\n    errors,\n    summary: errors.length === 0\n      ? 'All systems OK'\n      : `${errors.length} problem(s) found`,\n    lp_stats: lpResult.json || {},\n    user_lp_stats: userLpOk ? userLpResult.json : { status: 'not running' },\n    timestamp: new Date().toISOString()\n  }\n}];"
       },
       "id": "aggregate-results",
       "name": "Aggregate Results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [680, 400]
+      "position": [680, 300]
     },
     {
       "parameters": {
@@ -124,27 +83,22 @@
       "name": "IF: Has Errors?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [900, 400]
+      "position": [900, 300]
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=🔴 <b>Health Check FAILED</b>\n\n{{ $json.errors.join('\\n') }}\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"🔴 <b>Health Check FAILED</b>\\n\\n{{ $json.errors.join('\\\\n') }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "tg-alert-fail",
       "name": "Telegram: HC Failed",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [1120, 300],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200]
     },
     {
       "parameters": {},
@@ -152,7 +106,7 @@
       "name": "All OK (no action)",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1120, 500]
+      "position": [1120, 400]
     },
     {
       "parameters": {
@@ -164,65 +118,32 @@
       "name": "Every 6 hours",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [240, 900]
+      "position": [240, 700]
     },
     {
       "parameters": {
-        "operation": "read",
-        "documentId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
-        },
-        "sheetName": {
-          "__rl": true,
-          "mode": "name",
-          "value": "Логи_N8N"
-        },
-        "options": {}
+        "jsCode": "// 6-hour summary — just report system status\nconst now = new Date();\nreturn [{\n  json: {\n    message: 'System is running',\n    timestamp: now.toISOString()\n  }\n}];"
       },
-      "id": "read-logs-6h",
-      "name": "Read: All Logs",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [460, 900],
-      "onError": "continueRegularOutput",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Count events in last 6 hours\nconst items = $input.all();\nconst sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);\n\nlet totalEvents = 0;\nlet recentEvents = 0;\nconst byType = {};\n\nfor (const item of items) {\n  totalEvents++;\n  const ts = item.json.Timestamp;\n  if (ts) {\n    const eventDate = new Date(ts);\n    if (eventDate >= sixHoursAgo) {\n      recentEvents++;\n      const eventType = item.json.Событие || 'unknown';\n      byType[eventType] = (byType[eventType] || 0) + 1;\n    }\n  }\n}\n\nconst breakdown = Object.entries(byType)\n  .sort((a, b) => b[1] - a[1])\n  .map(([k, v]) => `  ${k}: ${v}`)\n  .join('\\n');\n\nreturn [{\n  json: {\n    totalEvents,\n    recentEvents,\n    breakdown,\n    timestamp: new Date().toISOString()\n  }\n}];"
-      },
-      "id": "count-events-6h",
-      "name": "Count Events (6h)",
+      "id": "summary-6h",
+      "name": "Build Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [680, 900]
+      "position": [460, 700]
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=✅ <b>Система работает</b>\n\n📊 Событий за 6ч: {{ $json.recentEvents }}\nВсего в логах: {{ $json.totalEvents }}\n\n{{ $json.breakdown ? '📋 Разбивка:\\n' + $json.breakdown : '' }}\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"✅ <b>Система работает</b>\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "tg-6h-report",
       "name": "Telegram: 6h Report",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [900, 900],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 700]
     }
   ],
   "connections": {
@@ -230,9 +151,7 @@
       "main": [[
         { "node": "Check: VK API", "type": "main", "index": 0 },
         { "node": "Check: Long Poll", "type": "main", "index": 0 },
-        { "node": "Check: User Long Poll", "type": "main", "index": 0 },
-        { "node": "Check: Google Sheets", "type": "main", "index": 0 },
-        { "node": "Check: systemctl LP", "type": "main", "index": 0 }
+        { "node": "Check: User Long Poll", "type": "main", "index": 0 }
       ]]
     },
     "Check: VK API": {
@@ -242,12 +161,6 @@
       "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
     },
     "Check: User Long Poll": {
-      "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
-    },
-    "Check: Google Sheets": {
-      "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
-    },
-    "Check: systemctl LP": {
       "main": [[ { "node": "Aggregate Results", "type": "main", "index": 0 } ]]
     },
     "Aggregate Results": {
@@ -260,18 +173,13 @@
       ]
     },
     "Every 6 hours": {
-      "main": [[ { "node": "Read: All Logs", "type": "main", "index": 0 } ]]
+      "main": [[ { "node": "Build Summary", "type": "main", "index": 0 } ]]
     },
-    "Read: All Logs": {
-      "main": [[ { "node": "Count Events (6h)", "type": "main", "index": 0 } ]]
-    },
-    "Count Events (6h)": {
+    "Build Summary": {
       "main": [[ { "node": "Telegram: 6h Report", "type": "main", "index": 0 } ]]
     }
   },
   "settings": {
     "executionOrder": "v1"
-  },
-  "active": true,
-  "tags": [{ "name": "P0-Foundation" }]
+  }
 }

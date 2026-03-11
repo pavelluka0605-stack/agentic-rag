@@ -32,7 +32,7 @@
       "id": "switch-type",
       "name": "Switch: Event Type",
       "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
+      "typeVersion": 3.1,
       "position": [460, 400]
     },
     {
@@ -92,33 +92,22 @@
       "name": "Log: Message",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [900, 150],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
+      "position": [900, 150]
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=📩 <b>Новое ЛС в группу</b>\n\nОт: <a href=\"https://vk.com/id{{ $('Extract: Message').item.json.from_id }}\">VK ID {{ $('Extract: Message').item.json.from_id }}</a>\nТекст: {{ $('Extract: Message').item.json.text }}\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"\uD83D\uDCE9 <b>Новое ЛС в группу</b>\\n\\nОт: <a href=\\\"https://vk.com/id{{ $('Extract: Message').item.json.from_id }}\\\">VK ID {{ $('Extract: Message').item.json.from_id }}</a>\\nТекст: {{ $('Extract: Message').item.json.text }}\\n\\n\u23F0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "tg-alert-message",
       "name": "Telegram: New DM",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [1120, 150],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 150]
     },
     {
       "parameters": {
@@ -178,33 +167,22 @@
       "name": "Log: Comment",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [900, 350],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
+      "position": [900, 350]
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=💬 <b>Новый комментарий</b>\n\nПост: wall-{{ $env.VK_GROUP_ID }}_{{ $('Extract: Comment').item.json.post_id }}\nОт: <a href=\"https://vk.com/id{{ $('Extract: Comment').item.json.from_id }}\">VK ID {{ $('Extract: Comment').item.json.from_id }}</a>\nТекст: {{ $('Extract: Comment').item.json.text }}\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"\uD83D\uDCAC <b>Новый комментарий</b>\\n\\nПост: wall-{{ $env.VK_GROUP_ID }}_{{ $('Extract: Comment').item.json.post_id }}\\nОт: <a href=\\\"https://vk.com/id{{ $('Extract: Comment').item.json.from_id }}\\\">VK ID {{ $('Extract: Comment').item.json.from_id }}</a>\\nТекст: {{ $('Extract: Comment').item.json.text }}\\n\\n\u23F0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "tg-alert-comment",
       "name": "Telegram: New Comment",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [1120, 350],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 350]
     },
     {
       "parameters": {
@@ -245,33 +223,22 @@
       "name": "Log: New Post",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [680, 1000],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
+      "position": [680, 1000]
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=📝 <b>Новый пост на стене</b>\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"\uD83D\uDCDD <b>Новый пост на стене</b>\\n\\n\u23F0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "tg-alert-post",
       "name": "Telegram: New Post",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [900, 1000],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 1000]
     },
     {
       "parameters": {
@@ -291,43 +258,33 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=⚠️ <b>VK Long Poll ошибка</b>\n\n{{ $json.error }}\n\nАвтоматический перезапуск...\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"\u26A0\uFE0F <b>VK Long Poll ошибка</b>\\n\\n{{ $json.error }}\\n\\nАвтоматический перезапуск...\\n\u23F0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "tg-alert-error",
       "name": "Telegram: LP Error",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [900, 550],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 550]
     },
     {
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_MANAGER_CHAT_ID }}",
-        "text": "=✅ <b>VK Long Poll запущен</b>\n\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"\u2705 <b>VK Long Poll запущен</b>\\n\\n\u23F0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
       },
       "id": "tg-alert-started",
       "name": "Telegram: LP Started",
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [900, 700],
-      "credentials": {
-        "telegramApi": {
-          "id": "TELEGRAM_CRED_ID",
-          "name": "Telegram Bot - Алерты"
-        }
-      }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 700]
     },
     {
       "parameters": {
@@ -368,13 +325,7 @@
       "name": "Log: Other Event",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [680, 800],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      }
+      "position": [680, 800]
     },
     {
       "parameters": {
@@ -444,7 +395,5 @@
   },
   "settings": {
     "executionOrder": "v1"
-  },
-  "active": true,
-  "tags": [{ "name": "P0-Foundation" }]
+  }
 }
