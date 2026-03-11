@@ -87,7 +87,7 @@ jobs:
 
       # ─── 4. Google Service Account JSON ────────
       - name: Deploy Google SA credentials
-        if: ${{ secrets.GOOGLE_SA_JSON != '' }}
+        if: true
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << REMOTE_SCRIPT
