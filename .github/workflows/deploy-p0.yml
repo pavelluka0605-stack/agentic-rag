@@ -35,6 +35,7 @@ on:
 # SPREADSHEET_ID  — ID Google-таблицы
 # BLUESALES_LOGIN — логин BlueSales
 # BLUESALES_PASS  — пароль BlueSales
+# BLUESALES_API_KEY — API ключ BlueSales
 # VK_USER_TOKEN   — Personal user token для чтения личных сообщений
 
 jobs:
@@ -135,6 +136,7 @@ jobs:
           BLUESALES_LOGIN=${{ secrets.BLUESALES_LOGIN }}
           BLUESALES_PASSWORD=${{ secrets.BLUESALES_PASS }}
           BLUESALES_PASSWORD_HASH=$(echo -n '${{ secrets.BLUESALES_PASS }}' | md5sum | awk '{print toupper($1)}')
+          BLUESALES_API_KEY=${{ secrets.BLUESALES_API_KEY }}
           ENVEOF
 
           # Удалить лишние пробелы от heredoc indent
