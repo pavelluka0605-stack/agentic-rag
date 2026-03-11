@@ -56,6 +56,63 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
+      # ─── 2b. Early Telegram diagnostic (from runner, no SSH) ───
+      - name: "Diagnostic: Telegram + SA secret check"
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+          SA_B64: ${{ secrets.GOOGLE_SA_JSON }}
+          VPS_H: ${{ secrets.VPS_HOST }}
+          SHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: |
+          echo "=== DIAGNOSTIC: checking secrets ==="
+          echo "TG_TOKEN length: ${#TG_TOKEN}"
+          echo "TG_CHAT length: ${#TG_CHAT}"
+          echo "SA_B64 length: ${#SA_B64}"
+          echo "VPS_HOST: ${VPS_H:+SET}"
+          echo "SPREADSHEET_ID: ${SHEET_ID:+SET}"
+
+          # SA decode test
+          SA_INFO="len=${#SA_B64}"
+          if [ -n "$SA_B64" ]; then
+            # Try base64
+            echo "$SA_B64" | base64 -d > /tmp/sa_test.json 2>/dev/null || true
+            SA_EMAIL=$(python3 -c "import json; print(json.load(open('/tmp/sa_test.json')).get('client_email',''))" 2>/dev/null || true)
+            if [ -n "$SA_EMAIL" ]; then
+              SA_INFO="b64 OK: ${SA_EMAIL}"
+            else
+              # Try raw JSON
+              printf '%s' "$SA_B64" > /tmp/sa_test.json
+              SA_EMAIL=$(python3 -c "import json; print(json.load(open('/tmp/sa_test.json')).get('client_email',''))" 2>/dev/null || true)
+              if [ -n "$SA_EMAIL" ]; then
+                SA_INFO="raw JSON OK: ${SA_EMAIL}"
+              else
+                SA_INFO="FAIL (len=${#SA_B64}, first20=$(echo "$SA_B64" | head -c 20))"
+              fi
+            fi
+            rm -f /tmp/sa_test.json
+          else
+            SA_INFO="EMPTY"
+          fi
+          echo "SA result: $SA_INFO"
+
+          # Send diagnostic to Telegram directly from runner
+          MSG=$(printf '%s\n%s\n%s\n%s\n%s\n%s\n%s' \
+            "P0 Diagnostic" \
+            "TG_TOKEN: ${#TG_TOKEN}c" \
+            "SA: ${SA_INFO}" \
+            "VPS: ${VPS_H:+OK}" \
+            "Sheet: ${SHEET_ID:+SET}" \
+            "Run: ${{ github.run_id }}" \
+            "Commit: ${{ github.sha }}")
+
+          echo "Sending diagnostic to Telegram..."
+          echo "MSG=$MSG"
+          RESP=$(curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" 2>&1)
+          echo "Telegram response: $RESP"
+
       # ─── 3. Создание .env на VPS ──────────────
       - name: Create .env on VPS
         run: |
