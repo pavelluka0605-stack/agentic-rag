@@ -1,0 +1,187 @@
+name: "Diagnose VK Long Poll"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: "VK Long Poll Diagnostics"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deep Diagnostics
+        id: diag
+        run: |
+          RESULT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          echo "══════════════════════════════════════"
+          echo "  VK LONG POLL DIAGNOSTICS — $(date '+%d.%m.%Y %H:%M:%S')"
+          echo "══════════════════════════════════════"
+
+          # ─── 1. Service status ─────────────────
+          echo ""
+          echo "=== 1. SYSTEMD SERVICE STATUS ==="
+          systemctl status vk-longpoll --no-pager 2>&1 || echo "(service not found)"
+          echo ""
+          echo "--- VK User Long Poll ---"
+          systemctl status vk-user-longpoll --no-pager 2>&1 || echo "(service not found)"
+
+          # ─── 2. Recent logs ────────────────────
+          echo ""
+          echo "=== 2. VK-LONGPOLL JOURNAL (last 50 lines) ==="
+          journalctl -u vk-longpoll -n 50 --no-pager 2>&1 || echo "(no logs)"
+
+          echo ""
+          echo "=== 3. VK-USER-LONGPOLL JOURNAL (last 20 lines) ==="
+          journalctl -u vk-user-longpoll -n 20 --no-pager 2>&1 || echo "(no logs)"
+
+          # ─── 3. Health endpoints ───────────────
+          echo ""
+          echo "=== 4. HEALTH ENDPOINTS ==="
+          echo "--- VK Long Poll (port 3100) ---"
+          curl -s --max-time 5 http://127.0.0.1:3100/health 2>&1 | python3 -m json.tool 2>/dev/null || echo "NOT RESPONDING"
+
+          echo "--- VK User Long Poll (port 3101) ---"
+          curl -s --max-time 5 http://127.0.0.1:3101/health 2>&1 | python3 -m json.tool 2>/dev/null || echo "NOT RESPONDING"
+
+          # ─── 4. N8N status ────────────────────
+          echo ""
+          echo "=== 5. N8N STATUS ==="
+          systemctl status n8n --no-pager 2>&1 | head -20
+          echo ""
+          echo "--- N8N Workflows ---"
+          curl -s http://localhost:5678/api/v1/workflows 2>/dev/null | python3 -c "
+          import sys, json
+          try:
+              data = json.load(sys.stdin).get('data', [])
+              for w in data:
+                  status = 'ACTIVE' if w.get('active') else 'INACTIVE'
+                  print(f\"  [{status}] {w['name']} (id={w['id']})\")
+          except: print('  ERROR parsing workflows')
+          " 2>/dev/null || echo "  N8N API not available"
+
+          # ─── 5. Webhook test ──────────────────
+          echo ""
+          echo "=== 6. WEBHOOK TEST ==="
+          echo "--- POST /webhook/vk-events (test comment event) ---"
+          WH_RESP=$(curl -s -w "\nHTTP_CODE:%{http_code}" --max-time 10 \
+            -X POST http://localhost:5678/webhook/vk-events \
+            -H "Content-Type: application/json" \
+            -d '{
+              "type": "wall_reply_new",
+              "group_id": 123,
+              "event_id": "diag_test_'$(date +%s)'",
+              "object": {
+                "id": 99999,
+                "from_id": 1,
+                "post_id": 1,
+                "text": "ДИАГНОСТИКА: тестовый комментарий '$(date +%H:%M:%S)'",
+                "date": '$(date +%s)',
+                "owner_id": -123
+              },
+              "received_at": "'$(date -Iseconds)'"
+            }')
+          echo "$WH_RESP"
+
+          # ─── 6. .env check ────────────────────
+          echo ""
+          echo "=== 7. ENV FILES CHECK ==="
+          echo "--- /opt/vk-longpoll/.env ---"
+          if [ -f /opt/vk-longpoll/.env ]; then
+            echo "(exists)"
+            # Show keys only, not values
+            grep -oP '^[A-Z_]+' /opt/vk-longpoll/.env 2>/dev/null || echo "(parse error)"
+          else
+            echo "FILE NOT FOUND"
+          fi
+
+          echo "--- /opt/p0-foundation/.env ---"
+          if [ -f /opt/p0-foundation/.env ]; then
+            echo "(exists)"
+            grep -oP '^[A-Z_]+' /opt/p0-foundation/.env 2>/dev/null || echo "(parse error)"
+          else
+            echo "FILE NOT FOUND"
+          fi
+
+          # ─── 7. Process check ─────────────────
+          echo ""
+          echo "=== 8. NODE PROCESSES ==="
+          ps aux | grep -i "[n]ode" | head -10
+
+          # ─── 8. VK API test ───────────────────
+          echo ""
+          echo "=== 9. VK API DIRECT TEST ==="
+          source /opt/p0-foundation/.env 2>/dev/null || source /opt/vk-longpoll/.env 2>/dev/null
+          if [ -n "${VK_TOKEN:-}" ]; then
+            echo "VK_TOKEN: set (${#VK_TOKEN} chars)"
+            echo "VK_GROUP_ID: ${VK_GROUP_ID:-NOT SET}"
+
+            # Test getLongPollServer
+            LP_RESP=$(curl -s --max-time 10 "https://api.vk.com/method/groups.getLongPollServer?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199")
+            if echo "$LP_RESP" | grep -q '"server"'; then
+              echo "✅ groups.getLongPollServer: OK"
+              echo "$LP_RESP" | python3 -c "import sys,json; r=json.load(sys.stdin)['response']; print(f\"  server: {r['server'][:50]}...\")" 2>/dev/null
+            else
+              echo "❌ groups.getLongPollServer: FAILED"
+              echo "$LP_RESP" | head -c 300
+            fi
+
+            # Test Long Poll Settings
+            LPS_RESP=$(curl -s --max-time 10 "https://api.vk.com/method/groups.getLongPollSettings?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199")
+            echo ""
+            echo "--- Long Poll Settings ---"
+            echo "$LPS_RESP" | python3 -c "
+          import sys, json
+          try:
+              r = json.load(sys.stdin)['response']
+              print(f\"  is_enabled: {r.get('is_enabled')}\")
+              events = r.get('events', {})
+              for k, v in events.items():
+                  if v: print(f\"  ✅ {k}\")
+          except Exception as e: print(f'  ERROR: {e}')
+          " 2>/dev/null
+          else
+            echo "VK_TOKEN: NOT SET"
+          fi
+
+          echo ""
+          echo "══════════════════════════════════════"
+          echo "  DIAGNOSTICS COMPLETE"
+          echo "══════════════════════════════════════"
+
+          REMOTE
+          )
+
+          echo "$RESULT"
+
+          # Save to output
+          echo "result<<DIAGEOF" >> $GITHUB_OUTPUT
+          echo "$RESULT" >> $GITHUB_OUTPUT
+          echo "DIAGEOF" >> $GITHUB_OUTPUT
+
+      - name: Send to Telegram
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+          DIAG_RESULT: ${{ steps.diag.outputs.result }}
+        run: |
+          # Send first 4000 chars (Telegram limit)
+          MSG=$(echo "$DIAG_RESULT" | head -100)
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=🔍 VK Diagnostics:
+          ${MSG}" || true
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
