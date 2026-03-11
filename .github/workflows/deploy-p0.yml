@@ -134,6 +134,8 @@ jobs:
             ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
               ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
               "chmod 600 /opt/credentials/google-service-account.json && echo '✓ SA deployed to VPS'"
+            SA_EMAIL_FOUND=$(python3 -c "import json; print(json.load(open('/tmp/sa_check.json')).get('client_email','?'))" 2>/dev/null)
+            echo "SA_DEPLOY_STATUS=✅ SA deployed: ${SA_EMAIL_FOUND}" >> "$GITHUB_ENV"
           else
             echo "⚠ Could not decode GOOGLE_SA_JSON — checking if VPS already has a valid SA file..."
             VPS_SA_CHECK=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
@@ -141,9 +143,11 @@ jobs:
               "python3 -c \"import json; d=json.load(open('/opt/credentials/google-service-account.json')); print(d.get('client_email',''))\" 2>/dev/null" || true)
             if [ -n "$VPS_SA_CHECK" ]; then
               echo "✓ VPS already has valid SA: $VPS_SA_CHECK"
+              echo "SA_DEPLOY_STATUS=⚠ SA from VPS cache: ${VPS_SA_CHECK}" >> "$GITHUB_ENV"
             else
               echo "❌ No valid SA on VPS either. Google Sheets will not work."
-              echo "ACTION NEEDED: Set GOOGLE_SA_JSON secret in GitHub (base64-encoded SA JSON)"
+              echo "ACTION NEEDED: Set GOOGLE_SA_JSON secret (base64 or raw JSON)"
+              echo "SA_DEPLOY_STATUS=❌ SA decode FAILED (len=${#SA_B64})" >> "$GITHUB_ENV"
             fi
           fi
           rm -f /tmp/sa_check.json
@@ -636,12 +640,15 @@ jobs:
       # ─── 8c. Direct verification: Telegram + Google Sheets ───
       - name: "Direct verify: Telegram + Google Sheets"
         if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}
+        env:
+          SA_STATUS: ${{ env.SA_DEPLOY_STATUS }}
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} bash -s << 'REMOTE_SCRIPT'
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} bash -s "$SA_STATUS" << 'REMOTE_SCRIPT'
 
+          SA_STATUS_MSG="${1:-неизвестно}"
           source /opt/p0-foundation/.env 2>/dev/null || true
-          RESULTS=""
+          RESULTS="${SA_STATUS_MSG}\n"
 
           # ─── 1. Telegram: прямой тест ─────────────
           echo "=== Telegram direct test ==="
