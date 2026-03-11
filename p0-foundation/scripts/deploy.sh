@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# P0 Foundation — Deploy Script для Frankfurt VPS
+# P0 Foundation — Deploy Script для Frankfurt VPS (v1.1)
 #
 # Использование:
 #   1. Скопируйте p0-foundation/ на VPS
