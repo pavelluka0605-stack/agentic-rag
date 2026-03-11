@@ -23,7 +23,7 @@
       "name": "Create Sheets",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 300],
+      "position": [460, 300]
     },
     {
       "parameters": {
@@ -63,7 +63,7 @@
       "name": "Headers: Товары",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [680, 100],
+      "position": [680, 100]
     },
     {
       "parameters": {
@@ -103,7 +103,7 @@
       "name": "Headers: Спрос",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [680, 250],
+      "position": [680, 250]
     },
     {
       "parameters": {
@@ -142,7 +142,7 @@
       "name": "Headers: Заказы_поставщику",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [680, 400],
+      "position": [680, 400]
     },
     {
       "parameters": {
@@ -186,7 +186,7 @@
       "name": "Headers: Заказы_клиентов",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [680, 550],
+      "position": [680, 550]
     },
     {
       "parameters": {
@@ -220,7 +220,7 @@
       "name": "Headers: Логи_N8N",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [680, 700],
+      "position": [680, 700]
     },
     {
       "parameters": {
@@ -258,7 +258,7 @@
       "name": "Headers: Сводка_спроса",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [680, 850],
+      "position": [680, 850]
     },
     {
       "parameters": {
@@ -275,12 +275,6 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [900, 850],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_CRED_ID",
-          "name": "Google Sheets - Склад"
-        }
-      },
       "notes": "Формулы Сводка_спроса лучше вписать вручную:\nA2: =UNIQUE(Товары!B2:B)\nB2: =VLOOKUP(A2,Товары!B:A,1,FALSE) или вручную\nC2: =COUNTIFS(Спрос!B:B,B2,Спрос!E:E,\"XS\",Спрос!I:I,\"<>отменено\")\nD2-H2: аналогично для S,M,L,XL,XXL\nI2: =SUM(C2:H2)\nJ2: =VLOOKUP(B2,Товары!A:G,7,FALSE)"
     },
     {
