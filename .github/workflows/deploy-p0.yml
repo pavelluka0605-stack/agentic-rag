@@ -585,9 +585,9 @@ jobs:
         if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} bash -s << 'REMOTE_SCRIPT'
 
-          source /opt/p0-foundation/.env 2>/dev/null
+          source /opt/p0-foundation/.env 2>/dev/null || true
           RESULTS=""
 
           # ─── 1. Telegram: прямой тест ─────────────
@@ -617,159 +617,111 @@ jobs:
           echo "=== Google Sheets direct setup ==="
           if [ -f "/opt/credentials/google-service-account.json" ] && [ -n "${GOOGLE_SPREADSHEET_ID:-}" ]; then
 
-            # Получить access token из service account (openssl, без внешних библиотек)
-            ACCESS_TOKEN=$(python3 2>/tmp/gs_token_err.log << 'PYEOF'
-import json, time, base64, subprocess, tempfile, os, urllib.request, urllib.parse, sys
+            # --- Helper: base64url encode (no padding, url-safe) ---
+            b64url() { base64 | tr '/+' '_-' | tr -d '=\n'; }
 
-SA_FILE = "/opt/credentials/google-service-account.json"
-try:
-    with open(SA_FILE) as f:
-        sa = json.load(f)
+            # --- Extract SA fields using python (always available) ---
+            SA_EMAIL=$(python3 -c "import json; print(json.load(open('/opt/credentials/google-service-account.json'))['client_email'])")
+            # SA_KEY must preserve newlines — write directly to temp file
+            python3 -c "import json; f=open('/tmp/_sa_key.pem','w'); f.write(json.load(open('/opt/credentials/google-service-account.json'))['private_key']); f.close()"
 
-    print(f"SA email: {sa.get('client_email','?')}", file=sys.stderr)
+            echo "SA email: $SA_EMAIL"
 
-    # 1. Build JWT header + payload
-    now = int(time.time())
-    header = {"alg": "RS256", "typ": "JWT"}
-    payload = {
-        "iss": sa["client_email"],
-        "scope": "https://www.googleapis.com/auth/spreadsheets",
-        "aud": "https://oauth2.googleapis.com/token",
-        "iat": now,
-        "exp": now + 3600
-    }
-
-    def b64url(data):
-        return base64.urlsafe_b64encode(json.dumps(data, separators=(',',':')).encode()).rstrip(b'=').decode()
-
-    h = b64url(header)
-    p = b64url(payload)
-    msg = f"{h}.{p}"
-
-    # 2. Sign with openssl
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as kf:
-        kf.write(sa["private_key"])
-        key_file = kf.name
-
-    proc = subprocess.run(
-        ["openssl", "dgst", "-sha256", "-sign", key_file],
-        input=msg.encode(),
-        capture_output=True
-    )
-    os.unlink(key_file)
-
-    if proc.returncode != 0:
-        print(f"openssl error rc={proc.returncode}: {proc.stderr.decode()}", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"openssl sig length: {len(proc.stdout)}", file=sys.stderr)
-    sig = base64.urlsafe_b64encode(proc.stdout).rstrip(b'=').decode()
-    jwt_token = f"{msg}.{sig}"
-
-    # 3. Exchange JWT for access token
-    data = urllib.parse.urlencode({
-        "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        "assertion": jwt_token
-    }).encode()
-    req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data)
-    try:
-        raw = urllib.request.urlopen(req, timeout=15).read()
-        resp = json.loads(raw)
-        if "access_token" in resp:
-            print(resp["access_token"])
-        else:
-            print(f"Google OAuth response (no token): {raw.decode()[:300]}", file=sys.stderr)
-            sys.exit(1)
-    except urllib.error.HTTPError as he:
-        body = he.read().decode()[:300]
-        print(f"Google OAuth HTTP {he.code}: {body}", file=sys.stderr)
-        sys.exit(1)
-except Exception as e:
-    import traceback
-    traceback.print_exc(file=sys.stderr)
-    sys.exit(1)
-PYEOF
-          )
-
-            GS_ERR=$(cat /tmp/gs_token_err.log 2>/dev/null)
-            echo "Token debug: $GS_ERR"
-
-            if [ -n "$ACCESS_TOKEN" ] && ! echo "$ACCESS_TOKEN" | grep -qi "error\|traceback"; then
-              echo "✓ Got Google access token"
-
-              # Создать листы (batchUpdate — игнорируем ошибки если листы уже есть)
-              SHEETS='["Товары","Спрос","Заказы_поставщику","Заказы_клиентов","Сводка_спроса","Логи_N8N"]'
-              for SHEET in $(echo "$SHEETS" | python3 -c "import sys,json; [print(s) for s in json.load(sys.stdin)]"); do
-                echo "  Creating sheet: $SHEET"
-                curl -s -X POST \
-                  "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}:batchUpdate" \
-                  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-                  -H "Content-Type: application/json" \
-                  -d "{\"requests\":[{\"addSheet\":{\"properties\":{\"title\":\"${SHEET}\",\"gridProperties\":{\"frozenRowCount\":1}}}}]}" \
-                  > /tmp/gs_resp.json 2>&1
-                if grep -q "already exists" /tmp/gs_resp.json 2>/dev/null; then
-                  echo "    (already exists — OK)"
-                elif grep -q "sheetId" /tmp/gs_resp.json 2>/dev/null; then
-                  echo "    ✓ created"
-                else
-                  echo "    Response: $(cat /tmp/gs_resp.json | head -c 200)"
-                fi
-              done
-
-              # Записать заголовки
-              echo ""
-              echo "  Writing headers..."
-
-              write_headers() {
-                local SHEET="$1"
-                shift
-                local HEADERS="$*"
-                # Build proper JSON: {"values":[["H1","H2",...]]}
-                local BODY
-                BODY=$(python3 -c "
-import json, sys
-headers = sys.argv[1].split(',')
-print(json.dumps({'values': [headers]}))
-" "$HEADERS")
-                curl -s -X PUT \
-                  "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${SHEET}!1:1?valueInputOption=RAW" \
-                  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-                  -H "Content-Type: application/json" \
-                  -d "$BODY" > /tmp/gs_h.json 2>&1
-                if grep -q "updatedRows" /tmp/gs_h.json 2>/dev/null; then
-                  echo "    ✓ $SHEET headers OK"
-                else
-                  echo "    $SHEET: $(cat /tmp/gs_h.json | head -c 200)"
-                fi
-              }
-
-              write_headers "Товары" "ID_поста_VK,Название,Цвет,Размеры,Цена_закупки,Цена_продажи,Статус,Дата_публикации,Дата_прихода,Номер_контейнера,URL_поста,Фото_URL"
-              write_headers "Спрос" "ID_записи,ID_поста_VK,VK_ID_клиента,Имя_клиента,Размер,Количество,Timestamp,Номер_в_очереди,Статус,Источник,Текст_комментария,Дата_обновления"
-              write_headers "Заказы_поставщику" "ID_заказа,ID_поста_VK,Размер,Заказано_шт,Получено_шт,Цена_за_шт,Сумма,Дата_заказа,Дата_оплаты,Дата_прихода,Статус"
-              write_headers "Заказы_клиентов" "ID_сделки,VK_ID_клиента,Имя_клиента,Состав_заказа,Сумма_товаров,Сумма_доставки,Итого,Способ_доставки,Трек_номер,Адрес_доставки,Статус,Дата_создания,Дата_отправки,Расч_дата_доставки,Факт_дата_получения,Ждёт_сборную"
-              write_headers "Сводка_спроса" "Название_товара,ID_поста,XS,S,M,L,XL,XXL,Итого,Статус_товара"
-              write_headers "Логи_N8N" "Timestamp,Workflow,Тип,Событие,Детали,Статус"
-
-              RESULTS="${RESULTS}✅ Google Sheets: листы и заголовки созданы\n"
-
-              # Проверяем чтение
-              echo ""
-              echo "  Verifying sheets..."
-              VERIFY=$(curl -s "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}?fields=sheets.properties.title" \
-                -H "Authorization: Bearer ${ACCESS_TOKEN}")
-              echo "$VERIFY" | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          sheets = [s['properties']['title'] for s in data.get('sheets', [])]
-          print(f'  Листов в таблице: {len(sheets)}')
-          for s in sheets:
-              print(f'    📋 {s}')
-          " 2>/dev/null
+            if [ -z "$SA_EMAIL" ] || [ ! -f "/tmp/_sa_key.pem" ]; then
+              echo "❌ Failed to read SA JSON fields"
+              RESULTS="${RESULTS}❌ Google Sheets: SA JSON нечитаем\n"
             else
-              echo "❌ Cannot get Google access token"
-              echo "Error log: $GS_ERR"
-              SHORT_ERR=$(echo "$GS_ERR" | tail -2 | head -c 150)
-              RESULTS="${RESULTS}❌ Google Sheets: нет token\n${SHORT_ERR}\n"
+              # --- Build JWT ---
+              NOW=$(date +%s)
+              EXP=$((NOW + 3600))
+
+              JWT_HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | b64url)
+              JWT_CLAIM=$(printf '{"iss":"%s","scope":"https://www.googleapis.com/auth/spreadsheets","aud":"https://oauth2.googleapis.com/token","iat":%d,"exp":%d}' "$SA_EMAIL" "$NOW" "$EXP" | b64url)
+
+              JWT_UNSIGNED="${JWT_HEADER}.${JWT_CLAIM}"
+
+              # --- Sign with openssl ---
+              JWT_SIG=$(printf '%s' "$JWT_UNSIGNED" | openssl dgst -sha256 -sign /tmp/_sa_key.pem | b64url)
+              rm -f /tmp/_sa_key.pem
+
+              if [ -z "$JWT_SIG" ]; then
+                echo "❌ openssl signing failed"
+                RESULTS="${RESULTS}❌ Google Sheets: openssl sign failed\n"
+              else
+                JWT_TOKEN="${JWT_UNSIGNED}.${JWT_SIG}"
+                echo "JWT token length: ${#JWT_TOKEN}"
+
+                # --- Exchange for access token ---
+                TOKEN_RESP=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+                  --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer" \
+                  --data-urlencode "assertion=${JWT_TOKEN}")
+
+                ACCESS_TOKEN=$(echo "$TOKEN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token',''))" 2>/dev/null)
+
+                if [ -z "$ACCESS_TOKEN" ]; then
+                  echo "❌ No access token in response"
+                  echo "Response: $(echo "$TOKEN_RESP" | head -c 300)"
+                  SHORT_ERR=$(echo "$TOKEN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error_description', d.get('error','unknown')))" 2>/dev/null || echo "parse error")
+                  RESULTS="${RESULTS}❌ Google Sheets: ${SHORT_ERR}\n"
+                else
+                  echo "✓ Got Google access token (${#ACCESS_TOKEN} chars)"
+
+                  # --- Создать листы ---
+                  for SHEET in Товары Спрос Заказы_поставщику Заказы_клиентов Сводка_спроса Логи_N8N; do
+                    echo "  Creating sheet: $SHEET"
+                    RESP=$(curl -s -X POST \
+                      "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}:batchUpdate" \
+                      -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"requests\":[{\"addSheet\":{\"properties\":{\"title\":\"${SHEET}\",\"gridProperties\":{\"frozenRowCount\":1}}}}]}")
+                    if echo "$RESP" | grep -q "already exists"; then
+                      echo "    (already exists — OK)"
+                    elif echo "$RESP" | grep -q "sheetId"; then
+                      echo "    ✓ created"
+                    else
+                      echo "    $(echo "$RESP" | head -c 200)"
+                    fi
+                  done
+
+                  # --- Записать заголовки ---
+                  echo ""
+                  echo "  Writing headers..."
+
+                  write_headers() {
+                    local SHEET="$1"; shift
+                    local HDRS="$*"
+                    local BODY
+                    BODY=$(python3 -c "import json,sys; print(json.dumps({'values':[sys.argv[1].split(',')]}))" "$HDRS")
+                    local RESP
+                    RESP=$(curl -s -X PUT \
+                      "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${SHEET}!1:1?valueInputOption=RAW" \
+                      -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+                      -H "Content-Type: application/json" \
+                      -d "$BODY")
+                    if echo "$RESP" | grep -q "updatedRows"; then
+                      echo "    ✓ $SHEET headers OK"
+                    else
+                      echo "    $SHEET: $(echo "$RESP" | head -c 200)"
+                    fi
+                  }
+
+                  write_headers "Товары" "ID_поста_VK,Название,Цвет,Размеры,Цена_закупки,Цена_продажи,Статус,Дата_публикации,Дата_прихода,Номер_контейнера,URL_поста,Фото_URL"
+                  write_headers "Спрос" "ID_записи,ID_поста_VK,VK_ID_клиента,Имя_клиента,Размер,Количество,Timestamp,Номер_в_очереди,Статус,Источник,Текст_комментария,Дата_обновления"
+                  write_headers "Заказы_поставщику" "ID_заказа,ID_поста_VK,Размер,Заказано_шт,Получено_шт,Цена_за_шт,Сумма,Дата_заказа,Дата_оплаты,Дата_прихода,Статус"
+                  write_headers "Заказы_клиентов" "ID_сделки,VK_ID_клиента,Имя_клиента,Состав_заказа,Сумма_товаров,Сумма_доставки,Итого,Способ_доставки,Трек_номер,Адрес_доставки,Статус,Дата_создания,Дата_отправки,Расч_дата_доставки,Факт_дата_получения,Ждёт_сборную"
+                  write_headers "Сводка_спроса" "Название_товара,ID_поста,XS,S,M,L,XL,XXL,Итого,Статус_товара"
+                  write_headers "Логи_N8N" "Timestamp,Workflow,Тип,Событие,Детали,Статус"
+
+                  RESULTS="${RESULTS}✅ Google Sheets: листы и заголовки созданы\n"
+
+                  # --- Проверяем ---
+                  echo ""
+                  echo "  Verifying sheets..."
+                  VERIFY=$(curl -s "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}?fields=sheets.properties.title" \
+                    -H "Authorization: Bearer ${ACCESS_TOKEN}")
+                  echo "$VERIFY" | python3 -c "import sys,json;d=json.load(sys.stdin);ss=[s['properties']['title'] for s in d.get('sheets',[])];print(f'Листов: {len(ss)}');[print(f'  {s}') for s in ss]" 2>/dev/null || echo "  (verify parse failed)"
+                fi
+              fi
             fi
           else
             echo "❌ No SA file or SPREADSHEET_ID"
