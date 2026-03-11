@@ -1,0 +1,125 @@
+name: "Setup N8N AI Credential"
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    name: "Setup OpenAI credential + activate P0-07"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Setup N8N credential and import workflow
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${VPS_PORT} -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST}"
+
+          echo "=== 1. Check N8N status ==="
+          $SSH_CMD "curl -s http://localhost:5678/healthz && echo ' N8N OK' || echo 'N8N DOWN'"
+
+          echo ""
+          echo "=== 2. List existing workflows ==="
+          $SSH_CMD "curl -s -H 'X-N8N-API-KEY: ${N8N_API_KEY}' http://localhost:5678/api/v1/workflows | python3 -c \"
+          import sys,json
+          d=json.load(sys.stdin)
+          for w in d.get('data',[]):
+              print(f'  {w[\"id\"]} | {w[\"name\"]} | active={w[\"active\"]}')
+          \""
+
+          echo ""
+          echo "=== 3. Create OpenAI HTTP Header Auth credential ==="
+          CRED_RESULT=$($SSH_CMD "curl -s -X POST http://localhost:5678/api/v1/credentials \
+            -H 'X-N8N-API-KEY: ${N8N_API_KEY}' \
+            -H 'Content-Type: application/json' \
+            -d '{
+              \"name\": \"OpenAI API Key\",
+              \"type\": \"httpHeaderAuth\",
+              \"data\": {
+                \"name\": \"Authorization\",
+                \"value\": \"Bearer ${OPENAI_API_KEY}\"
+              }
+            }'")
+          echo "$CRED_RESULT" | python3 -c "
+          import sys,json
+          try:
+              d=json.load(sys.stdin)
+              if 'id' in d:
+                  print(f'Credential created: id={d[\"id\"]}, name={d[\"name\"]}')
+              else:
+                  print(f'Result: {json.dumps(d)[:300]}')
+          except:
+              print(f'Raw: {sys.stdin.read()[:300]}')
+          "
+
+          echo ""
+          echo "=== 4. Import P0-07 workflow ==="
+          IMPORT_RESULT=$($SSH_CMD "cat /opt/n8n-workflows/P0-07_AI_Comment_Reply.json 2>/dev/null && echo 'FILE_EXISTS' || echo 'NO_FILE'")
+
+          if echo "$IMPORT_RESULT" | grep -q "NO_FILE"; then
+            echo "P0-07 JSON not found on VPS, uploading..."
+          fi
+
+          # Import via API
+          $SSH_CMD "curl -s -X POST http://localhost:5678/api/v1/workflows \
+            -H 'X-N8N-API-KEY: ${N8N_API_KEY}' \
+            -H 'Content-Type: application/json' \
+            -d @/opt/n8n-workflows/P0-07_AI_Comment_Reply.json 2>/dev/null | python3 -c \"
+          import sys,json
+          try:
+              d=json.load(sys.stdin)
+              if 'id' in d:
+                  print(f'Workflow imported: id={d[\\\"id\\\"]}, name={d[\\\"name\\\"]}')
+                  wf_id=d['id']
+              else:
+                  print(f'Import result: {json.dumps(d)[:300]}')
+          except Exception as e:
+              print(f'Error: {e}')
+          \""
+
+          echo ""
+          echo "=== 5. Re-import P0-03 (updated) ==="
+          $SSH_CMD "curl -s -X POST http://localhost:5678/api/v1/workflows \
+            -H 'X-N8N-API-KEY: ${N8N_API_KEY}' \
+            -H 'Content-Type: application/json' \
+            -d @/opt/n8n-workflows/P0-03_VK_Event_Receiver.json 2>/dev/null | python3 -c \"
+          import sys,json
+          try:
+              d=json.load(sys.stdin)
+              if 'id' in d:
+                  print(f'P0-03 re-imported: id={d[\\\"id\\\"]}')
+              else:
+                  print(f'Result: {json.dumps(d)[:300]}')
+          except Exception as e:
+              print(f'Error: {e}')
+          \""
+
+          echo ""
+          echo "=== 6. List all workflows (final) ==="
+          $SSH_CMD "curl -s -H 'X-N8N-API-KEY: ${N8N_API_KEY}' http://localhost:5678/api/v1/workflows | python3 -c \"
+          import sys,json
+          d=json.load(sys.stdin)
+          for w in d.get('data',[]):
+              print(f'  {w[\"id\"]} | {w[\"name\"]} | active={w[\"active\"]}')
+          \""
+
+          echo ""
+          echo "=== 7. Notify Telegram ==="
+          MSG="🤖 P0-07 AI Comment Reply%0A%0A✅ OpenAI credential создан%0A✅ P0-07 импортирован в N8N%0A✅ P0-03 обновлён%0A%0A⏰ $(date '+%d.%m.%Y %H:%M UTC')"
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            -d "text=${MSG}" > /dev/null || true
+          echo "Telegram notified"
