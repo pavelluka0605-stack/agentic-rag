@@ -341,6 +341,83 @@ jobs:
             fi
           done
 
+      # ─── 8b. Активация и запуск workflows ────
+      - name: Activate & run P0 workflows
+        if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}
+        env:
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
+        run: |
+          N8N_URL="${N8N_BASE_URL:-https://n8n.marbomebel.ru}"
+
+          # Получить все workflows
+          ALL_WF=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/workflows?limit=100")
+
+          # Функция: найти ID по имени
+          get_wf_id() {
+            echo "$ALL_WF" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+              if w['name'] == '$1':
+                  print(w['id'])
+                  break
+          " 2>/dev/null
+          }
+
+          # ─── Активировать P0-03 (webhook receiver — должен быть всегда active) ───
+          WF_ID=$(get_wf_id "P0-03_VK_Event_Receiver")
+          if [ -n "$WF_ID" ]; then
+            echo "Activating P0-03_VK_Event_Receiver (ID: $WF_ID)..."
+            resp=$(curl -s -X PATCH "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{"active": true}')
+            if echo "$resp" | grep -q '"active":true'; then
+              echo "  ✓ P0-03 активирован"
+            else
+              echo "  ✗ P0-03: $(echo "$resp" | head -c 200)"
+            fi
+          fi
+
+          # ─── Активировать P0-04 (health check каждые 30 мин) ───
+          WF_ID=$(get_wf_id "P0-04_Health_Check")
+          if [ -n "$WF_ID" ]; then
+            echo "Activating P0-04_Health_Check (ID: $WF_ID)..."
+            resp=$(curl -s -X PATCH "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{"active": true}')
+            if echo "$resp" | grep -q '"active":true'; then
+              echo "  ✓ P0-04 активирован"
+            else
+              echo "  ✗ P0-04: $(echo "$resp" | head -c 200)"
+            fi
+          fi
+
+          # ─── Запустить P0-02 (тест Telegram) один раз ───
+          WF_ID=$(get_wf_id "P0-02_Test_Telegram")
+          if [ -n "$WF_ID" ]; then
+            echo "Executing P0-02_Test_Telegram (ID: $WF_ID)..."
+            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/run" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+            echo "  P0-02 result: $(echo "$resp" | head -c 200)"
+          fi
+
+          # ─── Запустить P0-01 (init Google Sheets) один раз ───
+          WF_ID=$(get_wf_id "P0-01_Init_Google_Sheets")
+          if [ -n "$WF_ID" ]; then
+            echo "Executing P0-01_Init_Google_Sheets (ID: $WF_ID)..."
+            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/run" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+            echo "  P0-01 result: $(echo "$resp" | head -c 200)"
+          fi
+
       # ─── 9. Health Check ──────────────────────
       - name: Health Check
         run: |
