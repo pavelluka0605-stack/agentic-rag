@@ -535,22 +535,28 @@ jobs:
 
           SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
 
-          # Run P0-02 (Telegram test)
-          if [ -n "$P02_ID" ]; then
-            echo "Running P0-02_Test_Telegram (ID: $P02_ID) via n8n CLI..."
-            $SSH_CMD "cd /root && n8n execute --id=$P02_ID 2>&1 | tail -10" || echo "  ⚠ P0-02 CLI returned non-zero (may still have executed)"
-            echo "  ✓ P0-02 done"
-          else
-            echo "  ⚠ P0-02_Test_Telegram: not found in API"
-          fi
+          if [ -n "$P02_ID" ] || [ -n "$P01_ID" ]; then
+            echo "Stopping n8n to free port for CLI execute..."
+            $SSH_CMD "systemctl stop n8n && sleep 2 && echo 'n8n stopped'"
 
-          # Run P0-01 (Init Google Sheets)
-          if [ -n "$P01_ID" ]; then
-            echo "Running P0-01_Init_Google_Sheets (ID: $P01_ID) via n8n CLI..."
-            $SSH_CMD "cd /root && n8n execute --id=$P01_ID 2>&1 | tail -20" || echo "  ⚠ P0-01 CLI returned non-zero (may still have executed)"
-            echo "  ✓ P0-01 done"
+            # Run P0-02 (Telegram test)
+            if [ -n "$P02_ID" ]; then
+              echo "Running P0-02_Test_Telegram (ID: $P02_ID) via n8n CLI..."
+              $SSH_CMD "cd /root && n8n execute --id=$P02_ID 2>&1 | tail -15" || echo "  ⚠ P0-02 CLI returned non-zero"
+              echo "  ✓ P0-02 done"
+            fi
+
+            # Run P0-01 (Init Google Sheets)
+            if [ -n "$P01_ID" ]; then
+              echo "Running P0-01_Init_Google_Sheets (ID: $P01_ID) via n8n CLI..."
+              $SSH_CMD "cd /root && n8n execute --id=$P01_ID 2>&1 | tail -20" || echo "  ⚠ P0-01 CLI returned non-zero"
+              echo "  ✓ P0-01 done"
+            fi
+
+            echo "Restarting n8n..."
+            $SSH_CMD "systemctl start n8n && sleep 5 && systemctl is-active n8n && echo 'n8n restarted OK'"
           else
-            echo "  ⚠ P0-01_Init_Google_Sheets: not found in API"
+            echo "  ⚠ Neither P0-01 nor P0-02 found in API"
           fi
 
       # ─── 9. Health Check ──────────────────────
