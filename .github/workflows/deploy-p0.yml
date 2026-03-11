@@ -305,51 +305,120 @@ jobs:
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
 
-          echo "═══ HEALTH CHECK ═══"
+          echo "═══════════════════════════════════"
+          echo "  P0 FULL HEALTH CHECK"
+          echo "  $(date '+%d.%m.%Y %H:%M:%S')"
+          echo "═══════════════════════════════════"
+          echo ""
+          ERRORS=0
 
-          # N8N
-          if curl -s http://localhost:5678/healthz &>/dev/null; then
-            echo "✓ N8N:          OK (port 5678)"
+          # ─── N8N ────────────────────────────────
+          if curl -s --max-time 5 http://localhost:5678/healthz &>/dev/null; then
+            echo "✅ N8N: работает (порт 5678)"
+            # Список workflow
+            WF_DATA=$(curl -s http://localhost:5678/api/v1/workflows 2>/dev/null)
+            if echo "$WF_DATA" | grep -q '"data"'; then
+              echo "$WF_DATA" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          print(f'   Workflows: {len(data)}')
+          for w in data:
+              s = '🟢' if w.get('active') else '⚪'
+              print(f'   {s} {w[\"name\"]} (id={w[\"id\"]})')
+          " 2>/dev/null
+            fi
           else
-            echo "✗ N8N:          DOWN"
+            echo "❌ N8N: НЕ РАБОТАЕТ"
+            systemctl status n8n 2>/dev/null | head -5 || true
+            ERRORS=$((ERRORS+1))
+          fi
+          echo ""
+
+          # ─── VK Long Poll (Groups) ──────────────
+          if systemctl is-active --quiet vk-longpoll 2>/dev/null; then
+            echo "✅ VK Long Poll (Groups): active"
+            if curl -s --max-time 3 http://127.0.0.1:3100/health &>/dev/null; then
+              curl -s http://127.0.0.1:3100/health | python3 -c "
+          import sys,json; d=json.load(sys.stdin)
+          print(f'   Events: {d.get(\"events_received\",0)} | Errors: {d.get(\"errors\",0)} | Started: {d.get(\"started_at\",\"?\")}')" 2>/dev/null
+            fi
+          else
+            echo "❌ VK Long Poll (Groups): не запущен"
+            journalctl -u vk-longpoll -n 3 --no-pager 2>/dev/null || true
+            ERRORS=$((ERRORS+1))
+          fi
+          echo ""
+
+          # ─── VK User Long Poll ──────────────────
+          if systemctl is-active --quiet vk-user-longpoll 2>/dev/null; then
+            echo "✅ VK User Long Poll: active"
+            if curl -s --max-time 3 http://127.0.0.1:3101/health &>/dev/null; then
+              curl -s http://127.0.0.1:3101/health | python3 -c "
+          import sys,json; d=json.load(sys.stdin)
+          print(f'   Messages: {d.get(\"messages_received\",0)}')" 2>/dev/null
+            fi
+          else
+            echo "⚪ VK User Long Poll: не запущен (VK_USER_TOKEN не задан?)"
+          fi
+          echo ""
+
+          # ─── Webhook test ───────────────────────
+          WH_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+            -X POST http://localhost:5678/webhook/vk-events \
+            -H "Content-Type: application/json" \
+            -d '{"type":"system","event":"healthcheck","timestamp":"'$(date -Iseconds)'"}')
+          if [ "$WH_CODE" = "200" ]; then
+            echo "✅ Webhook /vk-events: HTTP $WH_CODE"
+          else
+            echo "❌ Webhook /vk-events: HTTP $WH_CODE (P0-03 не активен?)"
+            ERRORS=$((ERRORS+1))
+          fi
+          echo ""
+
+          # ─── VK API + Telegram ──────────────────
+          source /opt/p0-foundation/.env 2>/dev/null
+
+          if [ -n "${VK_TOKEN:-}" ]; then
+            VK_RESP=$(curl -s --max-time 10 "https://api.vk.com/method/groups.getById?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199")
+            if echo "$VK_RESP" | grep -q '"response"'; then
+              echo "✅ VK API: OK"
+            else
+              echo "❌ VK API: ошибка — $(echo "$VK_RESP" | head -c 150)"
+              ERRORS=$((ERRORS+1))
+            fi
+          else
+            echo "❌ VK API: .env не загружен"
+            ERRORS=$((ERRORS+1))
           fi
 
-          # VK Long Poll
-          if curl -s http://127.0.0.1:3100/health &>/dev/null; then
-            stats=$(curl -s http://127.0.0.1:3100/health)
-            events=$(echo "$stats" | python3 -c "import sys,json; print(json.load(sys.stdin).get('events_received',0))" 2>/dev/null)
-            echo "✓ VK Long Poll: OK (events: $events)"
-          else
-            echo "✗ VK Long Poll: DOWN"
+          if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
+            TG_RESP=$(curl -s --max-time 10 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe")
+            if echo "$TG_RESP" | grep -q '"ok":true'; then
+              BOT=$(echo "$TG_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['username'])" 2>/dev/null || echo "?")
+              echo "✅ Telegram: @$BOT"
+            else
+              echo "❌ Telegram: бот не отвечает"
+              ERRORS=$((ERRORS+1))
+            fi
           fi
+          echo ""
 
-          # VK User Long Poll
-          if curl -s http://127.0.0.1:3101/health &>/dev/null; then
-            stats=$(curl -s http://127.0.0.1:3101/health)
-            msgs=$(echo "$stats" | python3 -c "import sys,json; print(json.load(sys.stdin).get('messages_received',0))" 2>/dev/null)
-            echo "✓ User LongPoll: OK (msgs: $msgs)"
+          # ─── Google SA + Файлы ──────────────────
+          [ -f "/opt/credentials/google-service-account.json" ] && echo "✅ Google SA JSON: есть" || echo "⚠️  Google SA JSON: нет"
+          [ -f "/opt/vk-longpoll/listener.js" ] && echo "✅ listener.js: есть" || echo "❌ listener.js: нет"
+          [ -f "/opt/vk-longpoll/.env" ] && echo "✅ vk-longpoll .env: есть" || echo "❌ vk-longpoll .env: нет"
+          WF_FILES=$(ls /opt/n8n-workflows/*.json 2>/dev/null | wc -l)
+          echo "📁 N8N workflow JSONs: $WF_FILES файлов"
+          echo ""
+
+          # ─── Итог ──────────────────────────────
+          echo "═══════════════════════════════════"
+          if [ "$ERRORS" -eq 0 ]; then
+            echo "✅ ВСЁ РАБОТАЕТ — ошибок: 0"
           else
-            echo "- User LongPoll: not running (VK_USER_TOKEN may not be set)"
+            echo "⚠️  ПРОБЛЕМ: $ERRORS"
           fi
-
-          # Telegram
-          source /opt/p0-foundation/.env
-          tg_ok=$(curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" | grep -c '"ok":true')
-          if [ "$tg_ok" = "1" ]; then
-            echo "✓ Telegram:     OK"
-          else
-            echo "✗ Telegram:     FAIL"
-          fi
-
-          # VK API
-          vk_ok=$(curl -s "https://api.vk.com/method/groups.getById?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199" | grep -c '"response"')
-          if [ "$vk_ok" = "1" ]; then
-            echo "✓ VK API:       OK"
-          else
-            echo "✗ VK API:       FAIL"
-          fi
-
-          echo "═══════════════════"
+          echo "═══════════════════════════════════"
           REMOTE_SCRIPT
 
       # ─── 10. Telegram уведомление ─────────────
