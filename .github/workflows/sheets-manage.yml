@@ -10,9 +10,14 @@ on:
         options:
           - list-sheets
           - delete-sheet
+          - delete-sheet-by-id
           - add-sheet
       sheet_name:
         description: 'Sheet name (for delete/add actions)'
+        required: false
+        type: string
+      sheet_id:
+        description: 'Sheet ID (for delete-sheet-by-id action)'
         required: false
         type: string
 
@@ -34,6 +39,7 @@ jobs:
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
           ACTION: ${{ inputs.action }}
           SHEET_NAME: ${{ inputs.sheet_name }}
+          SHEET_ID: ${{ inputs.sheet_id }}
         run: |
           python3 << 'PYEOF'
           import json, os, requests
@@ -82,6 +88,23 @@ jobs:
                   exit(1)
               sheet_id = sheets[SHEET_NAME]
               print(f"\nDeleting '{SHEET_NAME}' (id={sheet_id})...")
+              del_resp = requests.post(
+                  f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}:batchUpdate",
+                  headers={**headers, "Content-Type": "application/json"},
+                  json={"requests": [{"deleteSheet": {"sheetId": sheet_id}}]}
+              )
+              del_resp.raise_for_status()
+              print("Deleted successfully!")
+
+          elif ACTION == "delete-sheet-by-id":
+              SHEET_ID = os.environ.get("SHEET_ID", "")
+              if not SHEET_ID:
+                  print("\nERROR: sheet_id is required for delete-sheet-by-id action")
+                  exit(1)
+              sheet_id = int(SHEET_ID)
+              # Find name for logging
+              name = next((t for t, sid in sheets.items() if sid == sheet_id), f"id={sheet_id}")
+              print(f"\nDeleting '{name}' (id={sheet_id})...")
               del_resp = requests.post(
                   f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}:batchUpdate",
                   headers={**headers, "Content-Type": "application/json"},
