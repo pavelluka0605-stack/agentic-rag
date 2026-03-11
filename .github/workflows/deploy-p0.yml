@@ -580,6 +580,230 @@ jobs:
           # Ensure n8n is running after all attempts
           $SSH_CMD "systemctl is-active n8n || systemctl start n8n"
 
+      # ─── 8c. Direct verification: Telegram + Google Sheets ───
+      - name: "Direct verify: Telegram + Google Sheets"
+        if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
+
+          source /opt/p0-foundation/.env 2>/dev/null
+          RESULTS=""
+
+          # ─── 1. Telegram: прямой тест ─────────────
+          echo "=== Telegram direct test ==="
+          if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_MANAGER_CHAT_ID:-}" ]; then
+            TG_RESP=$(curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"chat_id\": \"${TELEGRAM_MANAGER_CHAT_ID}\",
+                \"text\": \"✅ <b>P0-02 Telegram Test OK</b>\n\n🔧 Прямая проверка из deploy pipeline.\nБот работает!\n\n⏰ $(date '+%d.%m.%Y %H:%M:%S')\n🖥 Frankfurt VPS\",
+                \"parse_mode\": \"HTML\"
+              }")
+            if echo "$TG_RESP" | grep -q '"ok":true'; then
+              echo "✅ Telegram message sent!"
+              RESULTS="${RESULTS}✅ Telegram: сообщение отправлено\n"
+            else
+              echo "❌ Telegram error: $TG_RESP"
+              RESULTS="${RESULTS}❌ Telegram: ошибка\n"
+            fi
+          else
+            echo "❌ TELEGRAM_BOT_TOKEN or CHAT_ID not set"
+            RESULTS="${RESULTS}❌ Telegram: нет токена\n"
+          fi
+
+          # ─── 2. Google Sheets: создание листов и заголовков ───
+          echo ""
+          echo "=== Google Sheets direct setup ==="
+          if [ -f "/opt/credentials/google-service-account.json" ] && [ -n "${GOOGLE_SPREADSHEET_ID:-}" ]; then
+
+            # Получить access token из service account
+            ACCESS_TOKEN=$(python3 << 'PYEOF'
+          import json, time, urllib.request, urllib.parse
+          try:
+              import jwt as pyjwt
+              USE_PYJWT = True
+          except ImportError:
+              USE_PYJWT = False
+
+          with open("/opt/credentials/google-service-account.json") as f:
+              sa = json.load(f)
+
+          if USE_PYJWT:
+              now = int(time.time())
+              payload = {
+                  "iss": sa["client_email"],
+                  "scope": "https://www.googleapis.com/auth/spreadsheets",
+                  "aud": "https://oauth2.googleapis.com/token",
+                  "iat": now,
+                  "exp": now + 3600
+              }
+              signed = pyjwt.encode(payload, sa["private_key"], algorithm="RS256")
+              data = urllib.parse.urlencode({
+                  "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                  "assertion": signed
+              }).encode()
+              req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data)
+              resp = json.loads(urllib.request.urlopen(req, timeout=15).read())
+              print(resp["access_token"])
+          else:
+              # Fallback: manual JWT with hmac (need cryptography or similar)
+              import subprocess, base64, hashlib
+              now = int(time.time())
+              header = base64.urlsafe_b64encode(json.dumps({"alg":"RS256","typ":"JWT"}).encode()).rstrip(b'=').decode()
+              payload_data = {
+                  "iss": sa["client_email"],
+                  "scope": "https://www.googleapis.com/auth/spreadsheets",
+                  "aud": "https://oauth2.googleapis.com/token",
+                  "iat": now, "exp": now + 3600
+              }
+              payload_b64 = base64.urlsafe_b64encode(json.dumps(payload_data).encode()).rstrip(b'=').decode()
+              msg = f"{header}.{payload_b64}"
+              # Sign with openssl
+              proc = subprocess.run(
+                  ["openssl", "dgst", "-sha256", "-sign", "/dev/stdin"],
+                  input=sa["private_key"].encode(), capture_output=True,
+                  env={"PATH": "/usr/bin:/bin"}
+              )
+              # Actually need to pipe the message to sign
+              import tempfile
+              with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as kf:
+                  kf.write(sa["private_key"])
+                  key_file = kf.name
+              proc = subprocess.run(
+                  ["openssl", "dgst", "-sha256", "-sign", key_file],
+                  input=msg.encode(), capture_output=True
+              )
+              import os; os.unlink(key_file)
+              sig = base64.urlsafe_b64encode(proc.stdout).rstrip(b'=').decode()
+              token_jwt = f"{msg}.{sig}"
+              data = urllib.parse.urlencode({
+                  "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                  "assertion": token_jwt
+              }).encode()
+              req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data)
+              resp = json.loads(urllib.request.urlopen(req, timeout=15).read())
+              print(resp["access_token"])
+          PYEOF
+          )
+
+            if [ -z "$ACCESS_TOKEN" ] || echo "$ACCESS_TOKEN" | grep -qi "error\|traceback"; then
+              echo "❌ Failed to get Google access token"
+              echo "Token output: $ACCESS_TOKEN"
+              # Try installing PyJWT
+              echo "Installing PyJWT..."
+              pip3 install PyJWT cryptography -q 2>/dev/null || pip install PyJWT cryptography -q 2>/dev/null
+              ACCESS_TOKEN=$(python3 << 'PYEOF2'
+          import json, time, urllib.request, urllib.parse, jwt as pyjwt
+          with open("/opt/credentials/google-service-account.json") as f:
+              sa = json.load(f)
+          now = int(time.time())
+          payload = {
+              "iss": sa["client_email"],
+              "scope": "https://www.googleapis.com/auth/spreadsheets",
+              "aud": "https://oauth2.googleapis.com/token",
+              "iat": now, "exp": now + 3600
+          }
+          signed = pyjwt.encode(payload, sa["private_key"], algorithm="RS256")
+          data = urllib.parse.urlencode({
+              "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+              "assertion": signed
+          }).encode()
+          req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data)
+          resp = json.loads(urllib.request.urlopen(req, timeout=15).read())
+          print(resp["access_token"])
+          PYEOF2
+          )
+            fi
+
+            if [ -n "$ACCESS_TOKEN" ] && ! echo "$ACCESS_TOKEN" | grep -qi "error\|traceback"; then
+              echo "✓ Got Google access token"
+
+              # Создать листы (batchUpdate — игнорируем ошибки если листы уже есть)
+              SHEETS='["Товары","Спрос","Заказы_поставщику","Заказы_клиентов","Сводка_спроса","Логи_N8N"]'
+              for SHEET in $(echo "$SHEETS" | python3 -c "import sys,json; [print(s) for s in json.load(sys.stdin)]"); do
+                echo "  Creating sheet: $SHEET"
+                curl -s -X POST \
+                  "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}:batchUpdate" \
+                  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"requests\":[{\"addSheet\":{\"properties\":{\"title\":\"${SHEET}\",\"gridProperties\":{\"frozenRowCount\":1}}}}]}" \
+                  > /tmp/gs_resp.json 2>&1
+                if grep -q "already exists" /tmp/gs_resp.json 2>/dev/null; then
+                  echo "    (already exists — OK)"
+                elif grep -q "sheetId" /tmp/gs_resp.json 2>/dev/null; then
+                  echo "    ✓ created"
+                else
+                  echo "    Response: $(cat /tmp/gs_resp.json | head -c 200)"
+                fi
+              done
+
+              # Записать заголовки
+              echo ""
+              echo "  Writing headers..."
+
+              write_headers() {
+                local SHEET="$1"
+                shift
+                local HEADERS="$@"
+                local VALUES=$(python3 -c "print('[' + ','.join(['\"' + h + '\"' for h in '$HEADERS'.split(',')]) + ']')")
+                curl -s -X PUT \
+                  "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}/values/${SHEET}!1:1?valueInputOption=RAW" \
+                  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"values\":[${VALUES}]}" > /tmp/gs_h.json 2>&1
+                if grep -q "updatedRows" /tmp/gs_h.json 2>/dev/null; then
+                  echo "    ✓ $SHEET headers OK"
+                else
+                  echo "    $SHEET: $(cat /tmp/gs_h.json | head -c 200)"
+                fi
+              }
+
+              write_headers "Товары" "ID_поста_VK,Название,Цвет,Размеры,Цена_закупки,Цена_продажи,Статус,Дата_публикации,Дата_прихода,Номер_контейнера,URL_поста,Фото_URL"
+              write_headers "Спрос" "ID_записи,ID_поста_VK,VK_ID_клиента,Имя_клиента,Размер,Количество,Timestamp,Номер_в_очереди,Статус,Источник,Текст_комментария,Дата_обновления"
+              write_headers "Заказы_поставщику" "ID_заказа,ID_поста_VK,Размер,Заказано_шт,Получено_шт,Цена_за_шт,Сумма,Дата_заказа,Дата_оплаты,Дата_прихода,Статус"
+              write_headers "Заказы_клиентов" "ID_сделки,VK_ID_клиента,Имя_клиента,Состав_заказа,Сумма_товаров,Сумма_доставки,Итого,Способ_доставки,Трек_номер,Адрес_доставки,Статус,Дата_создания,Дата_отправки,Расч_дата_доставки,Факт_дата_получения,Ждёт_сборную"
+              write_headers "Сводка_спроса" "Название_товара,ID_поста,XS,S,M,L,XL,XXL,Итого,Статус_товара"
+              write_headers "Логи_N8N" "Timestamp,Workflow,Тип,Событие,Детали,Статус"
+
+              RESULTS="${RESULTS}✅ Google Sheets: листы и заголовки созданы\n"
+
+              # Проверяем чтение
+              echo ""
+              echo "  Verifying sheets..."
+              VERIFY=$(curl -s "https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SPREADSHEET_ID}?fields=sheets.properties.title" \
+                -H "Authorization: Bearer ${ACCESS_TOKEN}")
+              echo "$VERIFY" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          sheets = [s['properties']['title'] for s in data.get('sheets', [])]
+          print(f'  Листов в таблице: {len(sheets)}')
+          for s in sheets:
+              print(f'    📋 {s}')
+          " 2>/dev/null
+            else
+              echo "❌ Cannot get Google access token"
+              RESULTS="${RESULTS}❌ Google Sheets: нет access token\n"
+            fi
+          else
+            echo "❌ No SA file or SPREADSHEET_ID"
+            RESULTS="${RESULTS}❌ Google Sheets: нет credentials\n"
+          fi
+
+          # ─── 3. Отправить итоговый отчёт в Telegram ───
+          echo ""
+          echo "=== Sending summary to Telegram ==="
+          if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_MANAGER_CHAT_ID:-}" ]; then
+            SUMMARY="📊 <b>P0 Setup Complete</b>\n\n$(echo -e "$RESULTS")\n⏰ $(date '+%d.%m.%Y %H:%M:%S')"
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -H "Content-Type: application/json" \
+              -d "{\"chat_id\":\"${TELEGRAM_MANAGER_CHAT_ID}\",\"text\":\"${SUMMARY}\",\"parse_mode\":\"HTML\"}" > /dev/null
+            echo "✓ Summary sent to Telegram"
+          fi
+
+          rm -f /tmp/gs_resp.json /tmp/gs_h.json
+          REMOTE_SCRIPT
+
       # ─── 9. Health Check ──────────────────────
       - name: Health Check
         run: |
