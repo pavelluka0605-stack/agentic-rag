@@ -391,6 +391,30 @@
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678/webhook' }}/vk-ai-reply",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"comment_id\": {{ $('Extract: Comment').item.json.comment_id }},\n  \"from_id\": {{ $('Extract: Comment').item.json.from_id }},\n  \"post_id\": {{ $('Extract: Comment').item.json.post_id }},\n  \"text\": {{ JSON.stringify($('Extract: Comment').item.json.text) }},\n  \"date\": {{ JSON.stringify($('Extract: Comment').item.json.date) }}\n}",
+        "options": {
+          "timeout": 60000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 0
+            }
+          }
+        }
+      },
+      "id": "call-ai-reply",
+      "name": "Call: AI Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 550],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "respondWith": "json",
         "responseBody": "={\"status\":\"ok\"}"
       },
@@ -437,7 +461,13 @@
       "main": [[ { "node": "Telegram: New Comment", "type": "main", "index": 0 } ]]
     },
     "Telegram: New Comment": {
-      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+      "main": [[
+        { "node": "Respond OK", "type": "main", "index": 0 },
+        { "node": "Call: AI Reply", "type": "main", "index": 0 }
+      ]]
+    },
+    "Call: AI Reply": {
+      "main": [[ ]]
     },
     "Log: New Post": {
       "main": [[ { "node": "Telegram: New Post", "type": "main", "index": 0 } ]]

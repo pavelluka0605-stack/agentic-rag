@@ -1,0 +1,262 @@
+{
+  "name": "P0-07_AI_Comment_Reply",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vk-ai-reply",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-ai",
+      "name": "Webhook: AI Reply",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "vk-ai-reply"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"temperature\": 0.3,\n  \"max_tokens\": 600,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Ты — AI-консультант мебельного магазина marbomebel.ru. Мы продаём мебель (диваны, кровати, шкафы, столы, стулья, комоды и т.д.).\\n\\nТвоя задача — проанализировать комментарий клиента под постом VK и определить его намерение.\\n\\nОтветь СТРОГО в формате JSON (без markdown):\\n{\\n  \\\"intent\\\": \\\"consultation\\\" | \\\"clarify\\\" | \\\"deal\\\",\\n  \\\"reply\\\": \\\"текст ответа клиенту на русском\\\",\\n  \\\"product\\\": \\\"название товара если понятно, иначе пустая строка\\\",\\n  \\\"details\\\": \\\"дополнительные детали заказа если есть\\\"\\n}\\n\\nПравила классификации:\\n- \\\"consultation\\\" — комментарий НЕ связан с покупкой (вопрос о материалах, уходе, доставке, общий вопрос). Дай полезный ответ.\\n- \\\"clarify\\\" — клиент ХОЧЕТ купить, но не хватает информации (не указан размер, цвет, количество, адрес). Вежливо уточни недостающее.\\n- \\\"deal\\\" — клиент чётко хочет купить, указал достаточно деталей (товар + размер/цвет/количество). Подтверди заказ.\\n\\nОтвечай кратко, дружелюбно, на русском языке. Максимум 2-3 предложения.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Комментарий клиента: {{ $json.text }}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "openai-classify",
+      "name": "OpenAI: Classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "openai-header",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse OpenAI response and extract intent + reply\nconst input = $input.item.json;\nconst webhookData = $('Webhook: AI Reply').item.json;\n\nlet aiResponse;\ntry {\n  const content = input.choices[0].message.content;\n  // Try to parse JSON from response (handle markdown code blocks)\n  let jsonStr = content;\n  if (content.includes('```')) {\n    jsonStr = content.replace(/```json?\\n?/g, '').replace(/```/g, '').trim();\n  }\n  aiResponse = JSON.parse(jsonStr);\n} catch (e) {\n  // Fallback if parsing fails\n  aiResponse = {\n    intent: 'consultation',\n    reply: 'Спасибо за ваш комментарий! Напишите нам в личные сообщения для подробной консультации.',\n    product: '',\n    details: ''\n  };\n}\n\nreturn [{\n  json: {\n    intent: aiResponse.intent || 'consultation',\n    reply: aiResponse.reply || '',\n    product: aiResponse.product || '',\n    details: aiResponse.details || '',\n    comment_id: webhookData.comment_id,\n    from_id: webhookData.from_id,\n    post_id: webhookData.post_id,\n    text: webhookData.text,\n    date: webhookData.date\n  }\n}];"
+      },
+      "id": "parse-ai",
+      "name": "Parse: AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.intent }}",
+        "rules": {
+          "rules": [
+            { "value2": "consultation" },
+            { "value2": "clarify" },
+            { "value2": "deal" }
+          ]
+        }
+      },
+      "id": "switch-intent",
+      "name": "Switch: Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [920, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.vk.com/method/wall.createComment",
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "=owner_id=-{{ $env.VK_GROUP_ID }}&post_id={{ $json.post_id }}&reply_to_comment={{ $json.comment_id }}&message={{ encodeURIComponent($json.reply) }}&access_token={{ $env.VK_TOKEN }}&v=5.199",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "vk-reply-consult",
+      "name": "VK: Reply Consultation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 250]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.vk.com/method/wall.createComment",
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "=owner_id=-{{ $env.VK_GROUP_ID }}&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token={{ $env.VK_TOKEN }}&v=5.199",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "vk-reply-clarify",
+      "name": "VK: Reply Clarify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare BlueSales customer data\nconst data = $input.item.json;\n\nreturn [{\n  json: {\n    vkId: String(data.from_id),\n    firstName: 'VK_' + data.from_id,\n    source: 'VK комментарий',\n    tags: [{ name: 'AI-сделка' }],\n    comment: 'Автоматическая сделка из VK комментария: ' + data.text,\n    product: data.product,\n    details: data.details,\n    reply: data.reply,\n    post_id: data.post_id,\n    comment_id: data.comment_id,\n    from_id: data.from_id\n  }\n}];"
+      },
+      "id": "prepare-deal",
+      "name": "Prepare: Deal Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 650]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://bluesales.ru/app/Customers/WebServer.aspx?login={{ $env.BLUESALES_LOGIN }}&password={{ $env.BLUESALES_PASSWORD_HASH }}&command=customers.add",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"vkId\": \"{{ $json.vkId }}\",\n  \"firstName\": \"{{ $json.firstName }}\",\n  \"source\": \"{{ $json.source }}\",\n  \"tags\": [{ \"name\": \"AI-сделка\" }],\n  \"comment\": \"{{ $json.comment }}\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "bs-add-customer",
+      "name": "BlueSales: Add Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 650]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.vk.com/method/wall.createComment",
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "=owner_id=-{{ $env.VK_GROUP_ID }}&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token={{ $env.VK_TOKEN }}&v=5.199",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "vk-reply-deal",
+      "name": "VK: Reply Deal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1640, 550]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"🤖 <b>AI создал сделку</b>\\n\\nКлиент: <a href=\\\"https://vk.com/id{{ $('Parse: AI Response').item.json.from_id }}\\\">VK ID {{ $('Parse: AI Response').item.json.from_id }}</a>\\nТовар: {{ $('Parse: AI Response').item.json.product || 'не указан' }}\\nКомментарий: {{ $('Parse: AI Response').item.json.text }}\\nОтвет AI: {{ $('Parse: AI Response').item.json.reply }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
+      },
+      "id": "tg-deal-alert",
+      "name": "Telegram: Deal Created",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1640, 750]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Workflow": "AI_Comment_Reply",
+            "Тип": "={{ $('Parse: AI Response').item.json.intent }}",
+            "Событие": "AI ответ на комментарий",
+            "Детали": "={{ JSON.stringify({ from_id: $('Parse: AI Response').item.json.from_id, post_id: $('Parse: AI Response').item.json.post_id, intent: $('Parse: AI Response').item.json.intent, reply: $('Parse: AI Response').item.json.reply }) }}",
+            "Статус": "success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Тип", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Событие", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Детали", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-ai-reply",
+      "name": "Log: AI Reply",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1880, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"ok\",\"intent\":\"{{ $('Parse: AI Response').item.json.intent }}\"}"
+      },
+      "id": "respond-ok-ai",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2100, 400]
+    }
+  ],
+  "connections": {
+    "Webhook: AI Reply": {
+      "main": [[ { "node": "OpenAI: Classify", "type": "main", "index": 0 } ]]
+    },
+    "OpenAI: Classify": {
+      "main": [[ { "node": "Parse: AI Response", "type": "main", "index": 0 } ]]
+    },
+    "Parse: AI Response": {
+      "main": [[ { "node": "Switch: Intent", "type": "main", "index": 0 } ]]
+    },
+    "Switch: Intent": {
+      "main": [
+        [{ "node": "VK: Reply Consultation", "type": "main", "index": 0 }],
+        [{ "node": "VK: Reply Clarify", "type": "main", "index": 0 }],
+        [{ "node": "Prepare: Deal Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "VK: Reply Consultation": {
+      "main": [[ { "node": "Log: AI Reply", "type": "main", "index": 0 } ]]
+    },
+    "VK: Reply Clarify": {
+      "main": [[ { "node": "Log: AI Reply", "type": "main", "index": 0 } ]]
+    },
+    "Prepare: Deal Data": {
+      "main": [[ { "node": "BlueSales: Add Customer", "type": "main", "index": 0 } ]]
+    },
+    "BlueSales: Add Customer": {
+      "main": [[
+        { "node": "VK: Reply Deal", "type": "main", "index": 0 },
+        { "node": "Telegram: Deal Created", "type": "main", "index": 0 }
+      ]]
+    },
+    "VK: Reply Deal": {
+      "main": [[ { "node": "Log: AI Reply", "type": "main", "index": 0 } ]]
+    },
+    "Telegram: Deal Created": {
+      "main": [[ { "node": "Log: AI Reply", "type": "main", "index": 0 } ]]
+    },
+    "Log: AI Reply": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
