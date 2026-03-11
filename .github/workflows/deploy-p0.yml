@@ -143,6 +143,8 @@ jobs:
 
           # Удалить лишние пробелы от heredoc indent
           sed -i 's/^          //' /opt/p0-foundation/.env
+          # Fix double slashes in URLs (e.g. https://host//webhook → https://host/webhook)
+          sed -i 's|://\(.*\)//|://\1/|g' /opt/p0-foundation/.env
           echo "✓ .env created"
           REMOTE_SCRIPT
 
@@ -299,7 +301,7 @@ jobs:
           VK_TOKEN=${VK_TOKEN}
           VK_GROUP_ID=${VK_GROUP_ID}
           VK_API_VERSION=${VK_API_VERSION:-5.199}
-          N8N_WEBHOOK_URL=${N8N_WEBHOOK_BASE_URL:-https://n8n.marbomebel.ru/webhook}/vk-events
+          N8N_WEBHOOK_URL=http://localhost:5678/webhook/vk-events
           HEALTH_PORT=3100
           ENVEOF
 
@@ -355,7 +357,7 @@ jobs:
           cat > /opt/vk-user-longpoll/.env << ENVEOF
           VK_USER_TOKEN=${VK_USER_TOKEN}
           VK_API_VERSION=${VK_API_VERSION:-5.199}
-          N8N_WEBHOOK_URL=${N8N_WEBHOOK_BASE_URL:-https://n8n.marbomebel.ru/webhook}/vk-user-messages
+          N8N_WEBHOOK_URL=http://localhost:5678/webhook/vk-user-messages
           HEALTH_PORT=3101
           ENVEOF
 
@@ -608,11 +610,20 @@ jobs:
             return 0
           }
 
-          # ─── Активировать P0-03 (webhook receiver — должен быть всегда active) ───
-          activate_workflow "P0-03_VK_Event_Receiver"
+          # ─── Активировать все P0 workflows ───
+          echo "Activating all P0 workflows..."
+          echo "$ALL_WF" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+              if w['name'].startswith('P0-'):
+                  print(w['name'])
+          " 2>/dev/null | while read -r wf_name; do
+            activate_workflow "$wf_name"
+          done
 
-          # ─── Активировать P0-04 (health check каждые 30 мин) ───
-          activate_workflow "P0-04_Health_Check"
+          # Double-check P0-03 (critical for webhooks)
+          activate_workflow "P0-03_VK_Event_Receiver"
 
           # ─── Запустить P0-02 и P0-01 через VPS (internal API) ───
           echo ""
