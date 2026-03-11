@@ -85,11 +85,18 @@ agentic-rag/
 
 Актуальный список листов — проверять через API (см. код выше).
 
+## GitHub Token
+
+- **Тип:** Classic (Personal Access Token)
+- **Scopes:** `repo`, `workflow`
+- **Примечание:** Fine-grained токены НЕ поддерживают scope `workflow` для пуша workflow-файлов
+
 ## Известные проблемы
 
-- **403 при доступе к Sheets API (март 2026):** HTML-ответ вместо JSON.
-  Возможные причины: пропагация включения API (подождать 5 мин),
-  или таблица не расшарена на SA email.
+- **Google APIs заблокированы из среды Claude Code** — IP этой среды получает 403 HTML от Google APIs.
+  Решение: все операции с Google Sheets выполнять через GitHub Actions workflow `sheets-manage.yml`.
+- **Кириллица в workflow_dispatch inputs** — при передаче через API могут быть проблемы с encoding.
+  Решение: использовать `delete-sheet-by-id` с числовым ID вместо имени листа.
 
 ## История ключевых решений
 
