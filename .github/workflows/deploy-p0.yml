@@ -618,13 +618,15 @@ jobs:
           if [ -f "/opt/credentials/google-service-account.json" ] && [ -n "${GOOGLE_SPREADSHEET_ID:-}" ]; then
 
             # Получить access token из service account (openssl, без внешних библиотек)
-            ACCESS_TOKEN=$(python3 << 'PYEOF'
+            ACCESS_TOKEN=$(python3 2>/tmp/gs_token_err.log << 'PYEOF'
 import json, time, base64, subprocess, tempfile, os, urllib.request, urllib.parse, sys
 
 SA_FILE = "/opt/credentials/google-service-account.json"
 try:
     with open(SA_FILE) as f:
         sa = json.load(f)
+
+    print(f"SA email: {sa.get('client_email','?')}", file=sys.stderr)
 
     # 1. Build JWT header + payload
     now = int(time.time())
@@ -644,7 +646,7 @@ try:
     p = b64url(payload)
     msg = f"{h}.{p}"
 
-    # 2. Sign with openssl (works on any Linux)
+    # 2. Sign with openssl
     with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as kf:
         kf.write(sa["private_key"])
         key_file = kf.name
@@ -657,9 +659,10 @@ try:
     os.unlink(key_file)
 
     if proc.returncode != 0:
-        print(f"openssl error: {proc.stderr.decode()}", file=sys.stderr)
+        print(f"openssl error rc={proc.returncode}: {proc.stderr.decode()}", file=sys.stderr)
         sys.exit(1)
 
+    print(f"openssl sig length: {len(proc.stdout)}", file=sys.stderr)
     sig = base64.urlsafe_b64encode(proc.stdout).rstrip(b'=').decode()
     jwt_token = f"{msg}.{sig}"
 
@@ -669,13 +672,27 @@ try:
         "assertion": jwt_token
     }).encode()
     req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data)
-    resp = json.loads(urllib.request.urlopen(req, timeout=15).read())
-    print(resp["access_token"])
+    try:
+        raw = urllib.request.urlopen(req, timeout=15).read()
+        resp = json.loads(raw)
+        if "access_token" in resp:
+            print(resp["access_token"])
+        else:
+            print(f"Google OAuth response (no token): {raw.decode()[:300]}", file=sys.stderr)
+            sys.exit(1)
+    except urllib.error.HTTPError as he:
+        body = he.read().decode()[:300]
+        print(f"Google OAuth HTTP {he.code}: {body}", file=sys.stderr)
+        sys.exit(1)
 except Exception as e:
-    print(f"ERROR: {e}", file=sys.stderr)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
     sys.exit(1)
 PYEOF
           )
+
+            GS_ERR=$(cat /tmp/gs_token_err.log 2>/dev/null)
+            echo "Token debug: $GS_ERR"
 
             if [ -n "$ACCESS_TOKEN" ] && ! echo "$ACCESS_TOKEN" | grep -qi "error\|traceback"; then
               echo "✓ Got Google access token"
@@ -750,7 +767,9 @@ print(json.dumps({'values': [headers]}))
           " 2>/dev/null
             else
               echo "❌ Cannot get Google access token"
-              RESULTS="${RESULTS}❌ Google Sheets: нет access token\n"
+              echo "Error log: $GS_ERR"
+              SHORT_ERR=$(echo "$GS_ERR" | tail -2 | head -c 150)
+              RESULTS="${RESULTS}❌ Google Sheets: нет token\n${SHORT_ERR}\n"
             fi
           else
             echo "❌ No SA file or SPREADSHEET_ID"
