@@ -72,8 +72,8 @@ jobs:
           TELEGRAM_MANAGER_CHAT_ID=${{ secrets.TG_CHAT_ID }}
           GOOGLE_SERVICE_ACCOUNT_FILE=/opt/credentials/google-service-account.json
           GOOGLE_SPREADSHEET_ID=${{ secrets.SPREADSHEET_ID }}
-          N8N_URL=http://localhost:5678
-          N8N_WEBHOOK_BASE_URL=http://localhost:5678/webhook
+          N8N_URL=${{ secrets.N8N_BASE_URL || 'http://localhost:5678' }}
+          N8N_WEBHOOK_BASE_URL=${{ secrets.N8N_BASE_URL || 'http://localhost:5678' }}/webhook
           VK_USER_TOKEN=${{ secrets.VK_USER_TOKEN }}
           BLUESALES_LOGIN=${{ secrets.BLUESALES_LOGIN }}
           BLUESALES_PASSWORD=${{ secrets.BLUESALES_PASS }}
@@ -181,7 +181,7 @@ jobs:
           VK_TOKEN=${VK_TOKEN}
           VK_GROUP_ID=${VK_GROUP_ID}
           VK_API_VERSION=${VK_API_VERSION:-5.199}
-          N8N_WEBHOOK_URL=http://localhost:5678/webhook/vk-events
+          N8N_WEBHOOK_URL=${N8N_WEBHOOK_BASE_URL:-https://n8n.marbomebel.ru/webhook}/vk-events
           HEALTH_PORT=3100
           ENVEOF
 
@@ -237,7 +237,7 @@ jobs:
           cat > /opt/vk-user-longpoll/.env << ENVEOF
           VK_USER_TOKEN=${VK_USER_TOKEN}
           VK_API_VERSION=${VK_API_VERSION:-5.199}
-          N8N_WEBHOOK_URL=http://localhost:5678/webhook/vk-user-messages
+          N8N_WEBHOOK_URL=${N8N_WEBHOOK_BASE_URL:-https://n8n.marbomebel.ru/webhook}/vk-user-messages
           HEALTH_PORT=3101
           ENVEOF
 
@@ -274,30 +274,64 @@ jobs:
       # ─── 8. Импорт N8N Workflows ──────────────
       - name: Import N8N workflows
         if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}
+        env:
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
         run: |
+          # Бэкап на VPS
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
-
-          # Бэкап workflow
           mkdir -p /opt/n8n-workflows
           cp /opt/p0-foundation/n8n-workflows/*.json /opt/n8n-workflows/
+          REMOTE_SCRIPT
 
-          # Импорт в N8N
-          N8N_URL="http://localhost:5678"
-          for wf in /opt/p0-foundation/n8n-workflows/P0-*.json; do
-            name=$(basename "$wf" .json)
-            echo "Importing: $name..."
-            response=$(curl -s -X POST "${N8N_URL}/api/v1/workflows" \
-              -H "Content-Type: application/json" \
-              -d @"$wf" 2>&1)
+          # Импорт в основной N8N (n8n.marbomebel.ru) через API
+          N8N_URL="${N8N_BASE_URL:-https://n8n.marbomebel.ru}"
+
+          echo "Importing workflows to $N8N_URL ..."
+
+          # Получить список существующих workflows
+          EXISTING=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/workflows?limit=100" 2>/dev/null)
+
+          for wf_file in p0-foundation/n8n-workflows/P0-*.json; do
+            wf_name=$(python3 -c "import json; print(json.load(open('$wf_file'))['name'])" 2>/dev/null)
+            echo "Processing: $wf_name..."
+
+            # Проверить, существует ли уже workflow с таким именем
+            EXISTING_ID=$(echo "$EXISTING" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+              if w['name'] == '$wf_name':
+                  print(w['id'])
+                  break
+          " 2>/dev/null || true)
+
+            if [ -n "$EXISTING_ID" ]; then
+              # Обновить существующий workflow
+              echo "  Updating existing workflow (ID: $EXISTING_ID)..."
+              response=$(curl -s -X PUT "${N8N_URL}/api/v1/workflows/${EXISTING_ID}" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d @"$wf_file" 2>&1)
+            else
+              # Создать новый workflow
+              echo "  Creating new workflow..."
+              response=$(curl -s -X POST "${N8N_URL}/api/v1/workflows" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d @"$wf_file" 2>&1)
+            fi
+
             if echo "$response" | grep -q '"id"'; then
               wf_id=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
-              echo "  ✓ $name → ID: $wf_id"
+              echo "  ✓ $wf_name → ID: $wf_id"
             else
-              echo "  ! $name — may need manual import"
+              echo "  ✗ $wf_name — ошибка:"
+              echo "    $(echo "$response" | head -c 300)"
             fi
           done
-          REMOTE_SCRIPT
 
       # ─── 9. Health Check ──────────────────────
       - name: Health Check
