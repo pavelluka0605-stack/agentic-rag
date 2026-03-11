@@ -90,38 +90,62 @@ jobs:
         env:
           SA_B64: ${{ secrets.GOOGLE_SA_JSON }}
         run: |
+          SA_DECODED=false
+
           if [ -z "$SA_B64" ]; then
-            echo "⚠ GOOGLE_SA_JSON secret is empty — skipping"
-            exit 0
+            echo "⚠ GOOGLE_SA_JSON secret is empty"
+          else
+            echo "Secret length: ${#SA_B64} chars"
+            echo "First 20 chars: $(echo "$SA_B64" | head -c 20)..."
+
+            # Method 1: base64 decode
+            echo "$SA_B64" | base64 -d > /tmp/sa_check.json 2>/dev/null || true
+            if python3 -c "import json; d=json.load(open('/tmp/sa_check.json')); print('email:', d.get('client_email','?'))" 2>/dev/null; then
+              echo "✓ Decoded as base64"
+              SA_DECODED=true
+            fi
+
+            # Method 2: raw JSON (secret might not be base64-encoded)
+            if [ "$SA_DECODED" = "false" ]; then
+              echo "base64 failed — trying raw JSON..."
+              printf '%s' "$SA_B64" > /tmp/sa_check.json
+              if python3 -c "import json; d=json.load(open('/tmp/sa_check.json')); print('email:', d.get('client_email','?'))" 2>/dev/null; then
+                echo "✓ Valid as raw JSON"
+                SA_DECODED=true
+              fi
+            fi
+
+            # Method 3: maybe it's base64 with line breaks — clean and retry
+            if [ "$SA_DECODED" = "false" ]; then
+              echo "raw JSON failed — trying cleaned base64..."
+              printf '%s' "$SA_B64" | tr -d '\n\r ' | base64 -d > /tmp/sa_check.json 2>/dev/null || true
+              if python3 -c "import json; d=json.load(open('/tmp/sa_check.json')); print('email:', d.get('client_email','?'))" 2>/dev/null; then
+                echo "✓ Decoded as cleaned base64"
+                SA_DECODED=true
+              fi
+            fi
           fi
 
-          # Decode on runner first to verify, then scp to VPS
-          echo "$SA_B64" | base64 -d > /tmp/sa_check.json 2>/dev/null || true
-
-          # If base64 decode failed (raw JSON?), try using as-is
-          if ! python3 -c "import json; json.load(open('/tmp/sa_check.json'))" 2>/dev/null; then
-            echo "base64 decode failed — trying as raw JSON..."
-            echo "$SA_B64" > /tmp/sa_check.json
+          if [ "$SA_DECODED" = "true" ]; then
+            # SCP validated file to VPS
+            scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+              /tmp/sa_check.json \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/credentials/google-service-account.json
+            ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              "chmod 600 /opt/credentials/google-service-account.json && echo '✓ SA deployed to VPS'"
+          else
+            echo "⚠ Could not decode GOOGLE_SA_JSON — checking if VPS already has a valid SA file..."
+            VPS_SA_CHECK=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              "python3 -c \"import json; d=json.load(open('/opt/credentials/google-service-account.json')); print(d.get('client_email',''))\" 2>/dev/null" || true)
+            if [ -n "$VPS_SA_CHECK" ]; then
+              echo "✓ VPS already has valid SA: $VPS_SA_CHECK"
+            else
+              echo "❌ No valid SA on VPS either. Google Sheets will not work."
+              echo "ACTION NEEDED: Set GOOGLE_SA_JSON secret in GitHub (base64-encoded SA JSON)"
+            fi
           fi
-
-          # Validate JSON
-          SA_EMAIL=$(python3 -c "import json; print(json.load(open('/tmp/sa_check.json')).get('client_email',''))" 2>/dev/null)
-          if [ -z "$SA_EMAIL" ]; then
-            echo "❌ GOOGLE_SA_JSON is neither valid base64(JSON) nor raw JSON"
-            echo "First 80 chars: $(head -c 80 /tmp/sa_check.json)"
-            exit 1
-          fi
-          echo "✓ SA validated: $SA_EMAIL"
-
-          # Copy to VPS
-          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
-            /tmp/sa_check.json \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/credentials/google-service-account.json
-
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "chmod 600 /opt/credentials/google-service-account.json && echo '✓ SA deployed to VPS'"
-
           rm -f /tmp/sa_check.json
 
       # ─── 5. Копирование файлов ────────────────
