@@ -420,6 +420,113 @@ jobs:
             return 0
           }
 
+          # ─── Найти существующие credentials и привязать к нодам ───
+          echo "Looking up credentials..."
+          ALL_CREDS=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/credentials" 2>/dev/null)
+
+          # Найти Google Sheets credential ID
+          GS_CRED_ID=$(echo "$ALL_CREDS" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for c in data:
+              if c.get('type') == 'googleSheetsOAuth2Api':
+                  print(c['id'])
+                  break
+          " 2>/dev/null)
+
+          GS_CRED_NAME=$(echo "$ALL_CREDS" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for c in data:
+              if c.get('type') == 'googleSheetsOAuth2Api':
+                  print(c['name'])
+                  break
+          " 2>/dev/null)
+
+          if [ -n "$GS_CRED_ID" ]; then
+            echo "  ✓ Google Sheets credential: $GS_CRED_NAME (ID: $GS_CRED_ID)"
+          else
+            echo "  ⚠ Google Sheets credential not found — P0-03 won't activate automatically"
+          fi
+
+          # Функция: привязать credentials к workflow через GET+PUT
+          bind_credentials() {
+            local WF_NAME="$1"
+            local WF_ID=$(get_wf_id "$WF_NAME")
+            if [ -z "$WF_ID" ] || [ -z "$GS_CRED_ID" ]; then
+              return 0
+            fi
+            echo "Binding credentials to $WF_NAME (ID: $WF_ID)..."
+
+            wf_body=$(curl -s "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+
+            updated_body=$(echo "$wf_body" | python3 -c "
+          import sys, json
+
+          wf = json.load(sys.stdin)
+          gs_cred_id = '$GS_CRED_ID'
+          gs_cred_name = '$GS_CRED_NAME'
+          changed = 0
+
+          for node in wf.get('nodes', []):
+              ntype = node.get('type', '')
+              # Google Sheets nodes
+              if ntype == 'n8n-nodes-base.googleSheets':
+                  node['credentials'] = {
+                      'googleSheetsOAuth2Api': {
+                          'id': gs_cred_id,
+                          'name': gs_cred_name
+                      }
+                  }
+                  changed += 1
+              # HTTP Request nodes using Google Sheets OAuth
+              params = node.get('parameters', {})
+              if (ntype == 'n8n-nodes-base.httpRequest' and
+                  params.get('authentication') == 'predefinedCredentialType' and
+                  params.get('nodeCredentialType') == 'googleSheetsOAuth2Api'):
+                  node['credentials'] = {
+                      'googleSheetsOAuth2Api': {
+                          'id': gs_cred_id,
+                          'name': gs_cred_name
+                      }
+                  }
+                  changed += 1
+
+          if changed == 0:
+              sys.exit(1)
+
+          clean = {
+              'name': wf['name'],
+              'nodes': wf.get('nodes', []),
+              'connections': wf.get('connections', {}),
+              'settings': wf.get('settings', {}),
+          }
+          if 'staticData' in wf:
+              clean['staticData'] = wf['staticData']
+          print(json.dumps(clean))
+          " 2>/dev/null)
+
+            if [ -n "$updated_body" ]; then
+              resp=$(curl -s -X PUT "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$updated_body")
+              if echo "$resp" | grep -q '"id"'; then
+                echo "  ✓ Credentials bound to $WF_NAME"
+              else
+                echo "  ⚠ Failed to bind credentials: $(echo "$resp" | head -c 200)"
+              fi
+            else
+              echo "  ℹ️  No Google Sheets nodes in $WF_NAME, skipping"
+            fi
+          }
+
+          # Привязать credentials к workflows с Google Sheets нодами
+          bind_credentials "P0-03_VK_Event_Receiver"
+          bind_credentials "P0-01_Init_Google_Sheets"
+
           # ─── Активировать P0-03 (webhook receiver — должен быть всегда active) ───
           activate_workflow "P0-03_VK_Event_Receiver"
 
