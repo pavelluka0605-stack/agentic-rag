@@ -134,6 +134,7 @@ jobs:
           VK_USER_TOKEN=${{ secrets.VK_USER_TOKEN }}
           BLUESALES_LOGIN=${{ secrets.BLUESALES_LOGIN }}
           BLUESALES_PASSWORD=${{ secrets.BLUESALES_PASS }}
+          BLUESALES_PASSWORD_HASH=$(echo -n '${{ secrets.BLUESALES_PASS }}' | md5sum | awk '{print toupper($1)}')
           ENVEOF
 
           # Удалить лишние пробелы от heredoc indent

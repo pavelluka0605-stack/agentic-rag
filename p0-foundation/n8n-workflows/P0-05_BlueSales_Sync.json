@@ -1,0 +1,401 @@
+{
+  "name": "P0-05_BlueSales_Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 1 }]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule: Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bluesales.ru/app/Customers/WebServer.aspx",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "login", "value": "={{ $env.BLUESALES_LOGIN }}" },
+            { "name": "password", "value": "={{ $env.BLUESALES_PASSWORD_HASH }}" },
+            { "name": "command", "value": "customers.get" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"pageSize\": 500,\n  \"startRowNumber\": 0\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "bs-get-customers",
+      "name": "BlueSales: Get Customers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-customers-ok",
+      "name": "IF: Customers OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [740, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "customers",
+        "options": {}
+      },
+      "id": "split-customers",
+      "name": "Split: Customers",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [960, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "set-id", "name": "ID_клиента", "value": "={{ $json.id }}", "type": "string" },
+            { "id": "set-name", "name": "Имя", "value": "={{ $json.firstName }} {{ $json.lastName }}", "type": "string" },
+            { "id": "set-vkid", "name": "VK_ID", "value": "={{ $json.vkId }}", "type": "string" },
+            { "id": "set-phone", "name": "Телефон", "value": "={{ $json.phone }}", "type": "string" },
+            { "id": "set-tags", "name": "Теги", "value": "={{ ($json.tags || []).map(t => t.name).join(', ') }}", "type": "string" },
+            { "id": "set-manager", "name": "Менеджер", "value": "={{ $json.managerLogin || '' }}", "type": "string" },
+            { "id": "set-source", "name": "Источник", "value": "={{ $json.source || '' }}", "type": "string" },
+            { "id": "set-firstcontact", "name": "Первый_контакт", "value": "={{ $json.firstContactDate || '' }}", "type": "string" },
+            { "id": "set-lastcontact", "name": "Последний_контакт", "value": "={{ $json.lastContactDate || '' }}", "type": "string" },
+            { "id": "set-comment", "name": "Комментарий", "value": "={{ $json.comment || '' }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "map-customer-fields",
+      "name": "Map: Customer Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1180, 200]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "BlueSales_Клиенты"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": ["ID_клиента"]
+        },
+        "options": {}
+      },
+      "id": "sheets-customers",
+      "name": "Sheets: Клиенты",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1400, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bluesales.ru/app/Customers/WebServer.aspx",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "login", "value": "={{ $env.BLUESALES_LOGIN }}" },
+            { "name": "password", "value": "={{ $env.BLUESALES_PASSWORD_HASH }}" },
+            { "name": "command", "value": "orders.get" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"pageSize\": 500,\n  \"startRowNumber\": 0\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "bs-get-orders",
+      "name": "BlueSales: Get Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "cond-valid2",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-orders-ok",
+      "name": "IF: Orders OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1180, 500]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "orders",
+        "options": {}
+      },
+      "id": "split-orders",
+      "name": "Split: Orders",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1400, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "set-oid", "name": "ID_заказа", "value": "={{ $json.id }}", "type": "string" },
+            { "id": "set-custid", "name": "ID_клиента", "value": "={{ $json.customerId }}", "type": "string" },
+            { "id": "set-custname", "name": "Клиент", "value": "={{ $json.customerName || '' }}", "type": "string" },
+            { "id": "set-items", "name": "Товары", "value": "={{ ($json.items || []).map(i => i.name + ' x' + i.quantity).join('; ') }}", "type": "string" },
+            { "id": "set-total", "name": "Сумма", "value": "={{ $json.totalSum || 0 }}", "type": "number" },
+            { "id": "set-status", "name": "Статус", "value": "={{ $json.status || '' }}", "type": "string" },
+            { "id": "set-created", "name": "Дата_создания", "value": "={{ $json.createdDate || '' }}", "type": "string" },
+            { "id": "set-delivery", "name": "Доставка", "value": "={{ $json.deliveryType || '' }}", "type": "string" },
+            { "id": "set-track", "name": "Трек_номер", "value": "={{ $json.trackNumber || '' }}", "type": "string" },
+            { "id": "set-comment2", "name": "Комментарий", "value": "={{ $json.comment || '' }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "map-order-fields",
+      "name": "Map: Order Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1620, 400]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "BlueSales_Заказы"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": ["ID_заказа"]
+        },
+        "options": {}
+      },
+      "id": "sheets-orders",
+      "name": "Sheets: Заказы",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1840, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Workflow": "BlueSales_Sync",
+            "Тип": "info",
+            "Событие": "Sync completed",
+            "Детали": "Customers and orders synced to Google Sheets",
+            "Статус": "success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Тип", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Событие", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Детали", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-sync",
+      "name": "Log: Sync Done",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2060, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"\\u2705 <b>BlueSales Sync</b>\\n\\nKлиенты и заказы синхронизированы с Google Sheets.\\n\\n\\u23F0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
+      },
+      "id": "tg-sync-done",
+      "name": "Telegram: Sync Done",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2280, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Workflow": "BlueSales_Sync",
+            "Тип": "error",
+            "Событие": "API Error",
+            "Детали": "={{ JSON.stringify($json) }}",
+            "Статус": "failed"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Тип", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Событие", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Детали", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-error",
+      "name": "Log: Error",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [960, 700]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"\\u26A0\\uFE0F <b>BlueSales Sync Error</b>\\n\\nОшибка при синхронизации:\\n{{ JSON.stringify($json).substring(0, 500) }}\\n\\n\\u23F0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
+      },
+      "id": "tg-error",
+      "name": "Telegram: Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 700]
+    }
+  ],
+  "connections": {
+    "Schedule: Every Hour": {
+      "main": [[ { "node": "BlueSales: Get Customers", "type": "main", "index": 0 } ]]
+    },
+    "Manual Trigger": {
+      "main": [[ { "node": "BlueSales: Get Customers", "type": "main", "index": 0 } ]]
+    },
+    "BlueSales: Get Customers": {
+      "main": [[ { "node": "IF: Customers OK?", "type": "main", "index": 0 } ]]
+    },
+    "IF: Customers OK?": {
+      "main": [
+        [{ "node": "Split: Customers", "type": "main", "index": 0 }],
+        [{ "node": "Log: Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split: Customers": {
+      "main": [[ { "node": "Map: Customer Fields", "type": "main", "index": 0 } ]]
+    },
+    "Map: Customer Fields": {
+      "main": [[ { "node": "Sheets: Клиенты", "type": "main", "index": 0 } ]]
+    },
+    "Sheets: Клиенты": {
+      "main": [[ { "node": "BlueSales: Get Orders", "type": "main", "index": 0 } ]]
+    },
+    "BlueSales: Get Orders": {
+      "main": [[ { "node": "IF: Orders OK?", "type": "main", "index": 0 } ]]
+    },
+    "IF: Orders OK?": {
+      "main": [
+        [{ "node": "Split: Orders", "type": "main", "index": 0 }],
+        [{ "node": "Log: Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split: Orders": {
+      "main": [[ { "node": "Map: Order Fields", "type": "main", "index": 0 } ]]
+    },
+    "Map: Order Fields": {
+      "main": [[ { "node": "Sheets: Заказы", "type": "main", "index": 0 } ]]
+    },
+    "Sheets: Заказы": {
+      "main": [[ { "node": "Log: Sync Done", "type": "main", "index": 0 } ]]
+    },
+    "Log: Sync Done": {
+      "main": [[ { "node": "Telegram: Sync Done", "type": "main", "index": 0 } ]]
+    },
+    "Log: Error": {
+      "main": [[ { "node": "Telegram: Error", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null
+}
