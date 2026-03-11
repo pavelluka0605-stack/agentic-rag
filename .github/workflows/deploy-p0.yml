@@ -298,6 +298,16 @@ jobs:
             wf_name=$(python3 -c "import json; print(json.load(open('$wf_file'))['name'])" 2>/dev/null)
             echo "Processing: $wf_name..."
 
+            # Убрать read-only поля (tags, active) перед отправкой
+            CLEAN_JSON=$(python3 -c "
+          import json
+          with open('$wf_file') as f:
+              wf = json.load(f)
+          wf.pop('tags', None)
+          wf.pop('active', None)
+          print(json.dumps(wf))
+          " 2>/dev/null)
+
             # Проверить, существует ли уже workflow с таким именем
             EXISTING_ID=$(echo "$EXISTING" | python3 -c "
           import sys, json
@@ -309,19 +319,17 @@ jobs:
           " 2>/dev/null || true)
 
             if [ -n "$EXISTING_ID" ]; then
-              # Обновить существующий workflow
               echo "  Updating existing workflow (ID: $EXISTING_ID)..."
-              response=$(curl -s -X PUT "${N8N_URL}/api/v1/workflows/${EXISTING_ID}" \
+              response=$(echo "$CLEAN_JSON" | curl -s -X PUT "${N8N_URL}/api/v1/workflows/${EXISTING_ID}" \
                 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
                 -H "Content-Type: application/json" \
-                -d @"$wf_file" 2>&1)
+                -d @- 2>&1)
             else
-              # Создать новый workflow
               echo "  Creating new workflow..."
-              response=$(curl -s -X POST "${N8N_URL}/api/v1/workflows" \
+              response=$(echo "$CLEAN_JSON" | curl -s -X POST "${N8N_URL}/api/v1/workflows" \
                 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
                 -H "Content-Type: application/json" \
-                -d @"$wf_file" 2>&1)
+                -d @- 2>&1)
             fi
 
             if echo "$response" | grep -q '"id"'; then
