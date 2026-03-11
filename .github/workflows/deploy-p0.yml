@@ -370,14 +370,23 @@ jobs:
           WF_ID=$(get_wf_id "P0-03_VK_Event_Receiver")
           if [ -n "$WF_ID" ]; then
             echo "Activating P0-03_VK_Event_Receiver (ID: $WF_ID)..."
-            resp=$(curl -s -X PATCH "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/activate" \
               -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d '{"active": true}')
+              -H "Content-Type: application/json")
             if echo "$resp" | grep -q '"active":true'; then
               echo "  ✓ P0-03 активирован"
             else
-              echo "  ✗ P0-03: $(echo "$resp" | head -c 200)"
+              # Fallback: попробовать PUT с active=true
+              resp2=$(curl -s -X PUT "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d '{"active": true}')
+              if echo "$resp2" | grep -q '"active":true'; then
+                echo "  ✓ P0-03 активирован (via PUT)"
+              else
+                echo "  ✗ P0-03 activate: $(echo "$resp" | head -c 150)"
+                echo "  ✗ P0-03 PUT:      $(echo "$resp2" | head -c 150)"
+              fi
             fi
           fi
 
@@ -385,14 +394,22 @@ jobs:
           WF_ID=$(get_wf_id "P0-04_Health_Check")
           if [ -n "$WF_ID" ]; then
             echo "Activating P0-04_Health_Check (ID: $WF_ID)..."
-            resp=$(curl -s -X PATCH "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/activate" \
               -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d '{"active": true}')
+              -H "Content-Type: application/json")
             if echo "$resp" | grep -q '"active":true'; then
               echo "  ✓ P0-04 активирован"
             else
-              echo "  ✗ P0-04: $(echo "$resp" | head -c 200)"
+              resp2=$(curl -s -X PUT "${N8N_URL}/api/v1/workflows/${WF_ID}" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d '{"active": true}')
+              if echo "$resp2" | grep -q '"active":true'; then
+                echo "  ✓ P0-04 активирован (via PUT)"
+              else
+                echo "  ✗ P0-04 activate: $(echo "$resp" | head -c 150)"
+                echo "  ✗ P0-04 PUT:      $(echo "$resp2" | head -c 150)"
+              fi
             fi
           fi
 
@@ -400,10 +417,10 @@ jobs:
           WF_ID=$(get_wf_id "P0-02_Test_Telegram")
           if [ -n "$WF_ID" ]; then
             echo "Executing P0-02_Test_Telegram (ID: $WF_ID)..."
-            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/run" \
+            resp=$(curl -s -X POST "${N8N_URL}/api/v1/executions" \
               -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d '{}')
+              -d "{\"workflowId\": \"$WF_ID\"}")
             echo "  P0-02 result: $(echo "$resp" | head -c 200)"
           fi
 
@@ -411,10 +428,10 @@ jobs:
           WF_ID=$(get_wf_id "P0-01_Init_Google_Sheets")
           if [ -n "$WF_ID" ]; then
             echo "Executing P0-01_Init_Google_Sheets (ID: $WF_ID)..."
-            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${WF_ID}/run" \
+            resp=$(curl -s -X POST "${N8N_URL}/api/v1/executions" \
               -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d '{}')
+              -d "{\"workflowId\": \"$WF_ID\"}")
             echo "  P0-01 result: $(echo "$resp" | head -c 200)"
           fi
 
