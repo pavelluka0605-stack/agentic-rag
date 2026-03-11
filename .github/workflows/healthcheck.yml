@@ -39,7 +39,6 @@ jobs:
             if echo "$N8N_VER" | grep -q '"data"'; then
               WF_COUNT=$(curl -s http://localhost:5678/api/v1/workflows | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',[])))" 2>/dev/null || echo "?")
               echo "   Workflows: $WF_COUNT"
-              # Список workflow
               curl -s http://localhost:5678/api/v1/workflows | python3 -c "
           import sys, json
           data = json.load(sys.stdin).get('data', [])
@@ -55,62 +54,82 @@ jobs:
           echo ""
 
           # ─── 2. VK Long Poll (Groups) ───────────
+          echo "--- VK Long Poll Service ---"
+          systemctl is-active vk-longpoll 2>&1 || true
           if systemctl is-active --quiet vk-longpoll 2>/dev/null; then
             echo "✅ VK Long Poll (Groups): сервис active"
             if curl -s --max-time 3 http://127.0.0.1:3100/health &>/dev/null; then
               STATS=$(curl -s http://127.0.0.1:3100/health)
-              EVENTS=$(echo "$STATS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('events_received',0))" 2>/dev/null || echo "?")
-              STARTED=$(echo "$STATS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('started_at','?'))" 2>/dev/null || echo "?")
-              echo "   Events: $EVENTS | Started: $STARTED"
+              echo "   Health: $STATS"
             else
               echo "   ⚠️ Health endpoint не отвечает (порт 3100)"
             fi
           else
             echo "❌ VK Long Poll (Groups): НЕ ЗАПУЩЕН"
-            echo "   $(journalctl -u vk-longpoll -n 3 --no-pager 2>/dev/null | tail -3)"
             ERRORS=$((ERRORS+1))
           fi
+          echo ""
+          echo "--- VK Long Poll Journal (last 30) ---"
+          journalctl -u vk-longpoll -n 30 --no-pager 2>&1 || echo "(no journal)"
           echo ""
 
           # ─── 3. VK User Long Poll ───────────────
           if systemctl is-active --quiet vk-user-longpoll 2>/dev/null; then
             echo "✅ VK User Long Poll: сервис active"
-            if curl -s --max-time 3 http://127.0.0.1:3101/health &>/dev/null; then
-              STATS=$(curl -s http://127.0.0.1:3101/health)
-              MSGS=$(echo "$STATS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('messages_received',0))" 2>/dev/null || echo "?")
-              echo "   Messages: $MSGS"
-            fi
           else
-            echo "⚪ VK User Long Poll: не запущен (VK_USER_TOKEN не задан?)"
+            echo "⚪ VK User Long Poll: не запущен"
           fi
           echo ""
 
           # ─── 4. Webhook test ────────────────────
-          WH_RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+          echo "--- Webhook Test ---"
+          WH_FULL=$(curl -s -w "\nHTTP_CODE:%{http_code}" --max-time 5 \
             -X POST http://localhost:5678/webhook/vk-events \
             -H "Content-Type: application/json" \
             -d '{"type":"system","event":"healthcheck_test","timestamp":"'$(date -Iseconds)'"}')
+          echo "$WH_FULL"
+          WH_RESP=$(echo "$WH_FULL" | grep "HTTP_CODE:" | cut -d: -f2)
           if [ "$WH_RESP" = "200" ]; then
-            echo "✅ Webhook /vk-events: отвечает (HTTP $WH_RESP)"
+            echo "✅ Webhook /vk-events: HTTP $WH_RESP"
           else
             echo "❌ Webhook /vk-events: HTTP $WH_RESP"
-            echo "   Возможно P0-03 workflow не активирован"
             ERRORS=$((ERRORS+1))
           fi
           echo ""
 
-          # ─── 5. VK API ─────────────────────────
+          # ─── 5. VK API + Long Poll Server ──────
           source /opt/p0-foundation/.env 2>/dev/null
           if [ -n "${VK_TOKEN:-}" ]; then
             VK_RESP=$(curl -s --max-time 10 "https://api.vk.com/method/groups.getById?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199")
             if echo "$VK_RESP" | grep -q '"response"'; then
-              GROUP_NAME=$(echo "$VK_RESP" | python3 -c "import sys,json; r=json.load(sys.stdin)['response']; print(r.get('groups',[r])[0].get('name','?') if isinstance(r,dict) else r[0].get('name','?'))" 2>/dev/null || echo "?")
-              echo "✅ VK API: OK — группа '$GROUP_NAME'"
+              echo "✅ VK API: OK"
             else
               echo "❌ VK API: ошибка"
               echo "   $(echo "$VK_RESP" | head -c 200)"
               ERRORS=$((ERRORS+1))
             fi
+            # Test Long Poll Server
+            LP_RESP=$(curl -s --max-time 10 "https://api.vk.com/method/groups.getLongPollServer?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199")
+            if echo "$LP_RESP" | grep -q '"server"'; then
+              echo "✅ VK Long Poll Server: доступен"
+            else
+              echo "❌ VK Long Poll Server: недоступен"
+              echo "   $(echo "$LP_RESP" | head -c 300)"
+              ERRORS=$((ERRORS+1))
+            fi
+            # Long Poll Settings
+            LPS_RESP=$(curl -s --max-time 10 "https://api.vk.com/method/groups.getLongPollSettings?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199")
+            echo "--- LP Settings ---"
+            echo "$LPS_RESP" | python3 -c "
+          import sys, json
+          try:
+              r = json.load(sys.stdin)['response']
+              print(f'  is_enabled: {r.get(\"is_enabled\")}')
+              events = r.get('events', {})
+              enabled = [k for k,v in events.items() if v]
+              print(f'  enabled events: {enabled}')
+          except Exception as e: print(f'  ERROR: {e}')
+          " 2>/dev/null
           else
             echo "⚠️ VK API: .env не найден"
             ERRORS=$((ERRORS+1))
@@ -130,19 +149,14 @@ jobs:
           fi
           echo ""
 
-          # ─── 7. Google Sheets ───────────────────
-          if [ -f "/opt/credentials/google-service-account.json" ]; then
-            echo "✅ Google SA JSON: файл существует"
-          else
-            echo "⚠️ Google SA JSON: файл НЕ найден"
-          fi
+          # ─── 7. Node processes ─────────────────
+          echo "--- Node Processes ---"
+          ps aux | grep "[n]ode" | head -5 || echo "(none)"
           echo ""
 
-          # ─── 8. Файлы на VPS ────────────────────
-          echo "📁 Файлы:"
-          ls -la /opt/vk-longpoll/listener.js 2>/dev/null && echo "   ✅ /opt/vk-longpoll/listener.js" || echo "   ❌ /opt/vk-longpoll/listener.js отсутствует"
-          ls -la /opt/vk-longpoll/.env 2>/dev/null && echo "   ✅ /opt/vk-longpoll/.env" || echo "   ❌ /opt/vk-longpoll/.env отсутствует"
-          ls /opt/n8n-workflows/*.json 2>/dev/null | wc -l | xargs -I{} echo "   📄 N8N workflow JSONs: {} файлов"
+          # ─── 8. .env keys ─────────────────────
+          echo "--- /opt/vk-longpoll/.env keys ---"
+          grep -oP '^[A-Z_]+' /opt/vk-longpoll/.env 2>/dev/null || echo "(file missing)"
           echo ""
 
           # ─── Итог ──────────────────────────────
@@ -163,7 +177,6 @@ jobs:
           echo "$RESULT" >> $GITHUB_OUTPUT
           echo "HCEOF" >> $GITHUB_OUTPUT
 
-          # Определить количество ошибок
           HC_ERRORS=$(echo "$RESULT" | grep "^ERRORS=" | tail -1 | cut -d= -f2)
           echo "errors=${HC_ERRORS:-0}" >> $GITHUB_OUTPUT
 
@@ -172,6 +185,7 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+          HC_RESULT: ${{ steps.hc.outputs.result }}
           HC_ERRORS: ${{ steps.hc.outputs.errors }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -181,11 +195,14 @@ jobs:
             ICON="⚠️"
           fi
 
-          # Отправляем краткий отчёт
-          MSG="${ICON} Health Check | Ошибок: ${HC_ERRORS:-?} | Logs: ${RUN_URL}"
+          # Send full diagnostic report (up to 4000 chars for Telegram)
+          FULL_MSG=$(echo "$HC_RESULT" | head -80)
           curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             -d "chat_id=${TG_CHAT}" \
-            -d "text=${MSG}" || true
+            --data-urlencode "text=${ICON} DIAGNOSTICS $(date '+%H:%M'):
+          ${FULL_MSG}
+
+          Logs: ${RUN_URL}" || true
 
       - name: Cleanup
         if: always()
