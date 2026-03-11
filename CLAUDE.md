@@ -107,22 +107,29 @@ agentic-rag/
 - [x] Workflow sheets-manage.yml поддерживает base64 GOOGLE_SA_JSON
 - [x] Classic GitHub PAT с scopes repo + workflow
 - [x] .google-sa.json добавлен в .gitignore
+- [x] VPS healthcheck пройден (SSH, все сервисы, Telegram)
+- [x] Полный деплой deploy-p0.yml — success (N8N + VK Long Poll + workflows)
+- [x] N8N workflows P0-01..P0-04 импортированы и активированы
+- [x] Создан P0-05_BlueSales_Sync.json — синхронизация BlueSales → Google Sheets
+- [x] Листы BlueSales_Клиенты и BlueSales_Заказы созданы в Google Sheets
+- [x] BLUESALES_PASSWORD_HASH добавлен в deploy .env
+- [x] Финальный healthcheck после деплоя P0-05 — success
 
-## Оставшиеся задачи (по порядку)
+## Текущее состояние системы
 
-1. **Уточнить BLUESALES_REMOTE_URL** — нужен реальный URL или убрать секрет?
-2. **Проверить готовность VPS** — запустить healthcheck.yml
-3. **Запустить полный деплой** — deploy-p0.yml (N8N + VK Long Poll + workflows)
-4. **Настроить N8N workflows** — импортировать P0-01..P0-04
-5. **Настроить BlueSales ↔ Google Sheets синхронизацию**
-6. **Протестировать полную цепочку** — VK → N8N → Sheets → Telegram уведомление
+- **N8N** — работает на VPS, все workflows активированы
+- **VK Long Poll** (community) — слушает входящие сообщения в группу
+- **VK User Long Poll** — слушает личные сообщения
+- **BlueSales Sync** — автосинхронизация клиентов/заказов каждый час
+- **Google Sheets** — листы: Товары, Спрос, Заказы_поставщику, Заказы_клиентов, Сводка_спроса, Логи_N8N, BlueSales_Клиенты, BlueSales_Заказы
+- **Telegram** — уведомления менеджеру работают
 
-## Что нужно от владельца для автономной работы
+## Возможные дальнейшие улучшения
 
-- [ ] Подтвердить готовность VPS (Ubuntu, Node.js установлен?)
-- [ ] Подтвердить что VK Long Poll API включён в настройках сообщества
-- [ ] Уточнить статус N8N на VPS (установлен или ставить с нуля?)
-- [ ] Уточнить BLUESALES_REMOTE_URL (реальный URL или не нужен?)
+1. Мониторинг — настроить cron healthcheck (автоматический, не ручной)
+2. Обработка комментариев VK → автоматическое добавление в лист "Спрос"
+3. Дашборд по сводке спроса (формулы в Сводка_спроса)
+4. Webhook от BlueSales для real-time обновлений (вместо polling)
 
 ## История ключевых решений
 
