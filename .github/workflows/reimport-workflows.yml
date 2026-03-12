@@ -1,0 +1,248 @@
+name: "Reimport N8N Workflows"
+
+on:
+  push:
+    branches:
+      - 'claude/vk-token-*'
+    paths:
+      - '.github/workflows/reimport-workflows.yml'
+
+jobs:
+  reimport:
+    name: "Import & Activate N8N Workflows"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Import workflows via N8N API"
+        env:
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
+          N8N_WEBHOOK_BASE: ${{ secrets.N8N_BASE_URL }}/webhook
+        run: |
+          N8N_URL="${N8N_BASE_URL:-https://n8n.marbomebel.ru}"
+          echo "Target: $N8N_URL"
+
+          # Check N8N API connectivity
+          echo "=== 1. Testing N8N API ==="
+          API_TEST=$(curl -s -w "\nHTTP:%{http_code}" -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/workflows?limit=1")
+          echo "$API_TEST"
+
+          # Get credentials
+          echo ""
+          echo "=== 2. Looking up credentials ==="
+          ALL_CREDS=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/credentials" 2>/dev/null)
+
+          GS_CRED_ID=$(echo "$ALL_CREDS" | python3 -c "
+          import sys, json
+          try:
+              raw = json.load(sys.stdin)
+              data = raw.get('data', raw) if isinstance(raw, dict) else raw
+              if not isinstance(data, list): data = []
+              for c in data:
+                  if c.get('type') == 'googleSheetsOAuth2Api':
+                      print(c['id']); break
+          except: pass
+          " 2>/dev/null)
+
+          GS_CRED_NAME=$(echo "$ALL_CREDS" | python3 -c "
+          import sys, json
+          try:
+              raw = json.load(sys.stdin)
+              data = raw.get('data', raw) if isinstance(raw, dict) else raw
+              if not isinstance(data, list): data = []
+              for c in data:
+                  if c.get('type') == 'googleSheetsOAuth2Api':
+                      print(c['name']); break
+          except: pass
+          " 2>/dev/null)
+
+          echo "Google Sheets credential: '${GS_CRED_NAME}' (ID: ${GS_CRED_ID})"
+
+          # Get existing workflows
+          EXISTING=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/workflows?limit=100" 2>/dev/null)
+
+          echo ""
+          echo "=== 3. Importing workflows ==="
+          RESULTS=""
+
+          for wf_file in p0-foundation/n8n-workflows/P0-*.json; do
+            wf_name=$(python3 -c "import json; print(json.load(open('$wf_file'))['name'])" 2>/dev/null)
+            echo "Processing: $wf_name..."
+
+            # Clean JSON + inject credentials + replace placeholders
+            CLEAN_JSON=$(python3 -c "
+          import json, os
+          gs_cred_id = '$GS_CRED_ID'
+          gs_cred_name = '$GS_CRED_NAME'
+          with open('$wf_file') as f:
+              wf = json.load(f)
+          wf.pop('tags', None)
+          wf.pop('active', None)
+          wf.pop('staticData', None)
+          if gs_cred_id:
+              for node in wf.get('nodes', []):
+                  ntype = node.get('type', '')
+                  if ntype == 'n8n-nodes-base.googleSheets':
+                      node['credentials'] = {'googleSheetsOAuth2Api': {'id': gs_cred_id, 'name': gs_cred_name}}
+          raw = json.dumps(wf)
+          replacements = {
+              '{{ __TG_BOT_TOKEN__ }}': os.environ.get('TG_BOT_TOKEN', ''),
+              '{{ __TG_CHAT_ID__ }}': os.environ.get('TG_CHAT_ID', ''),
+              '{{ __VK_GROUP_ID__ }}': os.environ.get('VK_GROUP_ID', ''),
+              '{{ __N8N_WEBHOOK_BASE__ }}': os.environ.get('N8N_WEBHOOK_BASE', ''),
+              '__TG_BOT_TOKEN__': os.environ.get('TG_BOT_TOKEN', ''),
+              '__TG_CHAT_ID__': os.environ.get('TG_CHAT_ID', ''),
+              '__VK_GROUP_ID__': os.environ.get('VK_GROUP_ID', ''),
+              '__N8N_WEBHOOK_BASE__': os.environ.get('N8N_WEBHOOK_BASE', ''),
+          }
+          for p, v in replacements.items():
+              raw = raw.replace(p, v)
+          print(raw)
+          " 2>/dev/null)
+
+            # Check if workflow already exists
+            EXISTING_ID=$(echo "$EXISTING" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+              if w['name'] == '$wf_name':
+                  print(w['id']); break
+          " 2>/dev/null || true)
+
+            if [ -n "$EXISTING_ID" ]; then
+              echo "  Updating (ID: $EXISTING_ID)..."
+              response=$(echo "$CLEAN_JSON" | curl -s -X PUT "${N8N_URL}/api/v1/workflows/${EXISTING_ID}" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" -d @- 2>&1)
+            else
+              echo "  Creating new..."
+              response=$(echo "$CLEAN_JSON" | curl -s -X POST "${N8N_URL}/api/v1/workflows" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" -d @- 2>&1)
+            fi
+
+            if echo "$response" | grep -q '"id"'; then
+              wf_id=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null)
+              echo "  OK: $wf_name -> ID: $wf_id"
+              RESULTS="${RESULTS}OK ${wf_name} (${wf_id})\n"
+            else
+              echo "  FAIL: $(echo "$response" | head -c 300)"
+              RESULTS="${RESULTS}FAIL ${wf_name}: $(echo "$response" | head -c 100)\n"
+            fi
+          done
+
+          echo ""
+          echo "=== 4. Activating workflows ==="
+
+          # Re-fetch workflows after import
+          ALL_WF=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/workflows?limit=100")
+
+          echo "$ALL_WF" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+              if w['name'].startswith('P0-'):
+                  print(w['id'], w['name'])
+          " 2>/dev/null | while read -r wf_id wf_name; do
+            echo "Activating $wf_name ($wf_id)..."
+
+            # Try POST /activate first
+            resp=$(curl -s -X POST "${N8N_URL}/api/v1/workflows/${wf_id}/activate" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              -H "Content-Type: application/json")
+
+            if echo "$resp" | grep -q '"active":true'; then
+              echo "  OK: activated"
+              RESULTS="${RESULTS}ACTIVATED ${wf_name}\n"
+            else
+              # Fallback: PUT with active:true
+              wf_body=$(curl -s "${N8N_URL}/api/v1/workflows/${wf_id}" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}")
+              updated=$(echo "$wf_body" | python3 -c "
+          import sys, json
+          wf = json.load(sys.stdin)
+          clean = {'name': wf['name'], 'nodes': wf.get('nodes',[]), 'connections': wf.get('connections',{}), 'settings': wf.get('settings',{}), 'active': True}
+          print(json.dumps(clean))
+          " 2>/dev/null)
+              resp2=$(curl -s -X PUT "${N8N_URL}/api/v1/workflows/${wf_id}" \
+                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+                -H "Content-Type: application/json" -d "$updated")
+              if echo "$resp2" | grep -q '"active":true'; then
+                echo "  OK: activated via PUT"
+              else
+                echo "  WARN: could not activate (may need manual activation)"
+                echo "  Response: $(echo "$resp2" | head -c 200)"
+              fi
+            fi
+          done
+
+          echo ""
+          echo "=== 5. Final verification ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_URL}/api/v1/workflows?limit=100" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+            s = 'ON' if w.get('active') else 'OFF'
+            print(f'[{s}] {w[\"name\"]} (id={w[\"id\"]})')
+          " 2>/dev/null
+
+          # Save results for Telegram
+          echo "IMPORT_RESULTS<<EOF" >> $GITHUB_ENV
+          echo -e "$RESULTS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: "Test P0-07 webhook after import"
+        id: test_p07
+        env:
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
+        run: |
+          N8N_URL="${N8N_BASE_URL:-https://n8n.marbomebel.ru}"
+          echo "Testing P0-07 webhook..."
+
+          # Wait a moment for webhooks to register
+          sleep 3
+
+          RESP=$(curl -s -w "\nHTTP:%{http_code}" --max-time 30 \
+            -X POST "${N8N_URL}/webhook/vk-ai-reply" \
+            -H "Content-Type: application/json" \
+            -d '{"comment_id":99999,"from_id":1,"post_id":1,"text":"ТЕСТ после реимпорта: цена дивана?","date":"2026-03-12T13:00:00Z"}')
+          echo "$RESP"
+
+          HTTP_CODE=$(echo "$RESP" | grep -o 'HTTP:[0-9]*' | cut -d: -f2)
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "P0-07 webhook: OK"
+          else
+            echo "P0-07 webhook: HTTP $HTTP_CODE"
+          fi
+
+      - name: "Send results to Telegram"
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          MSG="🔧 N8N Workflows Reimport
+          $(date '+%d.%m.%Y %H:%M UTC')
+
+          ${IMPORT_RESULTS:-no results}
+
+          P0-07 test: ${{ steps.test_p07.outcome }}
+
+          Run: https://github.com/pavelluka0605-stack/agentic-rag/actions/runs/${{ github.run_id }}"
+
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
+
