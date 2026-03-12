@@ -160,10 +160,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ __TG_BOT_TOKEN__ }}/sendMessage",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ __TG_CHAT_ID__ }}\",\n  \"text\": \"\ud83d\udd14 <b>BlueSales: {{ $json.event }}</b>\\n\\n{{ JSON.stringify($json).substring(0, 500) }}\\n\\n\u23f0 {{ $json.timestamp }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"\ud83d\udd14 <b>BlueSales: {{ $json.event }}</b>\\n\\n{{ JSON.stringify($json).substring(0, 500) }}\\n\\n\u23f0 {{ $json.timestamp }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-notify",

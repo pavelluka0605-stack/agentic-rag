@@ -19,7 +19,7 @@
         "url": "https://api.vk.com/method/groups.getById",
         "sendBody": true,
         "specifyBody": "string",
-        "body": "=group_id={{ __VK_GROUP_ID__ }}&access_token={{ __VK_TOKEN__ }}&v=5.199",
+        "body": "=group_id=__VK_GROUP_ID__&access_token=__VK_TOKEN__&v=5.199",
         "options": {
           "timeout": 10000
         }
@@ -88,10 +88,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ __TG_BOT_TOKEN__ }}/sendMessage",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ __TG_CHAT_ID__ }}\",\n  \"text\": \"🔴 <b>Health Check FAILED</b>\\n\\n{{ $json.errors.join('\\\\n') }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"🔴 <b>Health Check FAILED</b>\\n\\n{{ $json.errors.join('\\\\n') }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-alert-fail",
@@ -133,10 +133,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ __TG_BOT_TOKEN__ }}/sendMessage",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ __TG_CHAT_ID__ }}\",\n  \"text\": \"✅ <b>Система работает</b>\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"✅ <b>Система работает</b>\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-6h-report",
