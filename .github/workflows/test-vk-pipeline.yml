@@ -112,7 +112,15 @@ jobs:
                   if r.get('error'):
                       em = r['error']
                       err = ' ERR: ' + (em.get('message','') if isinstance(em,dict) else str(em))[:120]
-                  print(f'  [{s}] {node_name}{err}')
+                  # Show output data for VK Reply and key nodes
+                  out = ''
+                  if 'VK:' in node_name or 'OpenAI' in node_name or 'Telegram' in node_name:
+                      try:
+                          d = r.get('data',{}).get('main',[[]])[0]
+                          if d:
+                              out = ' OUT: ' + json.dumps(d[0].get('json',{}), ensure_ascii=False)[:250]
+                      except: pass
+                  print(f'  [{s}] {node_name}{err}{out}')
           " 2>/dev/null || echo "  Parse error")
             add "$NODES_RAN"
           done
