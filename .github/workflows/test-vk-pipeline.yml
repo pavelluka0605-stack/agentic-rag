@@ -47,45 +47,64 @@ jobs:
 
           # 2. Wait for processing
           add ""
-          add "=== STEP 2: Wait 10s for N8N processing ==="
-          sleep 10
+          add "=== STEP 2: Wait 15s for N8N processing ==="
+          sleep 15
 
-          # 3. Check N8N executions
+          # 3. Check latest execution detail
           add ""
-          add "=== STEP 3: Recent N8N executions ==="
-          EXECS=$(curl -s --max-time 10 \
+          add "=== STEP 3: Latest execution detail ==="
+          # Get latest execution ID
+          LATEST=$(curl -s --max-time 10 \
             -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/executions?limit=5" 2>&1)
-          EXEC_INFO=$(echo "$EXECS" | python3 -c "
+            "${N8N_BASE_URL}/api/v1/executions?limit=3" 2>&1)
+
+          EXEC_IDS=$(echo "$LATEST" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          for e in d.get('data',[])[:3]:
+              print(e['id'])
+          " 2>/dev/null)
+
+          for EXEC_ID in $EXEC_IDS; do
+            add "--- Execution $EXEC_ID ---"
+            DETAIL=$(curl -s --max-time 10 \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              "${N8N_BASE_URL}/api/v1/executions/${EXEC_ID}?includeData=true" 2>&1)
+
+            DETAIL_INFO=$(echo "$DETAIL" | python3 -c "
           import sys,json
           try:
-              d = json.load(sys.stdin)
-              for e in d.get('data', []):
-                  wf_name = e.get('workflowData', {}).get('name', 'unknown')
-                  status = e.get('status', '?')
-                  finished = e.get('stoppedAt', '?')
-                  line = f'  [{status}] {wf_name} ({finished})'
-                  if status == 'error':
-                      rd = e.get('data',{}).get('resultData',{})
-                      if rd:
-                          em = rd.get('error',{})
-                          if isinstance(em, dict):
-                              line += ' ERR: ' + str(em.get('message',''))[:150]
-                          elif isinstance(em, str):
-                              line += ' ERR: ' + em[:150]
-                      rl = rd.get('runData',{})
-                      for node_name, runs in rl.items():
-                          for r in runs:
-                              if r.get('error'):
-                                  err_msg = r['error'].get('message','')[:100] if isinstance(r['error'],dict) else str(r['error'])[:100]
-                                  line += f' | node={node_name}: {err_msg}'
-                  print(line)
+              e = json.load(sys.stdin)
+              wf = e.get('workflowData',{}).get('name','?')
+              status = e.get('status','?')
+              print(f'Workflow: {wf} | Status: {status}')
+              rd = e.get('data',{}).get('resultData',{})
+              run_data = rd.get('runData',{})
+              for node_name, runs in run_data.items():
+                  for r in runs:
+                      s = r.get('executionStatus','?')
+                      err = ''
+                      if r.get('error'):
+                          em = r['error']
+                          err = ' ERR: ' + (em.get('message','') if isinstance(em,dict) else str(em))[:120]
+                      # Show output data summary for key nodes
+                      out = ''
+                      data = r.get('data',{}).get('main',[[]])
+                      if data and data[0]:
+                          items = data[0]
+                          out = f' items={len(items)}'
+                          if items and isinstance(items[0], dict):
+                              j = items[0].get('json',{})
+                              keys = list(j.keys())[:5]
+                              out += f' keys={keys}'
+                      print(f'  [{s}] {node_name}{out}{err}')
           except Exception as ex:
-              print(f'  Parse error: {ex}')
-          " 2>/dev/null || echo "  API error")
-          add "$EXEC_INFO"
+              print(f'Parse error: {ex}')
+          " 2>/dev/null || echo "  API/parse error")
+            add "$DETAIL_INFO"
+          done
 
-          # 4. Check LP health via SSH
+          # 4. LP health
           add ""
           add "=== STEP 4: LP Health ==="
           mkdir -p ~/.ssh
@@ -97,11 +116,9 @@ jobs:
           add "$LP_INFO"
           rm -f ~/.ssh/deploy_key
 
-          # Output as annotation
-          ONELINE=$(echo "$MSG" | tr '\n' ' | ' | head -c 3000)
+          # Output
+          ONELINE=$(echo "$MSG" | tr '\n' ' | ' | head -c 4000)
           echo "::notice title=TestResult::${ONELINE}"
-
-          # Summary
           {
             echo '```'
             echo "$MSG"
