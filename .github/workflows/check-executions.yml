@@ -2,6 +2,11 @@ name: "Check Recent Executions"
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'claude/vk-token-*'
+    paths:
+      - '.github/workflows/check-executions.yml'
 
 jobs:
   check:
