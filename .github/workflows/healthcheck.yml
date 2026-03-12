@@ -130,17 +130,31 @@ jobs:
             add "  Updated: $NEW_LP_URL"
           fi
 
-          # 6. VK LP Settings
+          # 6. VK diagnostics
           source /opt/p0-foundation/.env 2>/dev/null
           if [ -n "${VK_TOKEN:-}" ]; then
-            LP_SET=$(curl -s --max-time 10 \
-              "https://api.vk.com/method/groups.getLongPollSettings?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199" | \
-              python3 -c "
+            add "VK_GROUP_ID=$VK_GROUP_ID"
+            add "VK_TOKEN=${VK_TOKEN:0:10}...${VK_TOKEN: -5}"
+
+            # Check which group the token belongs to
+            GRP_INFO=$(curl -s --max-time 10 \
+              "https://api.vk.com/method/groups.getById?access_token=${VK_TOKEN}&v=5.199" 2>&1)
+            add "groups.getById: $(echo "$GRP_INFO" | head -c 300)"
+
+            # Check getLongPollServer raw response
+            LP_RAW=$(curl -s --max-time 10 \
+              "https://api.vk.com/method/groups.getLongPollServer?group_id=${VK_GROUP_ID}&access_token=${VK_TOKEN}&v=5.199" 2>&1)
+            add "getLongPollServer: $(echo "$LP_RAW" | head -c 300)"
+
+            LP_SET=$(echo "$LP_RAW" | python3 -c "
           import sys,json
-          r=json.load(sys.stdin).get('response',{})
-          en=r.get('is_enabled','?')
-          evts=[k for k,v in r.get('events',{}).items() if v]
-          print(f'enabled={en} events={evts}')
+          d=json.load(sys.stdin)
+          if 'error' in d:
+              e=d['error']
+              print(f'ERROR {e.get(\"error_code\")}: {e.get(\"error_msg\")}')
+          else:
+              r=d.get('response',{})
+              print(f'server={r.get(\"server\",\"?\")[:50]}')
           " 2>/dev/null || echo "PARSE_ERR")
             add "VK LP: $LP_SET"
           else
