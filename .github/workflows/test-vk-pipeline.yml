@@ -73,8 +73,18 @@ jobs:
           add "=== STEP 3: Execution ==="
           LATEST=$(curl -s --max-time 10 \
             -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/executions?limit=1" 2>&1)
-          EXEC_ID=$(echo "$LATEST" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+            "${N8N_BASE_URL}/api/v1/executions?limit=5" 2>&1)
+          # Find P0-03 execution
+          EXEC_ID=$(echo "$LATEST" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          for e in d.get('data',[]):
+              wf = e.get('workflowData',{}).get('name','')
+              if 'P0-03' in wf or 'VK_Event' in wf:
+                  print(e['id']); break
+          else:
+              print(d['data'][0]['id'])
+          " 2>/dev/null)
           DETAIL=$(curl -s --max-time 10 \
             -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
             "${N8N_BASE_URL}/api/v1/executions/${EXEC_ID}?includeData=true" 2>&1)
