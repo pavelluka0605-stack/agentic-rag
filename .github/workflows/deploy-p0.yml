@@ -411,6 +411,7 @@ jobs:
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
           VK_TOKEN: ${{ secrets.VK_TOKEN }}
+          VK_USER_TOKEN: ${{ secrets.VK_USER_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           BLUESALES_LOGIN: ${{ secrets.BLUESALES_LOGIN }}
           BLUESALES_PASSWORD_HASH: ${{ secrets.BLUESALES_PASS }}
@@ -526,6 +527,7 @@ jobs:
               '__TG_CHAT_ID__': os.environ.get('TG_CHAT_ID', ''),
               '__VK_GROUP_ID__': os.environ.get('VK_GROUP_ID', ''),
               '__VK_TOKEN__': os.environ.get('VK_TOKEN', ''),
+              '__VK_USER_TOKEN__': os.environ.get('VK_USER_TOKEN', ''),
               '__OPENAI_API_KEY__': os.environ.get('OPENAI_API_KEY', ''),
               '__BLUESALES_LOGIN__': os.environ.get('BLUESALES_LOGIN', ''),
               '__BLUESALES_PASSWORD_HASH__': bs_hash,
