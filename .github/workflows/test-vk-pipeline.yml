@@ -14,6 +14,7 @@ jobs:
           N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          VK_TOKEN: ${{ secrets.VK_TOKEN }}
         run: |
           MSG=""
           add() { MSG="${MSG}${1}
@@ -46,6 +47,49 @@ jobs:
                   if m: print(f'  {node[\"name\"]}: token_start={m.group(1)[:12]}')
           " 2>/dev/null || echo "parse error")
             add "$PCHECK"
+          fi
+
+          # 0b. Direct VK API test: check token permissions
+          add ""
+          add "=== STEP 0b: Direct VK API Test ==="
+          # Get a real post from the wall
+          WALL=$(curl -s --max-time 10 \
+            "https://api.vk.com/method/wall.get?owner_id=-137949809&count=3&access_token=${VK_TOKEN}&v=5.199" 2>&1)
+          add "Wall posts: $(echo "$WALL" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          if 'error' in d: print('ERROR:', d['error']['error_msg'])
+          else:
+              for p in d.get('response',{}).get('items',[]):
+                  print(f'  #{p[\"id\"]} ({p.get(\"post_type\",\"?\")}): {str(p.get(\"text\",\"\"))[:60]}')
+          " 2>/dev/null || echo "parse error")"
+
+          # Try to create a test comment on the most recent post
+          REAL_POST_ID=$(echo "$WALL" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          items = d.get('response',{}).get('items',[])
+          if items: print(items[0]['id'])
+          " 2>/dev/null)
+
+          if [ -n "$REAL_POST_ID" ]; then
+            add "Testing wall.createComment on post #${REAL_POST_ID}..."
+            VK_REPLY=$(curl -s --max-time 10 \
+              "https://api.vk.com/method/wall.createComment?owner_id=-137949809&post_id=${REAL_POST_ID}&message=test_autocheck_$(date +%s)&access_token=${VK_TOKEN}&v=5.199" 2>&1)
+            add "VK Reply: $(echo "$VK_REPLY" | head -c 300)"
+
+            # If comment was created, delete it
+            COMMENT_ID=$(echo "$VK_REPLY" | python3 -c "
+            import sys,json
+            d = json.load(sys.stdin)
+            if 'response' in d: print(d['response'].get('comment_id',''))
+            " 2>/dev/null)
+            if [ -n "$COMMENT_ID" ]; then
+              add "  Comment created (id: $COMMENT_ID) — deleting..."
+              curl -s --max-time 10 \
+                "https://api.vk.com/method/wall.deleteComment?owner_id=-137949809&comment_id=${COMMENT_ID}&access_token=${VK_TOKEN}&v=5.199" >/dev/null 2>&1
+              add "  Deleted test comment"
+            fi
           fi
 
           # 1. Test n8n Variables API
