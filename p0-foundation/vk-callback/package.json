@@ -1,0 +1,13 @@
+{
+  "name": "vk-callback-receiver",
+  "version": "1.0.0",
+  "description": "VK Callback API Receiver → N8N webhook bridge",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "health": "curl -s http://127.0.0.1:3102/health | jq ."
+  },
+  "keywords": ["vk", "callback", "n8n"],
+  "license": "UNLICENSED",
+  "private": true
+}

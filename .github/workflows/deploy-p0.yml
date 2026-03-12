@@ -17,8 +17,9 @@ on:
         default: "full"
         type: choice
         options:
-          - full          # Полный деплой (N8N + Long Poll + workflows)
+          - full          # Полный деплой (N8N + Long Poll + Callback + workflows)
           - longpoll      # Только VK Long Poll listener
+          - callback      # Только VK Callback receiver
           - workflows     # Только N8N workflows
           - healthcheck   # Проверка всех сервисов
 
@@ -38,6 +39,8 @@ on:
 # BLUESALES_API_KEY — API ключ BlueSales
 # VK_USER_TOKEN   — Personal user token для чтения личных сообщений
 # OPENAI_API_KEY  — API ключ OpenAI для AI автоответов
+# VK_CONFIRMATION_TOKEN — строка подтверждения VK Callback API
+# VK_SECRET_KEY   — секретный ключ VK Callback API
 
 jobs:
   deploy:
@@ -139,6 +142,8 @@ jobs:
           BLUESALES_PASSWORD_HASH=$(echo -n '${{ secrets.BLUESALES_PASS }}' | md5sum | awk '{print toupper($1)}')
           BLUESALES_API_KEY=${{ secrets.BLUESALES_API_KEY }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          VK_CONFIRMATION_TOKEN=${{ secrets.VK_CONFIRMATION_TOKEN }}
+          VK_SECRET_KEY=${{ secrets.VK_SECRET_KEY }}
           ENVEOF
 
           # Удалить лишние пробелы от heredoc indent
@@ -222,6 +227,7 @@ jobs:
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
             p0-foundation/vk-longpoll \
             p0-foundation/vk-user-longpoll \
+            p0-foundation/vk-callback \
             p0-foundation/n8n-workflows \
             p0-foundation/scripts \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/p0-foundation/
@@ -391,6 +397,65 @@ jobs:
           else
             echo "✗ VK User Long Poll failed to start"
             journalctl -u vk-user-longpoll -n 10 --no-pager
+          fi
+          REMOTE_SCRIPT
+
+      # ─── 7c. VK Callback API Receiver ─────────
+      - name: Deploy VK Callback Receiver
+        if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'callback' || github.event.inputs.action == '' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
+
+          source /opt/p0-foundation/.env
+
+          if [ -z "${VK_CONFIRMATION_TOKEN:-}" ]; then
+            echo "⚠ VK_CONFIRMATION_TOKEN не задан — VK Callback пропущен"
+            exit 0
+          fi
+
+          mkdir -p /opt/vk-callback
+          cp /opt/p0-foundation/vk-callback/server.js /opt/vk-callback/
+          cp /opt/p0-foundation/vk-callback/package.json /opt/vk-callback/
+
+          # .env для callback receiver
+          N8N_WH_BASE="${N8N_URL:-http://localhost:5678}"
+          cat > /opt/vk-callback/.env << ENVEOF
+          VK_CONFIRMATION_TOKEN=${VK_CONFIRMATION_TOKEN}
+          VK_SECRET_KEY=${VK_SECRET_KEY:-}
+          VK_GROUP_ID=${VK_GROUP_ID}
+          N8N_WEBHOOK_URL=${N8N_WH_BASE}/webhook/vk-events
+          CALLBACK_PORT=3102
+          ENVEOF
+
+          # Systemd unit
+          cat > /etc/systemd/system/vk-callback.service << 'UNIT'
+          [Unit]
+          Description=VK Callback API Receiver
+          After=network.target n8n.service
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/vk-callback
+          EnvironmentFile=/opt/vk-callback/.env
+          ExecStart=/usr/bin/node /opt/vk-callback/server.js
+          Restart=always
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          systemctl daemon-reload
+          systemctl enable vk-callback
+          systemctl restart vk-callback
+          sleep 3
+
+          if systemctl is-active --quiet vk-callback; then
+            echo "✓ VK Callback Receiver running on :3102"
+          else
+            echo "✗ VK Callback Receiver failed to start"
+            journalctl -u vk-callback -n 10 --no-pager
           fi
           REMOTE_SCRIPT
 
