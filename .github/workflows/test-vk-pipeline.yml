@@ -61,13 +61,25 @@ jobs:
           try:
               d = json.load(sys.stdin)
               for e in d.get('data', []):
-                  wf = e.get('workflowData', {}).get('name', '?')
+                  wf_name = e.get('workflowData', {}).get('name', 'unknown')
                   status = e.get('status', '?')
-                  err = ''
-                  if status == 'error':
-                      err = ' ERR: ' + str(e.get('data',{}).get('resultData',{}).get('error',{}).get('message','?'))[:100]
                   finished = e.get('stoppedAt', '?')
-                  print(f'  {wf}: {status} ({finished}){err}')
+                  line = f'  [{status}] {wf_name} ({finished})'
+                  if status == 'error':
+                      rd = e.get('data',{}).get('resultData',{})
+                      if rd:
+                          em = rd.get('error',{})
+                          if isinstance(em, dict):
+                              line += ' ERR: ' + str(em.get('message',''))[:150]
+                          elif isinstance(em, str):
+                              line += ' ERR: ' + em[:150]
+                      rl = rd.get('runData',{})
+                      for node_name, runs in rl.items():
+                          for r in runs:
+                              if r.get('error'):
+                                  err_msg = r['error'].get('message','')[:100] if isinstance(r['error'],dict) else str(r['error'])[:100]
+                                  line += f' | node={node_name}: {err_msg}'
+                  print(line)
           except Exception as ex:
               print(f'  Parse error: {ex}')
           " 2>/dev/null || echo "  API error")
