@@ -19,6 +19,35 @@ jobs:
           add() { MSG="${MSG}${1}
           "; }
 
+          # 0. Check placeholder substitution in deployed workflows
+          add "=== STEP 0: Check deployed P0-07 ==="
+          ALL_WF=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_BASE_URL}/api/v1/workflows?limit=100" 2>&1)
+          P07_ID=$(echo "$ALL_WF" | python3 -c "
+          import sys,json
+          for w in json.load(sys.stdin).get('data',[]):
+              if 'P0-07' in w['name']: print(w['id']); break
+          " 2>/dev/null)
+          if [ -n "$P07_ID" ]; then
+            WF_JSON=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              "${N8N_BASE_URL}/api/v1/workflows/${P07_ID}" 2>&1)
+            PCHECK=$(echo "$WF_JSON" | python3 -c "
+          import sys,json,re
+          wf = json.load(sys.stdin)
+          raw = json.dumps(wf)
+          found = set(re.findall(r'__[A-Z_]+__', raw))
+          if found: print('UNSUBSTITUTED: ' + ', '.join(found))
+          else: print('All placeholders OK')
+          for node in wf.get('nodes',[]):
+              p = node.get('parameters',{})
+              body = p.get('body','')
+              if 'access_token' in str(body):
+                  m = re.search(r'access_token=([^&\"]{0,20})', body)
+                  if m: print(f'  {node[\"name\"]}: token_start={m.group(1)[:12]}')
+          " 2>/dev/null || echo "parse error")
+            add "$PCHECK"
+          fi
+
           # 1. Test n8n Variables API
           add "=== STEP 1: Test n8n Variables API ==="
 
