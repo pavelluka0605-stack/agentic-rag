@@ -1,0 +1,138 @@
+name: "Check Placeholder Substitution"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: "Verify deployed workflows"
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check P0-07 on N8N
+        env:
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+        run: |
+          MSG=""
+          add() { MSG="${MSG}${1}
+          "; }
+
+          # Get P0-07 workflow
+          ALL_WF=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_BASE_URL}/api/v1/workflows?limit=100" 2>&1)
+
+          P07_ID=$(echo "$ALL_WF" | python3 -c "
+          import sys,json
+          data = json.load(sys.stdin).get('data',[])
+          for w in data:
+              if 'P0-07' in w['name']:
+                  print(w['id'])
+                  break
+          " 2>/dev/null)
+          add "P0-07 ID: ${P07_ID}"
+
+          if [ -n "$P07_ID" ]; then
+            WF_DETAIL=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              "${N8N_BASE_URL}/api/v1/workflows/${P07_ID}" 2>&1)
+
+            # Check for remaining placeholders
+            PLACEHOLDERS=$(echo "$WF_DETAIL" | python3 -c "
+          import sys,json,re
+          wf = json.load(sys.stdin)
+          raw = json.dumps(wf)
+          # Find all __XXX__ patterns
+          found = re.findall(r'__[A-Z_]+__', raw)
+          if found:
+              print('UNSUBSTITUTED: ' + ', '.join(set(found)))
+          else:
+              print('All placeholders substituted OK')
+
+          # Check VK Reply nodes for access_token
+          for node in wf.get('nodes',[]):
+              params = node.get('parameters',{})
+              body = params.get('body','')
+              if 'access_token' in str(body):
+                  # Mask token but show first/last 8 chars
+                  import re as r2
+                  m = r2.search(r'access_token=([^&\"]+)', body)
+                  if m:
+                      tok = m.group(1)
+                      if len(tok) > 20:
+                          masked = tok[:8] + '...' + tok[-8:]
+                      else:
+                          masked = tok
+                      print(f'  {node[\"name\"]}: access_token={masked}')
+                  else:
+                      print(f'  {node[\"name\"]}: access_token NOT FOUND in body')
+
+          # Check OpenAI key
+          for node in wf.get('nodes',[]):
+              params = node.get('parameters',{})
+              headers = params.get('headerParameters',{}).get('parameters',[])
+              for h in headers:
+                  if h.get('name') == 'Authorization':
+                      val = h.get('value','')
+                      if 'sk-' in val:
+                          print(f'  OpenAI key: present (sk-...{val[-8:]})')
+                      elif '__OPENAI' in val:
+                          print(f'  OpenAI key: NOT SUBSTITUTED ({val})')
+                      else:
+                          print(f'  OpenAI key: {val[:30]}...')
+
+          # Check Telegram token
+          for node in wf.get('nodes',[]):
+              params = node.get('parameters',{})
+              url = params.get('url','')
+              if 'telegram' in url.lower() and 'bot' in url.lower():
+                  import re as r3
+                  m = r3.search(r'bot([^/]+)', url)
+                  if m:
+                      tok = m.group(1)
+                      if '__TG' in tok:
+                          print(f'  {node[\"name\"]}: TG token NOT SUBSTITUTED')
+                      elif len(tok) > 10:
+                          print(f'  {node[\"name\"]}: TG token present ({tok[:6]}...)')
+                      else:
+                          print(f'  {node[\"name\"]}: TG token={tok}')
+          " 2>/dev/null || echo "Parse error")
+            add "$PLACEHOLDERS"
+          fi
+
+          # Also check P0-03
+          P03_ID=$(echo "$ALL_WF" | python3 -c "
+          import sys,json
+          data = json.load(sys.stdin).get('data',[])
+          for w in data:
+              if 'P0-03' in w['name']:
+                  print(w['id'])
+                  break
+          " 2>/dev/null)
+          add ""
+          add "P0-03 ID: ${P03_ID}"
+
+          if [ -n "$P03_ID" ]; then
+            WF_DETAIL=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              "${N8N_BASE_URL}/api/v1/workflows/${P03_ID}" 2>&1)
+
+            PLACEHOLDERS2=$(echo "$WF_DETAIL" | python3 -c "
+          import sys,json,re
+          wf = json.load(sys.stdin)
+          raw = json.dumps(wf)
+          found = re.findall(r'__[A-Z_]+__', raw)
+          if found:
+              print('UNSUBSTITUTED: ' + ', '.join(set(found)))
+          else:
+              print('All placeholders substituted OK')
+          " 2>/dev/null || echo "Parse error")
+            add "$PLACEHOLDERS2"
+          fi
+
+          # Also check LP listener status
+          add ""
+          add "=== LP Listener Health ==="
+          LP_HEALTH=$(curl -s --max-time 5 "${N8N_BASE_URL}/../:3100/health" 2>/dev/null || echo "Cannot reach LP health")
+          add "LP: $LP_HEALTH"
+
+          ONELINE=$(echo "$MSG" | tr '\n' ' | ' | head -c 4000)
+          echo "::notice title=PlaceholderCheck::${ONELINE}"
