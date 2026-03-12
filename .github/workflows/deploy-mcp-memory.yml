@@ -44,11 +44,22 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
 
           set -e
+
+          # Load nvm if available (non-interactive SSH doesn't source .bashrc)
+          export NVM_DIR="${HOME}/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+
           cd /opt/mcp-memory
 
           echo "=== Step 1: Check environment ==="
-          node --version || { echo "Node.js not found"; exit 1; }
-          npm --version
+          if ! command -v node &>/dev/null; then
+            echo "Node.js not found, installing via nodesource..."
+            curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+            apt-get install -y nodejs
+          fi
+          echo "Node: $(node --version)"
+          echo "npm: $(npm --version)"
+          echo "Path: $(which node)"
 
           # Ensure build-essential for better-sqlite3
           dpkg -l | grep -q build-essential || {
@@ -147,14 +158,9 @@ jobs:
           node src/backup.js
 
           echo "=== Step 9: Seed data ==="
-          EXISTING=$(node -e "
-            import('./src/database.js').then(m => {
-              const db = m.initDatabase('/opt/mcp-memory/data/memory.db');
-              const c = db.prepare('SELECT COUNT(*) as count FROM memories').get();
-              console.log(c.count);
-              db.close();
-            });
-          " 2>/dev/null || echo "0")
+          which sqlite3 > /dev/null 2>&1 || apt-get install -y -qq sqlite3
+          EXISTING=$(sqlite3 /opt/mcp-memory/data/memory.db "SELECT COUNT(*) FROM memories;" 2>/dev/null || echo "0")
+          echo "Existing records: $EXISTING"
           if [ "$EXISTING" = "0" ] || [ "$EXISTING" = "" ]; then
             echo "Loading seed data..."
             node src/seed.js
