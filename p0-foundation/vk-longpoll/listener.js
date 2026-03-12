@@ -268,7 +268,8 @@ async function startLongPoll() {
 
       // Цикл опроса
       while (true) {
-        const pollUrl = `https://${server}?act=a_check&key=${key}&ts=${ts}&wait=25&mode=2&version=3`;
+        const baseUrl = server.startsWith('https://') ? server : `https://${server}`;
+        const pollUrl = `${baseUrl}?act=a_check&key=${key}&ts=${ts}&wait=25&mode=2&version=3`;
         const response = await httpsGet(pollUrl);
 
         // Обработка ошибок Long Poll
