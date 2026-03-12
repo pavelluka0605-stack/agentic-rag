@@ -13,58 +13,42 @@ jobs:
         env:
           N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
         run: |
           MSG=""
           add() { MSG="${MSG}${1}
           "; }
 
-          # 1. Get current P0-03 from N8N API to verify switch rules
-          add "=== STEP 1: Check P0-03 switch rules in N8N ==="
-          # Find P0-03 workflow ID
-          WF_LIST=$(curl -s --max-time 10 \
-            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/workflows?limit=100" 2>&1)
-          P03_ID=$(echo "$WF_LIST" | python3 -c "
-          import sys,json
-          d = json.load(sys.stdin)
-          for w in d.get('data',[]):
-              if 'P0-03' in w.get('name',''):
-                  print(w['id'])
-                  break
-          " 2>/dev/null)
-          add "P0-03 workflow ID: ${P03_ID}"
+          # 1. Test n8n Variables API
+          add "=== STEP 1: Test n8n Variables API ==="
 
-          if [ -n "$P03_ID" ]; then
-            WF_DETAIL=$(curl -s --max-time 10 \
-              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              "${N8N_BASE_URL}/api/v1/workflows/${P03_ID}" 2>&1)
-            SWITCH_INFO=$(echo "$WF_DETAIL" | python3 -c "
-          import sys,json
-          wf = json.load(sys.stdin)
-          for node in wf.get('nodes',[]):
-              if 'switch' in node.get('name','').lower() or 'switch' in node.get('type','').lower():
-                  rules = node.get('parameters',{}).get('rules',{}).get('rules',[])
-                  print(f'Switch rules ({len(rules)}):')
-                  for i,r in enumerate(rules):
-                      print(f'  [{i}] {r.get(\"value2\",\"?\")}')
-          conns = wf.get('connections',{}).get('Switch: Event Type',{}).get('main',[])
-          print(f'Switch outputs ({len(conns)}):')
-          for i,c in enumerate(conns):
-              targets = [x.get('node','?') for x in c] if c else ['(empty)']
-              print(f'  [{i}] -> {\", \".join(targets)}')
-          " 2>/dev/null || echo "  Parse error")
-            add "$SWITCH_INFO"
-          fi
+          # List existing variables
+          VARS_LIST=$(curl -s --max-time 10 \
+            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_BASE_URL}/api/v1/variables" 2>&1)
+          add "Existing variables: $(echo "$VARS_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print([v.get('key') for v in d.get('data',d if isinstance(d,list) else [])])" 2>/dev/null || echo "$VARS_LIST" | head -c 200)"
+
+          # Try to create a test variable
+          CREATE_RESP=$(curl -s -w "\nHTTP:%{http_code}" --max-time 10 \
+            -X POST "${N8N_BASE_URL}/api/v1/variables" \
+            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{"key":"TEST_VAR","value":"test123"}' 2>&1)
+          add "Create TEST_VAR: $(echo "$CREATE_RESP" | tail -1) $(echo "$CREATE_RESP" | head -1 | head -c 200)"
+
+          # Try to set GOOGLE_SPREADSHEET_ID
+          CREATE_RESP2=$(curl -s -w "\nHTTP:%{http_code}" --max-time 10 \
+            -X POST "${N8N_BASE_URL}/api/v1/variables" \
+            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"key\":\"GOOGLE_SPREADSHEET_ID\",\"value\":\"${SPREADSHEET_ID}\"}" 2>&1)
+          add "Create GOOGLE_SPREADSHEET_ID: $(echo "$CREATE_RESP2" | tail -1) $(echo "$CREATE_RESP2" | head -1 | head -c 200)"
 
           # 2. Send test event
           add ""
-          add "=== STEP 2: Send test photo_comment_new ==="
+          add "=== STEP 2: Send test ==="
           TIMESTAMP=$(date +%s)
-          HTTP_CODE=$(curl -s -o /tmp/webhook_resp.txt -w "%{http_code}" --max-time 15 \
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
             -X POST "${N8N_BASE_URL}/webhook/vk-events" \
             -H "Content-Type: application/json" \
             -d "{
@@ -81,14 +65,12 @@ jobs:
                 \"owner_id\": -137949809
               }
             }")
-          RESP=$(cat /tmp/webhook_resp.txt 2>/dev/null)
-          add "HTTP ${HTTP_CODE}: ${RESP}"
-
-          sleep 10
+          add "Webhook: HTTP ${HTTP_CODE}"
+          sleep 12
 
           # 3. Check execution
           add ""
-          add "=== STEP 3: Latest execution ==="
+          add "=== STEP 3: Execution ==="
           LATEST=$(curl -s --max-time 10 \
             -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
             "${N8N_BASE_URL}/api/v1/executions?limit=1" 2>&1)
@@ -108,19 +90,10 @@ jobs:
                   if r.get('error'):
                       em = r['error']
                       err = ' ERR: ' + (em.get('message','') if isinstance(em,dict) else str(em))[:120]
-                  out_count = 0
-                  data = r.get('data',{}).get('main',[[]])
-                  if data and data[0]:
-                      out_count = len(data[0])
-                  print(f'  [{s}] {node_name} (out={out_count}){err}')
+                  print(f'  [{s}] {node_name}{err}')
           " 2>/dev/null || echo "  Parse error")
           add "$NODES_RAN"
 
           # Output
           ONELINE=$(echo "$MSG" | tr '\n' ' | ' | head -c 4000)
           echo "::notice title=TestResult::${ONELINE}"
-          {
-            echo '```'
-            echo "$MSG"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
