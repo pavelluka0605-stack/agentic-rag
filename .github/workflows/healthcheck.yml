@@ -19,7 +19,8 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Run Diagnostics on VPS (sends to Telegram directly)
+      - name: Run Diagnostics on VPS
+        id: diag
         env:
           TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT_ID }}
@@ -27,21 +28,16 @@ jobs:
           N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+          # Collect diagnostics via SSH, capture stdout
+          DIAG_OUTPUT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "TG_TOKEN=$TG_TOKEN" "TG_CHAT=$TG_CHAT" "RUN_URL=$RUN_URL" "N8N_API_KEY=$N8N_API_KEY" "N8N_BASE_URL=$N8N_BASE_URL" \
+            "N8N_API_KEY=$N8N_API_KEY" "N8N_BASE_URL=$N8N_BASE_URL" \
             'bash -s' << 'REMOTE'
-
-          send_tg() {
-            curl -s --max-time 15 "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=${TG_CHAT}" \
-              --data-urlencode "text=$1" > /dev/null 2>&1
-          }
 
           MSG=""
           add() { MSG="${MSG}${1}\n"; }
 
-          add "🔍 VPS DIAGNOSTICS $(date '+%H:%M:%S')"
+          add "VPS DIAGNOSTICS $(date '+%H:%M:%S')"
           add ""
 
           # 1. Services
@@ -57,14 +53,9 @@ jobs:
           # 3. N8N Workflows via API
           add ""
           add "--- N8N Workflows ---"
-          # Try external URL first (works in deploy), fallback to localhost
           N8N_API_URL="${N8N_BASE_URL:-http://localhost:5678}"
           WF_LIST=$(curl -s --max-time 10 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
             "${N8N_API_URL}/api/v1/workflows?limit=100" 2>&1)
-          # Show raw response snippet for debugging
-          RAW_SNIPPET=$(echo "$WF_LIST" | head -c 120)
-          add "API(${N8N_API_URL}): ${RAW_SNIPPET}"
-          add ""
           WF_INFO=$(echo "$WF_LIST" | python3 -c "
           import sys,json
           try:
@@ -77,7 +68,7 @@ jobs:
           " 2>/dev/null || echo "API_ERR")
           add "$WF_INFO"
 
-          # 4. Force re-activate P0-03 (deactivate then activate to re-register webhook)
+          # 4. Force re-activate P0-03
           add ""
           P03_ID=$(echo "$WF_LIST" | python3 -c "
           import sys,json
@@ -88,18 +79,16 @@ jobs:
 
           if [ -n "$P03_ID" ]; then
             add "Re-activating P0-03 (id=$P03_ID)..."
-            # Deactivate first
             curl -s -X POST "${N8N_API_URL}/api/v1/workflows/${P03_ID}/deactivate" \
               -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
             sleep 2
-            # Activate
             REACTIVATE=$(curl -s -X POST "${N8N_API_URL}/api/v1/workflows/${P03_ID}/activate" \
               -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
               -H "Content-Type: application/json" 2>&1)
             if echo "$REACTIVATE" | grep -q '"active":true'; then
-              add "  ✓ P0-03 re-activated"
+              add "  P0-03 re-activated OK"
             else
-              add "  ✗ P0-03: $(echo "$REACTIVATE" | head -c 200)"
+              add "  P0-03 FAIL: $(echo "$REACTIVATE" | head -c 200)"
             fi
           else
             add "P0-03 not found!"
@@ -123,13 +112,13 @@ jobs:
           WH_EXT_BODY=$(echo "$WH_EXT" | head -c 150)
           add "Webhook external: $WH_EXT_CODE ($WH_EXT_BODY)"
 
-          # 5b. N8N journal for errors
+          # 5b. N8N journal
           add ""
           add "--- N8N Journal ---"
           N8N_LOG=$(journalctl -u n8n -n 5 --no-pager -o short-iso 2>&1 | tail -5)
           add "$N8N_LOG"
 
-          # 5c. Show LP .env webhook URL
+          # 5c. LP .env
           LP_URL=$(grep N8N_WEBHOOK_URL /opt/vk-longpoll/.env 2>/dev/null || echo "NOT_FOUND")
           add "LP .env: $LP_URL"
 
@@ -150,25 +139,37 @@ jobs:
             add "VK: .env NOT LOADED"
           fi
 
-          # 7. LP Journal (last 5 lines)
+          # 7. LP Journal
           add ""
           add "--- LP Journal ---"
           JOURNAL=$(journalctl -u vk-longpoll -n 5 --no-pager -o short-iso 2>&1 | tail -5)
           add "$JOURNAL"
 
-          add ""
-          add "Run: $RUN_URL"
-
-          # Print to stdout (visible in GitHub Actions logs)
-          FINAL=$(printf "$MSG")
-          echo "========== DIAGNOSTICS OUTPUT =========="
-          echo "$FINAL"
-          echo "========== END DIAGNOSTICS =========="
-
-          # Send to Telegram
-          send_tg "$FINAL"
+          # Output to stdout (captured by runner)
+          printf "$MSG"
 
           REMOTE
+          )
+
+          # Save to file for next steps
+          echo "$DIAG_OUTPUT" | tee /tmp/diag_output.txt
+
+          # Write Job Summary (visible on Actions run page)
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$DIAG_OUTPUT" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          # Send to Telegram
+          curl -s --max-time 15 "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${DIAG_OUTPUT}" > /dev/null 2>&1
+
+          # Save as output for gh api access
+          {
+            echo 'diagnostics<<DIAG_EOF'
+            echo "$DIAG_OUTPUT"
+            echo 'DIAG_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Cleanup
         if: always()
