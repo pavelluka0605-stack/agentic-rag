@@ -44,11 +44,16 @@ jobs:
           N8N_ST=$(systemctl is-active n8n 2>&1 || true)
           LP_ST=$(systemctl is-active vk-longpoll 2>&1 || true)
           ULP_ST=$(systemctl is-active vk-user-longpoll 2>&1 || true)
-          add "Services: n8n=$N8N_ST | lp=$LP_ST | ulp=$ULP_ST"
+          CB_ST=$(systemctl is-active vk-callback 2>&1 || true)
+          add "Services: n8n=$N8N_ST | lp=$LP_ST | ulp=$ULP_ST | cb=$CB_ST"
 
           # 2. VK LP Health
           LP_HEALTH=$(curl -s --max-time 3 http://127.0.0.1:3100/health 2>&1 || echo "NO_RESPONSE")
           add "LP Health: $LP_HEALTH"
+
+          # 2b. VK Callback Health
+          CB_HEALTH=$(curl -s --max-time 3 http://127.0.0.1:3102/health 2>&1 || echo "NO_RESPONSE")
+          add "Callback Health: $CB_HEALTH"
 
           # 3. N8N Workflows via API
           add ""

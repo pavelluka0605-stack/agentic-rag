@@ -1029,6 +1029,19 @@ jobs:
           fi
           echo ""
 
+          # ─── VK Callback Receiver ────────────────
+          if systemctl is-active --quiet vk-callback 2>/dev/null; then
+            echo "✅ VK Callback: active (порт 3102)"
+            if curl -s --max-time 3 http://127.0.0.1:3102/health &>/dev/null; then
+              curl -s http://127.0.0.1:3102/health | python3 -c "
+          import sys,json; d=json.load(sys.stdin)
+          print(f'   Events: {d.get(\"events_received\",0)} | Forwarded: {d.get(\"events_forwarded\",0)} | Errors: {d.get(\"errors\",0)}')" 2>/dev/null
+            fi
+          else
+            echo "⚪ VK Callback: не запущен (VK_CONFIRMATION_TOKEN не задан?)"
+          fi
+          echo ""
+
           # ─── Webhook test ───────────────────────
           WH_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
             -X POST http://localhost:5678/webhook/vk-events \
@@ -1074,6 +1087,7 @@ jobs:
           [ -f "/opt/credentials/google-service-account.json" ] && echo "✅ Google SA JSON: есть" || echo "⚠️  Google SA JSON: нет"
           [ -f "/opt/vk-longpoll/listener.js" ] && echo "✅ listener.js: есть" || echo "❌ listener.js: нет"
           [ -f "/opt/vk-longpoll/.env" ] && echo "✅ vk-longpoll .env: есть" || echo "❌ vk-longpoll .env: нет"
+          [ -f "/opt/vk-callback/server.js" ] && echo "✅ vk-callback server.js: есть" || echo "⚪ vk-callback: не установлен"
           WF_FILES=$(ls /opt/n8n-workflows/*.json 2>/dev/null | wc -l)
           echo "📁 N8N workflow JSONs: $WF_FILES файлов"
           echo ""
