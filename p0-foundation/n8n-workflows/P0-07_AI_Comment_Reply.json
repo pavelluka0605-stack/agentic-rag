@@ -17,6 +17,16 @@
     },
     {
       "parameters": {
+        "jsCode": "// Flatten webhook v2 body to top-level\nreturn $input.all().map(item => ({\n  json: item.json.body || item.json\n}));"
+      },
+      "id": "flatten-body-ai",
+      "name": "Flatten: Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [360, 400]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://api.openai.com/v1/chat/completions",
         "sendHeaders": true,
@@ -47,7 +57,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse OpenAI response and extract intent + reply\nconst input = $input.item.json;\nconst webhookData = $('Webhook: AI Reply').item.json;\n\nlet aiResponse;\ntry {\n  const content = input.choices[0].message.content;\n  // Try to parse JSON from response (handle markdown code blocks)\n  let jsonStr = content;\n  if (content.includes('```')) {\n    jsonStr = content.replace(/```json?\\n?/g, '').replace(/```/g, '').trim();\n  }\n  aiResponse = JSON.parse(jsonStr);\n} catch (e) {\n  // Fallback if parsing fails\n  aiResponse = {\n    intent: 'consultation',\n    reply: 'Спасибо за ваш комментарий! Напишите нам в личные сообщения для подробной консультации.',\n    product: '',\n    details: ''\n  };\n}\n\nreturn [{\n  json: {\n    intent: aiResponse.intent || 'consultation',\n    reply: aiResponse.reply || '',\n    product: aiResponse.product || '',\n    details: aiResponse.details || '',\n    comment_id: webhookData.comment_id,\n    from_id: webhookData.from_id,\n    post_id: webhookData.post_id,\n    text: webhookData.text,\n    date: webhookData.date\n  }\n}];"
+        "jsCode": "// Parse OpenAI response and extract intent + reply\nconst input = $input.item.json;\nconst webhookData = $('Flatten: Body').item.json;\n\nlet aiResponse;\ntry {\n  const content = input.choices[0].message.content;\n  // Try to parse JSON from response (handle markdown code blocks)\n  let jsonStr = content;\n  if (content.includes('```')) {\n    jsonStr = content.replace(/```json?\\n?/g, '').replace(/```/g, '').trim();\n  }\n  aiResponse = JSON.parse(jsonStr);\n} catch (e) {\n  // Fallback if parsing fails\n  aiResponse = {\n    intent: 'consultation',\n    reply: 'Спасибо за ваш комментарий! Напишите нам в личные сообщения для подробной консультации.',\n    product: '',\n    details: ''\n  };\n}\n\nreturn [{\n  json: {\n    intent: aiResponse.intent || 'consultation',\n    reply: aiResponse.reply || '',\n    product: aiResponse.product || '',\n    details: aiResponse.details || '',\n    comment_id: webhookData.comment_id,\n    from_id: webhookData.from_id,\n    post_id: webhookData.post_id,\n    text: webhookData.text,\n    date: webhookData.date\n  }\n}];"
       },
       "id": "parse-ai",
       "name": "Parse: AI Response",
@@ -201,6 +211,9 @@
   ],
   "connections": {
     "Webhook: AI Reply": {
+      "main": [[ { "node": "Flatten: Body", "type": "main", "index": 0 } ]]
+    },
+    "Flatten: Body": {
       "main": [[ { "node": "OpenAI: Classify", "type": "main", "index": 0 } ]]
     },
     "OpenAI: Classify": {
