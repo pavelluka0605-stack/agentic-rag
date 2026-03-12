@@ -16,10 +16,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.vk.com/method/groups.getById",
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "=group_id=__VK_GROUP_ID__&access_token=__VK_TOKEN__&v=5.199",
+        "url": "=https://api.vk.com/method/groups.getById?group_id=__VK_GROUP_ID__&access_token=__VK_TOKEN__&v=5.199",
         "options": {
           "timeout": 10000
         }

@@ -76,10 +76,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.vk.com/method/wall.createComment",
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "=owner_id=-__VK_GROUP_ID__&post_id={{ $json.post_id }}&reply_to_comment={{ $json.comment_id }}&message={{ encodeURIComponent($json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
+        "url": "=https://api.vk.com/method/wall.createComment?owner_id=-__VK_GROUP_ID__&post_id={{ $json.post_id }}&reply_to_comment={{ $json.comment_id }}&message={{ encodeURIComponent($json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
         "options": {
           "timeout": 15000
         }
@@ -93,10 +90,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.vk.com/method/wall.createComment",
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "=owner_id=-__VK_GROUP_ID__&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
+        "url": "=https://api.vk.com/method/wall.createComment?owner_id=-__VK_GROUP_ID__&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
         "options": {
           "timeout": 15000
         }
@@ -137,10 +131,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.vk.com/method/wall.createComment",
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "=owner_id=-__VK_GROUP_ID__&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
+        "url": "=https://api.vk.com/method/wall.createComment?owner_id=-__VK_GROUP_ID__&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
         "options": {
           "timeout": 15000
         }
