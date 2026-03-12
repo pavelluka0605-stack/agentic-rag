@@ -318,6 +318,7 @@
     {
       "parameters": {
         "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
           "conditions": [
             { "id": "cond-err", "leftValue": "={{ $json.event }}", "rightValue": "longpoll_error", "operator": { "type": "string", "operation": "equals" } }
           ],
