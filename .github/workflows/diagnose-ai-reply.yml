@@ -21,218 +21,189 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: "1. Check N8N workflows on VPS"
-        id: check_workflows
-        env:
-          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
-          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
-        run: |
-          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
-
-          source /opt/p0-foundation/.env 2>/dev/null
-
-          echo "=== 1. N8N WORKFLOWS — ACTIVE STATUS ==="
-          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            http://localhost:5678/api/v1/workflows 2>/dev/null | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin).get('data', [])
-          for w in data:
-            status = 'ACTIVE' if w.get('active') else 'INACTIVE'
-            print(f'  [{status}] {w[\"name\"]} (id={w[\"id\"]})')
-          " 2>/dev/null || echo "  ERROR: Cannot query N8N API"
-
-          echo ""
-          echo "=== 2. P0-03 — Call AI Reply URL (actual on server) ==="
-          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            http://localhost:5678/api/v1/workflows 2>/dev/null | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin).get('data', [])
-          for w in data:
-            if 'P0-03' in w.get('name', '') or 'Event_Receiver' in w.get('name', ''):
-              print(f'Workflow: {w[\"name\"]} (id={w[\"id\"]})')
-              for node in w.get('nodes', []):
-                name = node.get('name', '')
-                params = node.get('parameters', {})
-                url = params.get('url', '')
-                if url:
-                  print(f'  Node: {name}')
-                  print(f'    URL: {url}')
-                if 'jsCode' in params:
-                  code = params['jsCode'][:100]
-                  print(f'  Node: {name} (Code: {code}...)')
-          " 2>/dev/null
-
-          echo ""
-          echo "=== 3. P0-07 — Webhook path and VK API nodes ==="
-          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            http://localhost:5678/api/v1/workflows 2>/dev/null | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin).get('data', [])
-          for w in data:
-            if 'P0-07' in w.get('name', '') or 'AI' in w.get('name', ''):
-              print(f'Workflow: {w[\"name\"]} (id={w[\"id\"]}, active={w.get(\"active\")})')
-              for node in w.get('nodes', []):
-                name = node.get('name', '')
-                params = node.get('parameters', {})
-                ntype = node.get('type', '')
-                if 'webhook' in ntype.lower():
-                  print(f'  WEBHOOK: path={params.get(\"path\", \"?\")}')
-                url = params.get('url', '')
-                body = params.get('body', params.get('jsonBody', ''))
-                if 'vk.com' in str(url) or 'vk.com' in str(body):
-                  print(f'  VK API Node: {name}')
-                  print(f'    URL: {url}')
-                  print(f'    Body: {str(body)[:200]}')
-                if 'openai' in str(url).lower():
-                  print(f'  OpenAI Node: {name}')
-                  print(f'    URL: {url}')
-          " 2>/dev/null
-
-          echo ""
-          echo "=== 4. ENV VARIABLES (key lengths) ==="
-          echo "VK_TOKEN: ${#VK_TOKEN} chars"
-          echo "VK_GROUP_ID: ${VK_GROUP_ID}"
-          echo "OPENAI_API_KEY: ${#OPENAI_API_KEY} chars"
-          echo "N8N_API_KEY: ${#N8N_API_KEY} chars"
-          echo "TG_BOT_TOKEN: ${#TG_BOT_TOKEN} chars"
-
-          REMOTE
-          )
-          echo "$RESULT"
-
-      - name: "2. Check recent P0-03 and P0-07 executions"
-        id: check_executions
-        run: |
-          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
-
-          source /opt/p0-foundation/.env 2>/dev/null
-
-          echo "=== 5. RECENT EXECUTIONS (last 20) ==="
-          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "http://localhost:5678/api/v1/executions?limit=20" 2>/dev/null | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin).get('data', [])
-          for e in data:
-            wf = e.get('workflowData', {}).get('name', e.get('workflowId', '?'))
-            status = e.get('status', '?')
-            finished = e.get('stoppedAt', e.get('startedAt', '?'))
-            eid = e.get('id', '?')
-            mode = e.get('mode', '?')
-            icon = '✅' if status == 'success' else '❌' if status == 'error' else '⏳'
-            print(f'  {icon} [{status}] {wf} (id={eid}, mode={mode}, at={finished})')
-          " 2>/dev/null || echo "  ERROR: Cannot query executions"
-
-          echo ""
-          echo "=== 6. FAILED EXECUTIONS DETAIL ==="
-          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "http://localhost:5678/api/v1/executions?limit=10&status=error" 2>/dev/null | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin).get('data', [])
-          if not data:
-            print('  No failed executions found')
-          for e in data[:5]:
-            wf = e.get('workflowData', {}).get('name', e.get('workflowId', '?'))
-            eid = e.get('id', '?')
-            started = e.get('startedAt', '?')
-            print(f'  FAILED: {wf} (id={eid}, at={started})')
-            # Try to get error message from execution data
-            exec_data = e.get('data', {})
-            if isinstance(exec_data, dict):
-              result = exec_data.get('resultData', {})
-              error = result.get('error', {})
-              if error:
-                print(f'    Error: {str(error)[:300]}')
-              run_data = result.get('runData', {})
-              for node_name, node_runs in run_data.items():
-                if isinstance(node_runs, list):
-                  for run in node_runs:
-                    if run.get('error'):
-                      err_msg = run['error'].get('message', str(run['error']))
-                      print(f'    Node [{node_name}]: {err_msg[:200]}')
-          " 2>/dev/null || echo "  ERROR: Cannot query failed executions"
-
-          REMOTE
-          )
-          echo "$RESULT"
-
-      - name: "3. Test P0-07 webhook directly"
-        id: test_p07
-        run: |
-          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
-
-          echo "=== 7. DIRECT P0-07 WEBHOOK TEST ==="
-          echo "POST http://localhost:5678/webhook/vk-ai-reply ..."
-
-          RESP=$(curl -s -w "\n---HTTP_CODE:%{http_code}---" --max-time 30 \
-            -X POST http://localhost:5678/webhook/vk-ai-reply \
-            -H "Content-Type: application/json" \
-            -d '{
-              "comment_id": 99999,
-              "from_id": 1,
-              "post_id": 1,
-              "text": "ТЕСТ: Сколько стоит диван угловой серый?",
-              "date": "2026-03-12T12:00:00Z"
-            }')
-
-          HTTP_CODE=$(echo "$RESP" | grep -o 'HTTP_CODE:[0-9]*' | cut -d: -f2)
-          BODY=$(echo "$RESP" | sed 's/---HTTP_CODE:[0-9]*---//')
-
-          echo "HTTP Code: $HTTP_CODE"
-          echo "Response: $BODY"
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ P0-07 webhook: RESPONDING"
-          elif [ "$HTTP_CODE" = "404" ]; then
-            echo "❌ P0-07 webhook: 404 NOT FOUND — workflow may be inactive or webhook path wrong"
-          else
-            echo "❌ P0-07 webhook: HTTP $HTTP_CODE"
-          fi
-
-          echo ""
-          echo "=== 8. TEST VK wall.createComment (DRY RUN — just check token scope) ==="
-          source /opt/p0-foundation/.env 2>/dev/null
-
-          # Test if token has wall permission by getting group info
-          RESP2=$(curl -s --max-time 10 \
-            "https://api.vk.com/method/wall.get?owner_id=-${VK_GROUP_ID}&count=1&access_token=${VK_TOKEN}&v=5.199")
-
-          if echo "$RESP2" | grep -q '"count"'; then
-            echo "✅ wall.get works — token has wall access"
-            echo "  Response: $(echo "$RESP2" | head -c 200)"
-          else
-            echo "❌ wall.get FAILED — check token scopes"
-            echo "  Response: $(echo "$RESP2" | head -c 500)"
-          fi
-
-          echo ""
-          echo "=== 9. Long Poll listener recent logs ==="
-          journalctl -u vk-longpoll -n 20 --no-pager 2>&1
-
-          REMOTE
-          )
-          echo "$RESULT"
-
-      - name: "Send results to Telegram"
-        if: always()
+      - name: "Run full diagnostics on VPS"
+        id: diag
         env:
           TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT_ID }}
         run: |
-          MSG="🔬 AI Reply Chain Diagnostics
-          $(date '+%d.%m.%Y %H:%M UTC')
+          # Function to send message to Telegram
+          send_tg() {
+            local msg="$1"
+            curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              -d "chat_id=${TG_CHAT}" \
+              --data-urlencode "text=${msg}" > /dev/null 2>&1 || true
+          }
 
-          1️⃣ Workflows check: ${{ steps.check_workflows.outcome }}
-          2️⃣ Executions check: ${{ steps.check_executions.outcome }}
-          3️⃣ P0-07 direct test: ${{ steps.test_p07.outcome }}
+          # ─── PART 1: Workflows & URLs ───
+          PART1=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
 
-          Run: https://github.com/pavelluka0605-stack/agentic-rag/actions/runs/${{ github.run_id }}"
+          source /opt/p0-foundation/.env 2>/dev/null
 
-          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-            -d "chat_id=${TG_CHAT}" \
-            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
+          echo "=== WORKFLOWS ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            http://localhost:5678/api/v1/workflows 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+            s = 'ON' if w.get('active') else 'OFF'
+            print(f'[{s}] {w[\"name\"]} (id={w[\"id\"]})')
+          " 2>/dev/null
+
+          echo ""
+          echo "=== P0-03 URLs ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            http://localhost:5678/api/v1/workflows 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+            if 'P0-03' in w.get('name','') or 'Event' in w.get('name',''):
+              for n in w.get('nodes',[]):
+                u = n.get('parameters',{}).get('url','')
+                if u: print(f'{n[\"name\"]}: {u}')
+          " 2>/dev/null
+
+          echo ""
+          echo "=== P0-07 INFO ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            http://localhost:5678/api/v1/workflows 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+            if 'P0-07' in w.get('name','') or 'AI_Comment' in w.get('name',''):
+              print(f'active={w.get(\"active\")}')
+              for n in w.get('nodes',[]):
+                t = n.get('type','')
+                p = n.get('parameters',{})
+                if 'webhook' in t: print(f'webhook path: {p.get(\"path\",\"?\")}')
+                u = p.get('url','')
+                if 'vk.com' in u: print(f'{n[\"name\"]}: {u[:150]}')
+                b = p.get('body','')
+                if 'vk.com' in b or 'VK_TOKEN' in b: print(f'{n[\"name\"]} body: {b[:150]}')
+                if 'openai' in u.lower(): print(f'{n[\"name\"]}: {u}')
+          " 2>/dev/null
+
+          echo ""
+          echo "=== ENV ==="
+          echo "VK_TOKEN=${#VK_TOKEN}ch VK_GROUP_ID=${VK_GROUP_ID} OPENAI=${#OPENAI_API_KEY}ch"
+
+          REMOTE
+          )
+          echo "$PART1"
+          send_tg "1/4 Workflows:
+          $PART1"
+
+          # ─── PART 2: Executions ───
+          PART2=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          source /opt/p0-foundation/.env 2>/dev/null
+
+          echo "=== LAST 20 EXECUTIONS ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "http://localhost:5678/api/v1/executions?limit=20" 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          if not data: print('NO EXECUTIONS')
+          for e in data:
+            wf = e.get('workflowData',{}).get('name', e.get('workflowId','?'))
+            st = e.get('status','?')
+            at = (e.get('stoppedAt') or e.get('startedAt','?'))[:19]
+            print(f'[{st}] {wf} at={at}')
+          " 2>/dev/null
+
+          echo ""
+          echo "=== FAILED DETAILS ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "http://localhost:5678/api/v1/executions?limit=5&status=error" 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          if not data: print('No failed executions')
+          for e in data:
+            wf = e.get('workflowData',{}).get('name','?')
+            print(f'FAIL: {wf}')
+            d = e.get('data',{})
+            if isinstance(d,dict):
+              rd = d.get('resultData',{})
+              err = rd.get('error')
+              if err: print(f'  err: {str(err)[:200]}')
+              for nn,nr in rd.get('runData',{}).items():
+                if isinstance(nr,list):
+                  for r in nr:
+                    if r.get('error'):
+                      print(f'  [{nn}]: {r[\"error\"].get(\"message\",str(r[\"error\"]))[:150]}')
+          " 2>/dev/null
+
+          REMOTE
+          )
+          echo "$PART2"
+          send_tg "2/4 Executions:
+          $PART2"
+
+          # ─── PART 3: Direct P0-07 test ───
+          PART3=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          echo "=== P0-07 DIRECT TEST ==="
+          RESP=$(curl -s -w "\nHTTP:%{http_code}" --max-time 30 \
+            -X POST http://localhost:5678/webhook/vk-ai-reply \
+            -H "Content-Type: application/json" \
+            -d '{"comment_id":99999,"from_id":1,"post_id":1,"text":"ТЕСТ: цена дивана?","date":"2026-03-12T12:00:00Z"}')
+          echo "$RESP"
+
+          echo ""
+          echo "=== VK wall.get TEST ==="
+          source /opt/p0-foundation/.env 2>/dev/null
+          RESP2=$(curl -s --max-time 10 \
+            "https://api.vk.com/method/wall.get?owner_id=-${VK_GROUP_ID}&count=1&access_token=${VK_TOKEN}&v=5.199")
+          echo "$RESP2" | python3 -c "
+          import sys,json
+          d=json.load(sys.stdin)
+          if 'error' in d: print(f'FAIL: {d[\"error\"][\"error_msg\"]}')
+          elif 'response' in d: print(f'OK: count={d[\"response\"][\"count\"]}')
+          else: print(f'UNKNOWN: {str(d)[:200]}')
+          " 2>/dev/null
+
+          echo ""
+          echo "=== VK wall.createComment TEST (fake post, expect error) ==="
+          RESP3=$(curl -s --max-time 10 \
+            "https://api.vk.com/method/wall.createComment?owner_id=-${VK_GROUP_ID}&post_id=999999999&message=test&access_token=${VK_TOKEN}&v=5.199")
+          echo "$RESP3" | python3 -c "
+          import sys,json
+          d=json.load(sys.stdin)
+          if 'error' in d:
+            code=d['error']['error_code']
+            msg=d['error']['error_msg']
+            if code==100: print(f'OK: token CAN comment (error={code} = post not found, expected)')
+            elif code==15: print(f'FAIL: Access denied — token lacks wall scope (error={code})')
+            elif code==7: print(f'FAIL: Permission denied (error={code}: {msg})')
+            else: print(f'Error {code}: {msg}')
+          elif 'response' in d: print(f'OK: comment created (unexpected!)')
+          " 2>/dev/null
+
+          REMOTE
+          )
+          echo "$PART3"
+          send_tg "3/4 P0-07+VK test:
+          $PART3"
+
+          # ─── PART 4: Long Poll logs ───
+          PART4=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          echo "=== VK-LONGPOLL LOGS (last 30) ==="
+          journalctl -u vk-longpoll -n 30 --no-pager 2>&1
+
+          echo ""
+          echo "=== VK-LONGPOLL HEALTH ==="
+          curl -s http://127.0.0.1:3100/health 2>&1
+
+          REMOTE
+          )
+          echo "$PART4"
+          send_tg "4/4 Long Poll logs:
+          $PART4"
 
       - name: Cleanup
         if: always()
