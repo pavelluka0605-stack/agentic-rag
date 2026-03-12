@@ -5,7 +5,6 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "vk-ai-reply",
-        "responseMode": "onReceived",
         "options": {}
       },
       "id": "webhook-ai",
