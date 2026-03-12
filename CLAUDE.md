@@ -159,6 +159,7 @@ agentic-rag/
 - [x] P0-07 исправлен: OpenAI API через $env.OPENAI_API_KEY вместо ручного credential
 - [x] OPENAI_API_KEY добавлен как GitHub секрет
 - [x] VK Callback API receiver — отдельный приёмник callback с валидацией secret + confirmation
+- [x] MCP Memory Server развёрнут на VPS (/opt/mcp-memory/) — 8 MCP tools, SQLite + FTS5, seed data, cron backup
 
 ## Текущее состояние системы
 
@@ -174,6 +175,35 @@ agentic-rag/
 - **Google Sheets** — листы: Товары, Спрос, Заказы_поставщику, Заказы_клиентов, Сводка_спроса, Логи_N8N, BlueSales_Клиенты, BlueSales_Заказы
 - **AI автоответы** (P0-07) — GPT-4o классифицирует VK комментарии: консультация / уточнение / сделка
 - **Telegram** — уведомления менеджеру работают
+
+## MCP Memory Server — ОБЯЗАТЕЛЬНЫЙ ПРОТОКОЛ
+
+У тебя подключен MCP Memory Server с 8 инструментами. ИСПОЛЬЗУЙ ИХ.
+
+### При начале работы (КАЖДЫЙ РАЗ):
+1. `session_start` — зарегистрировать сессию
+2. `memory_get_context` — загрузить релевантный контекст
+3. Прочитать контекст ПЕРЕД тем как начать кодить
+
+### В процессе работы:
+- Решил баг → `memory_save` (type: lesson/error_fix)
+- Нашёл паттерн → `memory_save` (type: pattern)
+- Принял решение → `memory_save` (type: decision)
+- Нужна информация → `memory_search`
+- Новая задача похожа на прошлую → `memory_find_similar`
+
+### При завершении (КАЖДЫЙ РАЗ):
+- `session_end` — с summary, problems, next_steps
+
+### Шкала важности:
+- 9-10: Критические баги, security, потеря данных
+- 7-8: Важные интеграции, API лимиты, архитектурные решения
+- 5-6: Полезные паттерны, оптимизации
+- 3-4: Мелкие заметки, стилистические предпочтения
+- 1-2: Временные заметки
+
+### Рекомендуемые теги:
+vk-api, n8n, docker, api, auth, webhook, rate-limit, error, architecture, database, security, google-sheets, bluesales, telegram
 
 ## Возможные дальнейшие улучшения
 
@@ -192,3 +222,4 @@ agentic-rag/
 - Telegram для уведомлений менеджеру
 - BlueSales для интеграции с CRM
 - OpenAI GPT-4o для AI автоответов на VK комментарии
+- MCP Memory Server для персистентной памяти Claude Code (SQLite + FTS5)
