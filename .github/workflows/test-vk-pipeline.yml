@@ -93,11 +93,50 @@ jobs:
               f.write('\n\n'.join(report))
               f.write('\n')
 
-          # Also print for logs
+          # Also write to file for artifact and print
+          with open('/tmp/n8n_report.txt', 'w') as f2:
+              for block in report:
+                  f2.write(block + '\n\n')
+
           for block in report:
               print(block)
               print()
+
+          # Write key errors as annotations (each gets its own ::notice)
+          for e_data in execs.get('data', [])[:3]:
+              eid = e_data['id']
+              status = e_data.get('status', '?')
+              try:
+                  det = api(f"/api/v1/executions/{eid}?includeData=true")
+                  wf = det.get('workflowData', {}).get('name', '?')
+                  rd = det.get('data', {}).get('resultData', {})
+                  top_err = rd.get('error', {})
+                  err_msg = ''
+                  if top_err:
+                      err_msg = top_err.get('message', str(top_err)) if isinstance(top_err, dict) else str(top_err)
+                  # Collect node errors
+                  node_errs = []
+                  for nn, runs in rd.get('runData', {}).items():
+                      for r in runs:
+                          if r.get('error'):
+                              em = r['error']
+                              node_errs.append(f"{nn}: {em.get('message','') if isinstance(em,dict) else str(em)}")
+                  info = f"#{eid} [{status}] {wf}"
+                  if err_msg: info += f" | WF_ERR: {err_msg[:200]}"
+                  for ne in node_errs[:3]: info += f" | NODE_ERR: {ne[:200]}"
+                  if not err_msg and not node_errs and not rd.get('runData'): info += " | no_run_data"
+                  print(f"::notice title=Exec_{eid}::{info[:3500]}")
+              except:
+                  print(f"::notice title=Exec_{eid}::#{eid} [{status}] detail_error")
           PYEOF
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: n8n-report
+          path: /tmp/n8n_report.txt
+          retention-days: 3
 
       - name: VK API check
         env:
