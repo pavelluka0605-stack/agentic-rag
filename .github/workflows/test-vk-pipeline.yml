@@ -68,13 +68,25 @@ jobs:
           add "Webhook: HTTP ${HTTP_CODE}"
           sleep 12
 
-          # 3. Check execution
+          # 3. Check all recent executions
           add ""
-          add "=== STEP 3: Execution ==="
+          add "=== STEP 3: All recent executions ==="
           LATEST=$(curl -s --max-time 10 \
             -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/executions?limit=5" 2>&1)
-          # Find P0-03 execution
+            "${N8N_BASE_URL}/api/v1/executions?limit=10" 2>&1)
+          ALL_EXECS=$(echo "$LATEST" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          for e in d.get('data',[]):
+              wf = e.get('workflowData',{}).get('name','unknown')
+              status = e.get('status','?')
+              eid = e.get('id','?')
+              t = e.get('stoppedAt','?')
+              print(f'  [{status}] #{eid} {wf} ({t})')
+          " 2>/dev/null || echo "  Parse error")
+          add "$ALL_EXECS"
+
+          # Get detail of first P0-03 execution
           EXEC_ID=$(echo "$LATEST" | python3 -c "
           import sys,json
           d = json.load(sys.stdin)
@@ -82,13 +94,14 @@ jobs:
               wf = e.get('workflowData',{}).get('name','')
               if 'P0-03' in wf or 'VK_Event' in wf:
                   print(e['id']); break
-          else:
-              print(d['data'][0]['id'])
           " 2>/dev/null)
-          DETAIL=$(curl -s --max-time 10 \
-            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/executions/${EXEC_ID}?includeData=true" 2>&1)
-          NODES_RAN=$(echo "$DETAIL" | python3 -c "
+          if [ -n "$EXEC_ID" ]; then
+            add ""
+            add "--- P0-03 execution #${EXEC_ID} detail ---"
+            DETAIL=$(curl -s --max-time 10 \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              "${N8N_BASE_URL}/api/v1/executions/${EXEC_ID}?includeData=true" 2>&1)
+            NODES_RAN=$(echo "$DETAIL" | python3 -c "
           import sys,json
           e = json.load(sys.stdin)
           print(f'Status: {e.get(\"status\")}')
@@ -102,7 +115,10 @@ jobs:
                       err = ' ERR: ' + (em.get('message','') if isinstance(em,dict) else str(em))[:120]
                   print(f'  [{s}] {node_name}{err}')
           " 2>/dev/null || echo "  Parse error")
-          add "$NODES_RAN"
+            add "$NODES_RAN"
+          else
+            add "No P0-03 execution found!"
+          fi
 
           # Output
           ONELINE=$(echo "$MSG" | tr '\n' ' | ' | head -c 4000)
