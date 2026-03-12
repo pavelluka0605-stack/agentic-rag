@@ -1,0 +1,88 @@
+name: "Check Recent Executions"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: "Check N8N Executions"
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Check recent executions and VK longpoll
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          source /opt/p0-foundation/.env 2>/dev/null
+
+          echo "=== LAST 10 N8N EXECUTIONS ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "http://localhost:5678/api/v1/executions?limit=10" 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          if not data: print('NO EXECUTIONS FOUND')
+          for e in data:
+            wf = e.get('workflowData',{}).get('name','?')
+            st = e.get('status','?')
+            at = (e.get('startedAt') or '?')[:19]
+            fin = (e.get('stoppedAt') or '?')[:19]
+            eid = e.get('id','?')
+            print(f'[{st}] #{eid} {wf}')
+            print(f'  started: {at}  stopped: {fin}')
+          " 2>/dev/null
+
+          echo ""
+          echo "=== VK LONGPOLL STATUS ==="
+          if pgrep -f "vk.*longpoll\|longpoll.*vk\|node.*vk" > /dev/null 2>&1; then
+            echo "VK Long Poll: RUNNING"
+            ps aux | grep -i "longpoll\|vk" | grep -v grep | head -5
+          else
+            echo "VK Long Poll: NOT RUNNING"
+          fi
+
+          echo ""
+          echo "=== VK LONGPOLL LOGS (last 30 lines) ==="
+          if [ -f /opt/p0-foundation/vk-longpoll/longpoll.log ]; then
+            tail -30 /opt/p0-foundation/vk-longpoll/longpoll.log
+          elif [ -f /var/log/vk-longpoll.log ]; then
+            tail -30 /var/log/vk-longpoll.log
+          else
+            # Check systemd/pm2/docker logs
+            echo "Checking PM2..."
+            pm2 logs vk-longpoll --lines 20 --nostream 2>/dev/null || echo "No PM2 logs"
+            echo "Checking systemd..."
+            journalctl -u vk-longpoll --no-pager -n 20 2>/dev/null || echo "No systemd logs"
+            echo "Checking Docker..."
+            docker logs vk-longpoll --tail 20 2>/dev/null || echo "No Docker logs"
+          fi
+
+          echo ""
+          echo "=== DOCKER CONTAINERS ==="
+          docker ps --format "{{.Names}}: {{.Status}}" 2>/dev/null || echo "Docker not available"
+
+          REMOTE
+          )
+
+          echo "$RESULT"
+
+          # Send to Telegram
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=📊 N8N Check:
+          $RESULT" > /dev/null 2>&1 || true
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
