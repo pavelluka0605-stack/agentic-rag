@@ -94,6 +94,29 @@ jobs:
             add "P0-03 not found!"
           fi
 
+          # 4b. Force re-activate P0-08
+          P08_ID=$(echo "$WF_LIST" | python3 -c "
+          import sys,json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+              if 'P0-08' in w.get('name',''): print(w['id']); break
+          " 2>/dev/null)
+
+          if [ -n "$P08_ID" ]; then
+            add "Re-activating P0-08 (id=$P08_ID)..."
+            curl -s -X POST "${N8N_API_URL}/api/v1/workflows/${P08_ID}/deactivate" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
+            sleep 2
+            REACTIVATE08=$(curl -s -X POST "${N8N_API_URL}/api/v1/workflows/${P08_ID}/activate" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              -H "Content-Type: application/json" 2>&1)
+            if echo "$REACTIVATE08" | grep -q '"active":true'; then
+              add "  P0-08 re-activated OK"
+            else
+              add "  P0-08 FAIL: $(echo "$REACTIVATE08" | head -c 200)"
+            fi
+          fi
+
           # 5. Webhook test — both localhost and external
           add ""
           sleep 3
