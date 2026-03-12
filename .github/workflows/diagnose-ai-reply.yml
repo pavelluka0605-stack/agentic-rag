@@ -1,4 +1,4 @@
-name: "Diagnose AI Reply Chain"
+name: "Diagnose AI Reply Chain v2"
 
 on:
   push:
