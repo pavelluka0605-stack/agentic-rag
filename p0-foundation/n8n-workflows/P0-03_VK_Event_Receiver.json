@@ -71,7 +71,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ 1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -146,7 +146,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ 1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -197,7 +197,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ 1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -265,7 +265,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ 1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -366,7 +366,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ 1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -404,7 +404,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ __N8N_WEBHOOK_BASE__ || 'http://localhost:5678/webhook' }}/vk-ai-reply",
+        "url": "__N8N_WEBHOOK_BASE__/vk-ai-reply",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"comment_id\": {{ $('Extract: Comment').item.json.comment_id }},\n  \"from_id\": {{ $('Extract: Comment').item.json.from_id }},\n  \"post_id\": {{ $('Extract: Comment').item.json.post_id }},\n  \"text\": {{ JSON.stringify($('Extract: Comment').item.json.text) }},\n  \"date\": {{ JSON.stringify($('Extract: Comment').item.json.date) }}\n}",
