@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Flatten webhook body + inject env config\n// N8N 2.x blocks $env in expressions, so we read process.env here\nconst body = $input.first().json.body || $input.first().json;\nconst _cfg = {\n  spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID || '',\n  tgBotToken: process.env.TELEGRAM_BOT_TOKEN || '',\n  tgChatId: process.env.TELEGRAM_MANAGER_CHAT_ID || '',\n  vkGroupId: process.env.VK_GROUP_ID || '',\n  webhookBase: process.env.N8N_WEBHOOK_BASE_URL || ''\n};\nreturn [{ json: { ...body, _cfg } }];"
+        "jsCode": "// Flatten webhook body to top-level JSON\n// N8N webhook v2 nests POST body under $json.body\nreturn $input.all().map(item => ({\n  json: item.json.body || item.json\n}));"
       },
       "id": "flatten-body",
       "name": "Flatten: Body",
@@ -109,10 +109,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ $('Flatten: Body').item.json._cfg.tgBotToken }}/sendMessage",
+        "url": "=https://api.telegram.org/bot{{ __TG_BOT_TOKEN__ }}/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $('Flatten: Body').item.json._cfg.tgChatId }}\",\n  \"text\": \"\ud83d\udce9 <b>\u041d\u043e\u0432\u043e\u0435 \u041b\u0421 \u0432 \u0433\u0440\u0443\u043f\u043f\u0443</b>\\n\\n\u041e\u0442: <a href=\\\"https://vk.com/id{{ $('Extract: Message').item.json.from_id }}\\\">VK ID {{ $('Extract: Message').item.json.from_id }}</a>\\n\u0422\u0435\u043a\u0441\u0442: {{ $('Extract: Message').item.json.text }}\\n\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"{{ __TG_CHAT_ID__ }}\",\n  \"text\": \"\ud83d\udce9 <b>\u041d\u043e\u0432\u043e\u0435 \u041b\u0421 \u0432 \u0433\u0440\u0443\u043f\u043f\u0443</b>\\n\\n\u041e\u0442: <a href=\\\"https://vk.com/id{{ $('Extract: Message').item.json.from_id }}\\\">VK ID {{ $('Extract: Message').item.json.from_id }}</a>\\n\u0422\u0435\u043a\u0441\u0442: {{ $('Extract: Message').item.json.text }}\\n\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-alert-message",
@@ -247,10 +247,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ $('Flatten: Body').item.json._cfg.tgBotToken }}/sendMessage",
+        "url": "=https://api.telegram.org/bot{{ __TG_BOT_TOKEN__ }}/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $('Flatten: Body').item.json._cfg.tgChatId }}\",\n  \"text\": \"\ud83d\udcac <b>\u041d\u043e\u0432\u044b\u0439 \u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</b>\\n\\n\u041f\u043e\u0441\u0442: wall-{{ $('Flatten: Body').item.json._cfg.vkGroupId }}_{{ $('Extract: Comment').item.json.post_id }}\\n\u041e\u0442: <a href=\\\"https://vk.com/id{{ $('Extract: Comment').item.json.from_id }}\\\">VK ID {{ $('Extract: Comment').item.json.from_id }}</a>\\n\u0422\u0435\u043a\u0441\u0442: {{ $('Extract: Comment').item.json.text }}\\n\u0420\u0430\u0437\u043c\u0435\u0440: {{ $json.\u0420\u0430\u0437\u043c\u0435\u0440 || '\u043d\u0435 \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u043d' }} x{{ $json.\u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e }}\\n\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"{{ __TG_CHAT_ID__ }}\",\n  \"text\": \"\ud83d\udcac <b>\u041d\u043e\u0432\u044b\u0439 \u043a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</b>\\n\\n\u041f\u043e\u0441\u0442: wall-{{ __VK_GROUP_ID__ }}_{{ $('Extract: Comment').item.json.post_id }}\\n\u041e\u0442: <a href=\\\"https://vk.com/id{{ $('Extract: Comment').item.json.from_id }}\\\">VK ID {{ $('Extract: Comment').item.json.from_id }}</a>\\n\u0422\u0435\u043a\u0441\u0442: {{ $('Extract: Comment').item.json.text }}\\n\u0420\u0430\u0437\u043c\u0435\u0440: {{ $json.\u0420\u0430\u0437\u043c\u0435\u0440 || '\u043d\u0435 \u0440\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u043d' }} x{{ $json.\u041a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e }}\\n\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-alert-comment",
@@ -303,10 +303,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ $('Flatten: Body').item.json._cfg.tgBotToken }}/sendMessage",
+        "url": "=https://api.telegram.org/bot{{ __TG_BOT_TOKEN__ }}/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $('Flatten: Body').item.json._cfg.tgChatId }}\",\n  \"text\": \"\ud83d\udcdd <b>\u041d\u043e\u0432\u044b\u0439 \u043f\u043e\u0441\u0442 \u043d\u0430 \u0441\u0442\u0435\u043d\u0435</b>\\n\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"{{ __TG_CHAT_ID__ }}\",\n  \"text\": \"\ud83d\udcdd <b>\u041d\u043e\u0432\u044b\u0439 \u043f\u043e\u0441\u0442 \u043d\u0430 \u0441\u0442\u0435\u043d\u0435</b>\\n\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-alert-post",
@@ -333,10 +333,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ $('Flatten: Body').item.json._cfg.tgBotToken }}/sendMessage",
+        "url": "=https://api.telegram.org/bot{{ __TG_BOT_TOKEN__ }}/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $('Flatten: Body').item.json._cfg.tgChatId }}\",\n  \"text\": \"\u26a0\ufe0f <b>VK Long Poll \u043e\u0448\u0438\u0431\u043a\u0430</b>\\n\\n{{ $json.error }}\\n\\n\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043f\u0435\u0440\u0435\u0437\u0430\u043f\u0443\u0441\u043a...\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"{{ __TG_CHAT_ID__ }}\",\n  \"text\": \"\u26a0\ufe0f <b>VK Long Poll \u043e\u0448\u0438\u0431\u043a\u0430</b>\\n\\n{{ $json.error }}\\n\\n\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043f\u0435\u0440\u0435\u0437\u0430\u043f\u0443\u0441\u043a...\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-alert-error",
@@ -348,10 +348,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ $('Flatten: Body').item.json._cfg.tgBotToken }}/sendMessage",
+        "url": "=https://api.telegram.org/bot{{ __TG_BOT_TOKEN__ }}/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $('Flatten: Body').item.json._cfg.tgChatId }}\",\n  \"text\": \"\u2705 <b>VK Long Poll \u0437\u0430\u043f\u0443\u0449\u0435\u043d</b>\\n\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"{{ __TG_CHAT_ID__ }}\",\n  \"text\": \"\u2705 <b>VK Long Poll \u0437\u0430\u043f\u0443\u0449\u0435\u043d</b>\\n\\n\u23f0 {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-alert-started",
@@ -404,7 +404,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Flatten: Body').item.json._cfg.webhookBase || 'http://localhost:5678/webhook' }}/vk-ai-reply",
+        "url": "={{ __N8N_WEBHOOK_BASE__ || 'http://localhost:5678/webhook' }}/vk-ai-reply",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"comment_id\": {{ $('Extract: Comment').item.json.comment_id }},\n  \"from_id\": {{ $('Extract: Comment').item.json.from_id }},\n  \"post_id\": {{ $('Extract: Comment').item.json.post_id }},\n  \"text\": {{ JSON.stringify($('Extract: Comment').item.json.text) }},\n  \"date\": {{ JSON.stringify($('Extract: Comment').item.json.date) }}\n}",
