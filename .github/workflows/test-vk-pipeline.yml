@@ -16,102 +16,96 @@ jobs:
           VK_USER_TOKEN: ${{ secrets.VK_USER_TOKEN }}
         run: |
           set +e
-          MSG=""
-          add() { MSG="${MSG}${1} "; }
 
-          # 1. Direct VK API test
-          add "=== VK API TEST ==="
-          WALL=$(curl -s --max-time 10 \
-            "https://api.vk.com/method/wall.get?owner_id=-137949809&count=1&access_token=${VK_USER_TOKEN}&v=5.199")
-          WALL_RESULT=$(echo "$WALL" | python3 -c "
-          import sys,json
-          d = json.load(sys.stdin)
-          if 'error' in d: print('ERROR: ' + str(d['error']))
-          else:
-              items = d.get('response',{}).get('items',[])
-              if items: print('OK post#' + str(items[0]['id']))
-              else: print('NO POSTS')
-          " 2>/dev/null || echo "parse_err")
-          add "wall.get: ${WALL_RESULT}"
-
-          POST_ID=$(echo "$WALL" | python3 -c "
-          import sys,json; items=json.load(sys.stdin).get('response',{}).get('items',[])
-          if items: print(items[0]['id'])
-          " 2>/dev/null)
-
-          if [ -n "$POST_ID" ]; then
-            REPLY=$(curl -s --max-time 10 \
-              "https://api.vk.com/method/wall.createComment?owner_id=-137949809&post_id=${POST_ID}&message=test_$(date +%s)&access_token=${VK_USER_TOKEN}&v=5.199")
-            add "wall.createComment: $(echo "$REPLY" | head -c 300)"
-            CID=$(echo "$REPLY" | python3 -c "
-            import sys,json; d=json.load(sys.stdin)
-            if 'response' in d: print(d['response'].get('comment_id',''))
-            " 2>/dev/null)
-            if [ -n "$CID" ]; then
-              add "COMMENT_OK id=$CID (deleting)"
-              curl -s "https://api.vk.com/method/wall.deleteComment?owner_id=-137949809&comment_id=${CID}&access_token=${VK_USER_TOKEN}&v=5.199" >/dev/null 2>&1
-            else
-              add "NO_COMMENT_CREATED"
-            fi
-          fi
-
-          # 2. Send test to N8N
-          add "=== N8N TEST ==="
+          # 1. Send test to N8N
+          echo "=== Sending test event to N8N ==="
           TS=$(date +%s)
           HC=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
             -X POST "${N8N_BASE_URL}/webhook/vk-events" \
             -H "Content-Type: application/json" \
-            -d "{\"type\":\"photo_comment_new\",\"group_id\":137949809,\"event_id\":\"t-${TS}\",\"comment\":{\"id\":${TS},\"from_id\":123456789,\"post_id\":99999,\"text\":\"Test diван M\",\"date\":${TS},\"owner_id\":-137949809}}")
-          add "Webhook:${HC}"
-          sleep 15
+            -d "{\"type\":\"photo_comment_new\",\"group_id\":137949809,\"event_id\":\"t-${TS}\",\"comment\":{\"id\":${TS},\"from_id\":123456789,\"post_id\":99999,\"text\":\"Test диван M\",\"date\":${TS},\"owner_id\":-137949809}}")
+          echo "Webhook response: HTTP ${HC}"
+          sleep 20
 
-          # 3. Check executions
-          LATEST=$(curl -s --max-time 10 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/executions?limit=4")
-          EXEC_SUM=$(echo "$LATEST" | python3 -c "
-          import sys,json
-          d=json.load(sys.stdin)
-          for e in d.get('data',[]):
-              wf=e.get('workflowData',{}).get('name','?')
-              print(f'[{e.get(\"status\")}] #{e[\"id\"]} {wf}')
-          " 2>/dev/null)
-          add "Execs: ${EXEC_SUM}"
+          # 2. Get detailed execution info
+          echo ""
+          echo "=== N8N Executions (last 5) ==="
+          python3 << 'PYEOF'
+          import json, urllib.request, os
 
-          # 4. Detail of latest 3 executions
-          echo "$LATEST" | python3 -c "
-          import sys,json
-          data = json.load(sys.stdin)
-          for e in data.get('data',[])[:3]:
-              print(e['id'])
-          " 2>/dev/null | while read EID; do
-            DET=$(curl -s --max-time 10 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              "${N8N_BASE_URL}/api/v1/executions/${EID}?includeData=true")
-            NODE_INFO=$(echo "$DET" | python3 -c "
-          import sys,json
-          e=json.load(sys.stdin)
-          wf=e.get('workflowData',{}).get('name','?')
-          lines = [f'#{e[\"id\"]} {wf} [{e.get(\"status\")}]']
-          rd=e.get('data',{}).get('resultData',{})
-          err_msg = rd.get('error',{}).get('message','') if isinstance(rd.get('error'),dict) else str(rd.get('error',''))
-          if err_msg: lines.append(f'  WORKFLOW_ERR: {err_msg[:300]}')
-          for nn,runs in rd.get('runData',{}).items():
-              for r in runs:
-                  s=r.get('executionStatus','?')
-                  err=''
-                  if r.get('error'):
-                      em=r['error']
-                      err=' ERR:'+((em.get('message','') if isinstance(em,dict) else str(em))[:200])
-                  lines.append(f'  [{s}] {nn}{err}')
-          print('\\n'.join(lines))
-          " 2>/dev/null)
-            echo "::notice title=Exec ${EID}::${NODE_INFO}"
-            add "--- ${NODE_INFO}"
-          done
+          base = os.environ['N8N_BASE_URL']
+          key = os.environ['N8N_API_KEY']
 
-          echo "::notice::${MSG}"
-          # Also write to step summary for full output
-          {
-            echo '```'
-            echo "$MSG" | tr ' ' '\n' | grep -v '^$'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          def api(path):
+              req = urllib.request.Request(f"{base}{path}", headers={"X-N8N-API-KEY": key})
+              with urllib.request.urlopen(req, timeout=15) as r:
+                  return json.loads(r.read())
+
+          execs = api("/api/v1/executions?limit=5")
+          summary_lines = []
+
+          for e in execs.get('data', []):
+              eid = e['id']
+              status = e.get('status', '?')
+              wf = e.get('workflowData', {}).get('name', '?')
+              line = f"#{eid} [{status}] {wf}"
+              summary_lines.append(line)
+              print(f"\n{'='*60}")
+              print(line)
+              print('='*60)
+
+              try:
+                  det = api(f"/api/v1/executions/{eid}?includeData=true")
+              except Exception as ex:
+                  print(f"  Cannot get detail: {ex}")
+                  continue
+
+              rd = det.get('data', {}).get('resultData', {})
+
+              # Top-level workflow error
+              top_err = rd.get('error')
+              if top_err:
+                  if isinstance(top_err, dict):
+                      print(f"  WORKFLOW ERROR: {top_err.get('message', '')}".rstrip()[:500])
+                  else:
+                      print(f"  WORKFLOW ERROR: {str(top_err)[:500]}")
+
+              # Node-level results
+              run_data = rd.get('runData', {})
+              if not run_data:
+                  print("  (no node data — workflow may have failed before nodes executed)")
+              else:
+                  for nn, runs in run_data.items():
+                      for r in runs:
+                          s = r.get('executionStatus', '?')
+                          err_str = ''
+                          if r.get('error'):
+                              em = r['error']
+                              if isinstance(em, dict):
+                                  err_str = f" ERR: {em.get('message', '')[:250]}"
+                              else:
+                                  err_str = f" ERR: {str(em)[:250]}"
+                          print(f"  [{s}] {nn}{err_str}")
+
+          # Write summary annotation
+          summary = " | ".join(summary_lines)
+          print(f"\n::notice title=Executions::{summary}")
+          PYEOF
+
+      - name: VK API check
+        env:
+          VK_USER_TOKEN: ${{ secrets.VK_USER_TOKEN }}
+        run: |
+          set +e
+          echo "=== VK API TEST ==="
+          WALL=$(curl -s --max-time 10 \
+            "https://api.vk.com/method/wall.get?owner_id=-137949809&count=1&access_token=${VK_USER_TOKEN}&v=5.199")
+          echo "$WALL" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          if 'error' in d: print('wall.get ERROR:', d['error'])
+          else:
+              items = d.get('response',{}).get('items',[])
+              if items: print('wall.get OK, latest post #' + str(items[0]['id']))
+              else: print('wall.get: NO POSTS')
+          " 2>/dev/null || echo "parse error"
