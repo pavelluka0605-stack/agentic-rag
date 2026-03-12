@@ -486,56 +486,33 @@ jobs:
               # Бэкап конфига
               cp "$N8N_CONF" "${N8N_CONF}.bak"
 
-              # Используем Python для точной вставки в SSL server-блок
-              python3 << PYEOF
-import re
+              # Создаём location-блок в отдельный файл
+              cat > /tmp/vk-cb-location.conf << 'LOCEOF'
+              # VK Callback API proxy -> :3102
+              location /vk-callback {
+                  proxy_pass http://127.0.0.1:3102/callback;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_read_timeout 10s;
+              }
+              LOCEOF
+              sed -i 's/^              /    /' /tmp/vk-cb-location.conf
+              echo "  Location block:"
+              cat /tmp/vk-cb-location.conf
 
-with open("$N8N_CONF", "r") as f:
-    content = f.read()
-
-LOCATION_BLOCK = """
-    # VK Callback API proxy -> :3102
-    location /vk-callback {
-        proxy_pass http://127.0.0.1:3102/callback;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 10s;
-    }
-"""
-
-# Стратегия: найти SSL server-блок (listen 443 ssl) и вставить location перед
-# последним } этого блока. Ищем "location /" внутри SSL блока и вставляем ДО него.
-# Если location / есть — вставляем перед ним (nginx выберет более длинный prefix).
-# Если нет — вставляем перед последним } в файле.
-
-# Простой подход: вставляем перед первым "location /" ПОСЛЕ "listen 443"
-lines = content.split('\n')
-ssl_found = False
-insert_idx = None
-last_brace = None
-
-for i, line in enumerate(lines):
-    stripped = line.strip()
-    if '443' in stripped and 'listen' in stripped:
-        ssl_found = True
-    if ssl_found and stripped.startswith('location /') and not stripped.startswith('location /vk'):
-        insert_idx = i
-        break
-    if stripped == '}':
-        last_brace = i
-
-# Вставляем перед location / в SSL блоке, или перед последним }
-target = insert_idx if insert_idx else last_brace
-if target:
-    lines.insert(target, LOCATION_BLOCK)
-    with open("$N8N_CONF", "w") as f:
-        f.write('\n'.join(lines))
-    print(f"  Inserted at line {target}")
-else:
-    print("  ERROR: Could not find insertion point")
-PYEOF
+              # Вставляем перед первым "location /" в SSL server-блоке
+              awk '
+                /listen.*443/ { ssl=1 }
+                ssl && /location \// && !/location \/vk/ && !done {
+                  while ((getline line < "/tmp/vk-cb-location.conf") > 0) print line
+                  print ""
+                  done=1
+                }
+                { print }
+              ' "$N8N_CONF" > "${N8N_CONF}.new"
+              mv "${N8N_CONF}.new" "$N8N_CONF"
 
               # Показать результат
               echo "  Config after insertion:"
