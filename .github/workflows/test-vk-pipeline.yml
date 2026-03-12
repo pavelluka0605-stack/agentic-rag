@@ -77,35 +77,41 @@ jobs:
           " 2>/dev/null)
           add "Execs: ${EXEC_SUM}"
 
-          # 4. Detail of latest 2
-          for EID in $(echo "$LATEST" | python3 -c "
+          # 4. Detail of latest 3 executions
+          echo "$LATEST" | python3 -c "
           import sys,json
-          for e in json.load(sys.stdin).get('data',[])[:2]: print(e['id'])
-          " 2>/dev/null); do
+          data = json.load(sys.stdin)
+          for e in data.get('data',[])[:3]:
+              print(e['id'])
+          " 2>/dev/null | while read EID; do
             DET=$(curl -s --max-time 10 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
               "${N8N_BASE_URL}/api/v1/executions/${EID}?includeData=true")
             NODE_INFO=$(echo "$DET" | python3 -c "
           import sys,json
           e=json.load(sys.stdin)
           wf=e.get('workflowData',{}).get('name','?')
-          print(f'#{e[\"id\"]} {wf} [{e.get(\"status\")}]')
+          lines = [f'#{e[\"id\"]} {wf} [{e.get(\"status\")}]']
           rd=e.get('data',{}).get('resultData',{})
+          err_msg = rd.get('error',{}).get('message','') if isinstance(rd.get('error'),dict) else str(rd.get('error',''))
+          if err_msg: lines.append(f'  WORKFLOW_ERR: {err_msg[:300]}')
           for nn,runs in rd.get('runData',{}).items():
               for r in runs:
                   s=r.get('executionStatus','?')
                   err=''
                   if r.get('error'):
                       em=r['error']
-                      err=' ERR:'+((em.get('message','') if isinstance(em,dict) else str(em))[:150])
-                  out=''
-                  if 'VK:' in nn:
-                      try:
-                          d2=r.get('data',{}).get('main',[[]])[0]
-                          if d2: out=' OUT:'+json.dumps(d2[0].get('json',{}),ensure_ascii=False)[:300]
-                      except: pass
-                  print(f'  [{s}] {nn}{err}{out}')
+                      err=' ERR:'+((em.get('message','') if isinstance(em,dict) else str(em))[:200])
+                  lines.append(f'  [{s}] {nn}{err}')
+          print('\\n'.join(lines))
           " 2>/dev/null)
+            echo "::notice title=Exec ${EID}::${NODE_INFO}"
             add "--- ${NODE_INFO}"
           done
 
           echo "::notice::${MSG}"
+          # Also write to step summary for full output
+          {
+            echo '```'
+            echo "$MSG" | tr ' ' '\n' | grep -v '^$'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
