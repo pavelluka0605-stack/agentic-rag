@@ -155,7 +155,13 @@ function sendToN8N(event) {
     const req = transport.request(options, (res) => {
       let body = '';
       res.on('data', (chunk) => body += chunk);
-      res.on('end', () => resolve(body));
+      res.on('end', () => {
+        if (res.statusCode >= 400) {
+          reject(new Error(`N8N HTTP ${res.statusCode}: ${body.substring(0, 200)}`));
+        } else {
+          resolve(body);
+        }
+      });
     });
     req.on('error', reject);
     req.setTimeout(10000, () => { req.destroy(); reject(new Error('N8N webhook timeout')); });

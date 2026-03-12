@@ -12,10 +12,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"✅ <b>Telegram подключён к N8N</b>\\n\\n🔧 Тестовое сообщение от системы автоматизации.\\nЕсли вы это видите — Telegram-бот работает!\\n\\n⏰ Время: {{ $now.format('dd.MM.yyyy HH:mm:ss') }}\\n🖥 Сервер: Frankfurt VPS\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"✅ <b>Telegram подключён к N8N</b>\\n\\n🔧 Тестовое сообщение от системы автоматизации.\\nЕсли вы это видите — Telegram-бот работает!\\n\\n⏰ Время: {{ $now.format('dd.MM.yyyy HH:mm:ss') }}\\n🖥 Сервер: Frankfurt VPS\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "telegram-test",

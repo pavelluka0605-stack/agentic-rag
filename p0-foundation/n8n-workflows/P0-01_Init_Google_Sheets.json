@@ -12,7 +12,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $env.GOOGLE_SPREADSHEET_ID }}:batchUpdate",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY:batchUpdate",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleSheetsOAuth2Api",
         "sendBody": true,
@@ -31,7 +31,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -71,7 +71,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -111,7 +111,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -150,7 +150,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -194,7 +194,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -228,7 +228,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -263,7 +263,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $env.GOOGLE_SPREADSHEET_ID }}:batchUpdate",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY:batchUpdate",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleSheetsOAuth2Api",
         "sendBody": true,
@@ -280,10 +280,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"✅ Google Sheets инициализирован!\\n\\nСозданы листы:\\n• Товары (12 колонок)\\n• Спрос (12 колонок)\\n• Заказы_поставщику (11 колонок)\\n• Заказы_клиентов (16 колонок)\\n• Сводка_спроса (формулы)\\n• Логи_N8N (6 колонок)\\n\\n📊 Таблица готова к работе.\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"✅ Google Sheets инициализирован!\\n\\nСозданы листы:\\n• Товары (12 колонок)\\n• Спрос (12 колонок)\\n• Заказы_поставщику (11 колонок)\\n• Заказы_клиентов (16 колонок)\\n• Сводка_спроса (формулы)\\n• Логи_N8N (6 колонок)\\n\\n📊 Таблица готова к работе.\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "telegram-notify",

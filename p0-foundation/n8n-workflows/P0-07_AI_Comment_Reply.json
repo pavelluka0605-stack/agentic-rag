@@ -5,7 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "vk-ai-reply",
-        "responseMode": "lastNode",
+        "responseMode": "onReceived",
         "options": {}
       },
       "id": "webhook-ai",
@@ -24,7 +24,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+              "value": "=Bearer __OPENAI_API_KEY__"
             },
             {
               "name": "Content-Type",
@@ -79,7 +79,7 @@
         "url": "=https://api.vk.com/method/wall.createComment",
         "sendBody": true,
         "specifyBody": "string",
-        "body": "=owner_id=-{{ $env.VK_GROUP_ID }}&post_id={{ $json.post_id }}&reply_to_comment={{ $json.comment_id }}&message={{ encodeURIComponent($json.reply) }}&access_token={{ $env.VK_TOKEN }}&v=5.199",
+        "body": "=owner_id=-__VK_GROUP_ID__&post_id={{ $json.post_id }}&reply_to_comment={{ $json.comment_id }}&message={{ encodeURIComponent($json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
         "options": {
           "timeout": 15000
         }
@@ -96,7 +96,7 @@
         "url": "=https://api.vk.com/method/wall.createComment",
         "sendBody": true,
         "specifyBody": "string",
-        "body": "=owner_id=-{{ $env.VK_GROUP_ID }}&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token={{ $env.VK_TOKEN }}&v=5.199",
+        "body": "=owner_id=-__VK_GROUP_ID__&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
         "options": {
           "timeout": 15000
         }
@@ -120,7 +120,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://bluesales.ru/app/Customers/WebServer.aspx?login={{ $env.BLUESALES_LOGIN }}&password={{ $env.BLUESALES_PASSWORD_HASH }}&command=customers.add",
+        "url": "=https://bluesales.ru/app/Customers/WebServer.aspx?login=__BLUESALES_LOGIN__&password=__BLUESALES_PASSWORD_HASH__&command=customers.add",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"vkId\": \"{{ $json.vkId }}\",\n  \"firstName\": \"{{ $json.firstName }}\",\n  \"source\": \"{{ $json.source }}\",\n  \"tags\": [{ \"name\": \"AI-сделка\" }],\n  \"comment\": \"{{ $json.comment }}\"\n}",
@@ -140,7 +140,7 @@
         "url": "=https://api.vk.com/method/wall.createComment",
         "sendBody": true,
         "specifyBody": "string",
-        "body": "=owner_id=-{{ $env.VK_GROUP_ID }}&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token={{ $env.VK_TOKEN }}&v=5.199",
+        "body": "=owner_id=-__VK_GROUP_ID__&post_id={{ $('Parse: AI Response').item.json.post_id }}&reply_to_comment={{ $('Parse: AI Response').item.json.comment_id }}&message={{ encodeURIComponent($('Parse: AI Response').item.json.reply) }}&access_token=__VK_TOKEN__&v=5.199",
         "options": {
           "timeout": 15000
         }
@@ -154,10 +154,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"🤖 <b>AI создал сделку</b>\\n\\nКлиент: <a href=\\\"https://vk.com/id{{ $('Parse: AI Response').item.json.from_id }}\\\">VK ID {{ $('Parse: AI Response').item.json.from_id }}</a>\\nТовар: {{ $('Parse: AI Response').item.json.product || 'не указан' }}\\nКомментарий: {{ $('Parse: AI Response').item.json.text }}\\nОтвет AI: {{ $('Parse: AI Response').item.json.reply }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"🤖 <b>AI создал сделку</b>\\n\\nКлиент: <a href=\\\"https://vk.com/id{{ $('Parse: AI Response').item.json.from_id }}\\\">VK ID {{ $('Parse: AI Response').item.json.from_id }}</a>\\nТовар: {{ $('Parse: AI Response').item.json.product || 'не указан' }}\\nКомментарий: {{ $('Parse: AI Response').item.json.text }}\\nОтвет AI: {{ $('Parse: AI Response').item.json.reply }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
         "options": {}
       },
       "id": "tg-deal-alert",
@@ -172,7 +172,7 @@
         "documentId": {
           "__rl": true,
           "mode": "id",
-          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}"
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
         },
         "sheetName": {
           "__rl": true,
@@ -206,17 +206,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [1880, 400]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\"status\":\"ok\",\"intent\":\"{{ $('Parse: AI Response').item.json.intent }}\"}"
-      },
-      "id": "respond-ok-ai",
-      "name": "Respond OK",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [2100, 400]
     }
   ],
   "connections": {
@@ -256,9 +245,6 @@
     },
     "Telegram: Deal Created": {
       "main": [[ { "node": "Log: AI Reply", "type": "main", "index": 0 } ]]
-    },
-    "Log: AI Reply": {
-      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
     }
   },
   "settings": {

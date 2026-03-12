@@ -299,6 +299,7 @@ jobs:
           # .env для listener (берём из основного)
           source /opt/p0-foundation/.env
           # Use external N8N URL for webhook (N8N registers webhooks on external URL only)
+          # N8N_URL comes from /opt/p0-foundation/.env (set by deploy step 3)
           N8N_WH_BASE="${N8N_URL:-http://localhost:5678}"
           cat > /opt/vk-longpoll/.env << ENVEOF
           VK_TOKEN=${VK_TOKEN}
@@ -307,6 +308,12 @@ jobs:
           N8N_WEBHOOK_URL=${N8N_WH_BASE}/webhook/vk-events
           HEALTH_PORT=3100
           ENVEOF
+          # Remove leading whitespace from heredoc indentation
+          sed -i 's/^[[:space:]]*//' /opt/vk-longpoll/.env
+          # Fix double slashes in URLs
+          sed -i 's|://\(.*\)//|://\1/|g' /opt/vk-longpoll/.env
+          echo "LP .env contents:"
+          grep -v TOKEN /opt/vk-longpoll/.env | grep -v "^$"
 
           # Systemd unit
           cat > /etc/systemd/system/vk-longpoll.service << 'UNIT'
@@ -403,6 +410,10 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
+          VK_TOKEN: ${{ secrets.VK_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BLUESALES_LOGIN: ${{ secrets.BLUESALES_LOGIN }}
+          BLUESALES_PASSWORD_HASH: ${{ secrets.BLUESALES_PASS }}
           N8N_WEBHOOK_BASE: ${{ secrets.N8N_BASE_URL }}/webhook
         run: |
           # Бэкап на VPS
@@ -505,14 +516,19 @@ jobs:
           # Replace {{ __PLACEHOLDER__ }} tokens with actual env values (n8n 2.x blocks $env)
           raw = json.dumps(wf)
           import os
+          # Compute BlueSales password MD5 hash
+          import hashlib
+          bs_pass = os.environ.get('BLUESALES_PASSWORD_HASH', '')
+          bs_hash = hashlib.md5(bs_pass.encode()).hexdigest().upper() if bs_pass else ''
+
           replacements = {
-              '{{ __TG_BOT_TOKEN__ }}': os.environ.get('TG_BOT_TOKEN', ''),
-              '{{ __TG_CHAT_ID__ }}': os.environ.get('TG_CHAT_ID', ''),
-              '{{ __VK_GROUP_ID__ }}': os.environ.get('VK_GROUP_ID', ''),
-              '{{ __N8N_WEBHOOK_BASE__ }}': os.environ.get('N8N_WEBHOOK_BASE', ''),
               '__TG_BOT_TOKEN__': os.environ.get('TG_BOT_TOKEN', ''),
               '__TG_CHAT_ID__': os.environ.get('TG_CHAT_ID', ''),
               '__VK_GROUP_ID__': os.environ.get('VK_GROUP_ID', ''),
+              '__VK_TOKEN__': os.environ.get('VK_TOKEN', ''),
+              '__OPENAI_API_KEY__': os.environ.get('OPENAI_API_KEY', ''),
+              '__BLUESALES_LOGIN__': os.environ.get('BLUESALES_LOGIN', ''),
+              '__BLUESALES_PASSWORD_HASH__': bs_hash,
               '__N8N_WEBHOOK_BASE__': os.environ.get('N8N_WEBHOOK_BASE', ''),
           }
           for placeholder, value in replacements.items():
