@@ -1,0 +1,121 @@
+name: "E2E Test AI Reply"
+
+on:
+  push:
+    branches:
+      - 'claude/vk-token-*'
+    paths:
+      - '.github/workflows/test-ai-reply-e2e.yml'
+
+jobs:
+  test:
+    name: "End-to-End AI Reply Test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: "E2E Test: VK comment → P0-03 → P0-07 → VK reply"
+        id: e2e
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          # Function to send to Telegram
+          send_tg() {
+            curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+              -d "chat_id=${TG_CHAT}" \
+              --data-urlencode "text=$1" > /dev/null 2>&1 || true
+          }
+
+          FULL_LOG=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          source /opt/p0-foundation/.env 2>/dev/null
+
+          echo "=== STEP 1: Check workflows are active ==="
+          WF_LIST=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            http://localhost:5678/api/v1/workflows?limit=100 2>/dev/null)
+          echo "$WF_LIST" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          print(f'Total workflows: {len(data)}')
+          for w in data:
+            s = 'ON' if w.get('active') else 'OFF'
+            print(f'  [{s}] {w[\"name\"]}')
+          " 2>/dev/null
+
+          echo ""
+          echo "=== STEP 2: Test P0-03 webhook (vk-events) ==="
+          R1=$(curl -s -w "\nHTTP:%{http_code}" --max-time 15 \
+            -X POST http://localhost:5678/webhook/vk-events \
+            -H "Content-Type: application/json" \
+            -d '{
+              "type": "wall_reply_new",
+              "group_id": '"${VK_GROUP_ID}"',
+              "event_id": "e2e_test_'"$(date +%s)"'",
+              "object": {
+                "id": 99998,
+                "from_id": 1,
+                "post_id": 1,
+                "text": "E2E_TEST: Сколько стоит диван?",
+                "date": '"$(date +%s)"',
+                "owner_id": -'"${VK_GROUP_ID}"'
+              },
+              "received_at": "'"$(date -Iseconds)"'"
+            }')
+          echo "P0-03 response: $R1"
+
+          echo ""
+          echo "=== STEP 3: Test P0-07 webhook (vk-ai-reply) directly ==="
+          R2=$(curl -s -w "\nHTTP:%{http_code}" --max-time 30 \
+            -X POST http://localhost:5678/webhook/vk-ai-reply \
+            -H "Content-Type: application/json" \
+            -d '{
+              "comment_id": 99998,
+              "from_id": 1,
+              "post_id": 1,
+              "text": "E2E_TEST: Сколько стоит диван?",
+              "date": "'"$(date -Iseconds)"'"
+            }')
+          echo "P0-07 response: $R2"
+
+          HTTP2=$(echo "$R2" | grep -o 'HTTP:[0-9]*' | cut -d: -f2)
+
+          echo ""
+          echo "=== STEP 4: Check recent executions ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "http://localhost:5678/api/v1/executions?limit=5" 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          if not data: print('NO EXECUTIONS')
+          for e in data:
+            wf = e.get('workflowData',{}).get('name','?')
+            st = e.get('status','?')
+            at = (e.get('stoppedAt') or e.get('startedAt','?'))[:19]
+            print(f'[{st}] {wf} at={at}')
+          " 2>/dev/null
+
+          echo ""
+          if [ "$HTTP2" = "200" ]; then
+            echo "RESULT: P0-07 WORKS"
+          else
+            echo "RESULT: P0-07 HTTP=$HTTP2"
+          fi
+
+          REMOTE
+          )
+
+          echo "$FULL_LOG"
+          send_tg "🧪 E2E AI Reply Test:
+          $FULL_LOG"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
