@@ -502,10 +502,14 @@ jobs:
                           }
                       }
 
-          # Replace __PLACEHOLDER__ tokens with actual env values (n8n 2.x blocks $env)
+          # Replace {{ __PLACEHOLDER__ }} tokens with actual env values (n8n 2.x blocks $env)
           raw = json.dumps(wf)
           import os
           replacements = {
+              '{{ __TG_BOT_TOKEN__ }}': os.environ.get('TG_BOT_TOKEN', ''),
+              '{{ __TG_CHAT_ID__ }}': os.environ.get('TG_CHAT_ID', ''),
+              '{{ __VK_GROUP_ID__ }}': os.environ.get('VK_GROUP_ID', ''),
+              '{{ __N8N_WEBHOOK_BASE__ }}': os.environ.get('N8N_WEBHOOK_BASE', ''),
               '__TG_BOT_TOKEN__': os.environ.get('TG_BOT_TOKEN', ''),
               '__TG_CHAT_ID__': os.environ.get('TG_CHAT_ID', ''),
               '__VK_GROUP_ID__': os.environ.get('VK_GROUP_ID', ''),
