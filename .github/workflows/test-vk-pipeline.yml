@@ -13,6 +13,7 @@ jobs:
         env:
           VK_USER_TOKEN: ${{ secrets.VK_USER_TOKEN }}
         run: |
+          set +e
           echo "=== Direct VK API Test ==="
           # Get wall posts
           WALL=$(curl -s --max-time 10 \
