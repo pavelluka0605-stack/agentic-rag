@@ -10,6 +10,9 @@ on:
       - ".github/workflows/deploy-mcp-memory.yml"
   workflow_dispatch:
 
+env:
+  SSH_CMD: ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+
 jobs:
   deploy:
     name: "Deploy MCP Memory to VPS"
@@ -17,8 +20,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup SSH
         run: |
@@ -29,154 +31,102 @@ jobs:
 
       - name: Copy files to VPS
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "mkdir -p /opt/mcp-memory/{src,data,backups}"
-
+          $SSH_CMD "mkdir -p /opt/mcp-memory/{src,data,backups}"
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
             mcp-memory/package.json \
             mcp-memory/src/ \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/mcp-memory/
 
-      - name: Install dependencies and setup
+      - name: Install Node.js deps
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
-
-          set -e
-
-          # Load nvm if available (non-interactive SSH doesn't source .bashrc)
-          export NVM_DIR="${HOME}/.nvm"
+          $SSH_CMD << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+          command -v node || { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs; }
+          echo "node=$(node --version) npm=$(npm --version) path=$(which node)"
+          dpkg -l | grep -q build-essential || { apt-get update -qq && apt-get install -y -qq build-essential python3; }
+          cd /opt/mcp-memory && npm install --no-audit --no-fund
+          ls -la node_modules/@modelcontextprotocol/sdk/package.json node_modules/better-sqlite3/build/Release/better_sqlite3.node node_modules/zod/package.json
+          EOF
 
+      - name: Run migrate
+        run: |
+          $SSH_CMD << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+          cd /opt/mcp-memory && node src/migrate.js
+          EOF
+
+      - name: Run tests
+        run: |
+          $SSH_CMD << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+          cd /opt/mcp-memory && npm test
+          EOF
+
+      - name: Test MCP protocol
+        run: |
+          $SSH_CMD << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
           cd /opt/mcp-memory
+          RESP=$(echo '{"jsonrpc":"2.0","method":"initialize","params":{"capabilities":{},"clientInfo":{"name":"test","version":"1.0"},"protocolVersion":"2024-11-05"},"id":1}' | timeout 5 node src/index.js 2>/dev/null || true)
+          echo "Response: $RESP"
+          echo "$RESP" | grep -q 'memory-server' && echo "✓ MCP OK" || echo "⚠ MCP response unexpected"
+          EOF
 
-          echo "=== Step 1: Check environment ==="
-          if ! command -v node &>/dev/null; then
-            echo "Node.js not found, installing via nodesource..."
-            curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-            apt-get install -y nodejs
-          fi
-          echo "Node: $(node --version)"
-          echo "npm: $(npm --version)"
-          echo "Path: $(which node)"
-
-          # Ensure build-essential for better-sqlite3
-          dpkg -l | grep -q build-essential || {
-            echo "Installing build-essential..."
-            apt-get update -qq && apt-get install -y -qq build-essential python3
-          }
-
-          echo "=== Step 2: npm install ==="
-          npm install --no-audit --no-fund 2>&1
-
-          # Verify deps
-          test -f node_modules/@modelcontextprotocol/sdk/package.json && echo "✓ MCP SDK OK"
-          test -f node_modules/better-sqlite3/build/Release/better_sqlite3.node && echo "✓ SQLite native OK"
-          test -f node_modules/zod/package.json && echo "✓ Zod OK"
-
-          echo "=== Step 3: Migrate DB ==="
-          node src/migrate.js
-
-          echo "=== Step 4: Run tests ==="
-          npm test
-
-          echo "=== Step 5: Test MCP protocol ==="
-          RESPONSE=$(echo '{"jsonrpc":"2.0","method":"initialize","params":{"capabilities":{},"clientInfo":{"name":"test","version":"1.0"},"protocolVersion":"2024-11-05"},"id":1}' | timeout 5 node src/index.js 2>/dev/null || true)
-          if echo "$RESPONSE" | grep -q '"memory-server"'; then
-            echo "✓ MCP protocol test passed"
-          else
-            echo "MCP response: $RESPONSE"
-            echo "⚠ MCP protocol test — checking stderr..."
-            echo '{"jsonrpc":"2.0","method":"initialize","params":{"capabilities":{},"clientInfo":{"name":"test","version":"1.0"},"protocolVersion":"2024-11-05"},"id":1}' | timeout 5 node src/index.js 2>&1 1>/dev/null || true
-          fi
-
-          echo "=== Step 6: Configure Claude Code ==="
+      - name: Configure Claude Code
+        run: |
+          $SSH_CMD << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
           NODE_PATH=$(readlink -f $(which node))
-          echo "Node path: $NODE_PATH"
-
+          echo "Node: $NODE_PATH"
           mkdir -p ~/.claude
-
+          which jq > /dev/null 2>&1 || apt-get install -y -qq jq
           if [ -f ~/.claude/settings.json ]; then
-            echo "Existing settings.json found, merging..."
-            # Install jq if needed
-            which jq > /dev/null 2>&1 || apt-get install -y -qq jq
-            jq --arg node "$NODE_PATH" '.mcpServers.memory = {
-              "command": $node,
-              "args": ["/opt/mcp-memory/src/index.js"],
-              "env": {
-                "MEMORY_DB_PATH": "/opt/mcp-memory/data/memory.db"
-              }
-            }' ~/.claude/settings.json > /tmp/claude-settings-new.json
-            if jq . /tmp/claude-settings-new.json > /dev/null 2>&1; then
-              cp /tmp/claude-settings-new.json ~/.claude/settings.json
-              echo "✓ settings.json updated"
-            else
-              echo "❌ JSON merge failed, creating new"
-              cat > ~/.claude/settings.json << SETTINGS
-          {
-            "mcpServers": {
-              "memory": {
-                "command": "$NODE_PATH",
-                "args": ["/opt/mcp-memory/src/index.js"],
-                "env": {
-                  "MEMORY_DB_PATH": "/opt/mcp-memory/data/memory.db"
-                }
-              }
-            }
-          }
-          SETTINGS
-              sed -i 's/^          //' ~/.claude/settings.json
-            fi
-          else
-            echo "Creating new settings.json..."
-            cat > ~/.claude/settings.json << SETTINGS
-          {
-            "mcpServers": {
-              "memory": {
-                "command": "$NODE_PATH",
-                "args": ["/opt/mcp-memory/src/index.js"],
-                "env": {
-                  "MEMORY_DB_PATH": "/opt/mcp-memory/data/memory.db"
-                }
-              }
-            }
-          }
-          SETTINGS
-            sed -i 's/^          //' ~/.claude/settings.json
+            echo "Merging into existing settings..."
+            jq --arg node "$NODE_PATH" '.mcpServers.memory = {"command":$node,"args":["/opt/mcp-memory/src/index.js"],"env":{"MEMORY_DB_PATH":"/opt/mcp-memory/data/memory.db"}}' ~/.claude/settings.json > /tmp/cs.json
+            jq . /tmp/cs.json > /dev/null 2>&1 && cp /tmp/cs.json ~/.claude/settings.json && echo "✓ Merged"
           fi
-
+          if ! jq -e '.mcpServers.memory' ~/.claude/settings.json > /dev/null 2>&1; then
+            echo "Creating settings.json..."
+            printf '{"mcpServers":{"memory":{"command":"%s","args":["/opt/mcp-memory/src/index.js"],"env":{"MEMORY_DB_PATH":"/opt/mcp-memory/data/memory.db"}}}}\n' "$NODE_PATH" | jq . > ~/.claude/settings.json
+          fi
           echo "Settings:"
           cat ~/.claude/settings.json
+          EOF
 
-          echo "=== Step 7: Setup cron backup ==="
+      - name: Setup cron and seed data
+        run: |
+          $SSH_CMD << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+          NODE_PATH=$(readlink -f $(which node))
+          cd /opt/mcp-memory
+
+          # Cron
           (crontab -l 2>/dev/null | grep -v mcp-memory; echo "0 3 * * * cd /opt/mcp-memory && $NODE_PATH src/backup.js >> /var/log/mcp-memory-backup.log 2>&1") | crontab -
-          echo "Cron:"
-          crontab -l | grep mcp-memory
+          crontab -l | grep mcp-memory && echo "✓ Cron OK"
 
-          echo "=== Step 8: Manual backup test ==="
+          # Backup test
           node src/backup.js
 
-          echo "=== Step 9: Seed data ==="
+          # Seed data
           which sqlite3 > /dev/null 2>&1 || apt-get install -y -qq sqlite3
-          EXISTING=$(sqlite3 /opt/mcp-memory/data/memory.db "SELECT COUNT(*) FROM memories;" 2>/dev/null || echo "0")
-          echo "Existing records: $EXISTING"
-          if [ "$EXISTING" = "0" ] || [ "$EXISTING" = "" ]; then
-            echo "Loading seed data..."
+          COUNT=$(sqlite3 data/memory.db "SELECT COUNT(*) FROM memories;" 2>/dev/null || echo "0")
+          echo "Records: $COUNT"
+          if [ "$COUNT" = "0" ] || [ -z "$COUNT" ]; then
             node src/seed.js
           else
-            echo "✓ Database already has $EXISTING records, skipping seed"
+            echo "✓ Already seeded ($COUNT records)"
           fi
 
           echo ""
-          echo "=== DEPLOYMENT COMPLETE ==="
-          echo "✓ MCP Memory Server deployed to /opt/mcp-memory/"
-          echo "✓ Database: /opt/mcp-memory/data/memory.db"
-          echo "✓ Backups: /opt/mcp-memory/backups/"
-          echo "✓ Claude Code config: ~/.claude/settings.json"
-          echo "✓ Cron backup: daily at 3:00"
-
-          REMOTE
+          echo "=== DONE ==="
+          node src/stats.js
+          EOF
 
       - name: Cleanup
         if: always()
