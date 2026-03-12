@@ -161,6 +161,16 @@ jobs:
             add "VK: .env NOT LOADED"
           fi
 
+          # 6b. N8N env check
+          add ""
+          add "--- N8N Service Env ---"
+          N8N_VER=$(n8n --version 2>/dev/null || echo "?")
+          add "N8N version: $N8N_VER"
+          N8N_BLOCK=$(grep N8N_BLOCK /etc/systemd/system/n8n.service 2>/dev/null || echo "NOT_FOUND")
+          add "Unit block setting: $N8N_BLOCK"
+          N8N_ENV_CHECK=$(systemctl show n8n --property=Environment 2>/dev/null | head -c 500)
+          add "Service env: $N8N_ENV_CHECK"
+
           # 7. LP Journal
           add ""
           add "--- LP Journal ---"
