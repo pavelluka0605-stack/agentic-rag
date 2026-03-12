@@ -127,6 +127,9 @@ agentic-rag/
   Решение: все операции с Google Sheets выполнять через GitHub Actions workflow `sheets-manage.yml`.
 - **Кириллица в workflow_dispatch inputs** — при передаче через API могут быть проблемы с encoding.
   Решение: использовать `delete-sheet-by-id` с числовым ID вместо имени листа.
+- **VK_USER_TOKEN — сервисный токен вместо user token** — текущий токен (`1cad6b15...`) это сервисный ключ, который не поддерживает `wall.createComment` (ошибка 28).
+  Решение: получить user token через OAuth Implicit Flow (например, через Kate Mobile, client_id=2685278).
+  URL: `https://oauth.vk.com/authorize?client_id=2685278&scope=wall,groups,offline&response_type=token&v=5.199`
 
 ## Выполненные задачи
 
@@ -155,27 +158,38 @@ agentic-rag/
 - [x] P0-03 обновлён: после комментария вызывает P0-07 для AI обработки
 - [x] P0-07 исправлен: OpenAI API через $env.OPENAI_API_KEY вместо ручного credential
 - [x] OPENAI_API_KEY добавлен как GitHub секрет
+- [x] P0-08 VK Comment Processor — 5-категорийная AI классификация комментариев (GPT-4o)
+- [x] P0-03 обновлён: вызывает P0-08 вместо P0-07 (/vk-ai-process)
+- [x] Архитектурная документация: docs/ARCHITECTURE_VK_COMMENT_PROCESSOR.md
+- [x] Схема листа Спрос обновлена для P0-08 (17 колонок)
+- [x] sheets-manage.yml: добавлено действие update-spros-headers
 
 ## Текущее состояние системы
 
-- **N8N** — работает на VPS, 7 workflows (P0-01..P0-07) активированы
+- **N8N** — работает на VPS, 8 workflows (P0-01..P0-08) активированы
 - **VK Long Poll** (community) — слушает входящие сообщения в группу
 - **VK User Long Poll** — слушает личные сообщения
 - **BlueSales Sync** (P0-05) — автосинхронизация клиентов/заказов каждый час
 - **BlueSales Webhook** (P0-06) — real-time обработка событий (endpoint: /webhook/bluesales-webhook)
-- **Парсинг спроса** — VK комментарии автоматически парсятся на размеры (XS-XXL) → лист "Спрос"
+- **VK Comment Processor** (P0-08) — AI обработка VK комментариев с 5-категорийной классификацией
+  - Категории: buy_complete, buy_incomplete, question, clarification, ignore
+  - Дедупликация по `{post_id}_{comment_id}` в листе "Спрос"
+  - Контекст: VK API (пост + имя пользователя) → GPT-4o → Decision Engine
+  - Действия: BlueSales (заказ), VK ответ, Telegram уведомление, Google Sheets запись
+  - **Требуется:** VK_USER_TOKEN (user token, не service token) для wall.createComment
 - **Сводка спроса** — формулы COUNTIFS автоматически считают спрос по размерам
 - **Healthcheck** — автоматически каждые 6 часов + ручной запуск
 - **Google Sheets** — листы: Товары, Спрос, Заказы_поставщику, Заказы_клиентов, Сводка_спроса, Логи_N8N, BlueSales_Клиенты, BlueSales_Заказы
-- **AI автоответы** (P0-07) — GPT-4o классифицирует VK комментарии: консультация / уточнение / сделка
+- **AI автоответы** (P0-07) — устаревший, заменён на P0-08
 - **Telegram** — уведомления менеджеру работают
 
 ## Возможные дальнейшие улучшения
 
-1. ~~Автоответы клиентам VK~~ → реализовано в P0-07 (AI автоответы GPT-4o)
-2. Получение имени клиента VK через VK API (users.get) при парсинге комментариев
-3. Дашборд/отчёты по продажам в Telegram (еженедельная сводка)
-4. Настройка webhook URL в BlueSales для P0-06 (нужен публичный URL N8N)
+1. ~~Автоответы клиентам VK~~ → реализовано в P0-08 (5-категорийная AI классификация)
+2. ~~Получение имени клиента VK через VK API (users.get)~~ → реализовано в P0-08 (Context: Fetch User)
+3. **VK_USER_TOKEN** — получить user token через OAuth Implicit Flow для wall.createComment
+4. Дашборд/отчёты по продажам в Telegram (еженедельная сводка)
+5. Настройка webhook URL в BlueSales для P0-06 (нужен публичный URL N8N)
 
 ## История ключевых решений
 
@@ -186,3 +200,4 @@ agentic-rag/
 - Telegram для уведомлений менеджеру
 - BlueSales для интеграции с CRM
 - OpenAI GPT-4o для AI автоответов на VK комментарии
+- P0-08 заменил P0-07: 5 категорий + decision engine + dedup + BlueSales интеграция

@@ -112,6 +112,14 @@ jobs:
           WH_EXT_BODY=$(echo "$WH_EXT" | head -c 150)
           add "Webhook external: $WH_EXT_CODE ($WH_EXT_BODY)"
 
+          # Test P0-08 webhook directly
+          WH_P08=$(curl -s -w "|HTTP:%{http_code}" --max-time 10 \
+            -X POST "${N8N_API_URL}/webhook/vk-ai-process" \
+            -H "Content-Type: application/json" \
+            -d '{"type":"system","event":"diag_test","text":"","from_id":-1}' 2>&1)
+          WH_P08_CODE=$(echo "$WH_P08" | grep -o 'HTTP:[0-9]*')
+          add "Webhook P0-08: $WH_P08_CODE"
+
           # 5b. N8N journal
           add ""
           add "--- N8N Journal ---"
