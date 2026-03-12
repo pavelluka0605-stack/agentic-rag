@@ -17,8 +17,7 @@ jobs:
         run: |
           set +e
 
-          # 1. Send test to N8N
-          echo "=== Sending test event to N8N ==="
+          # 1. Отправка тестового события в N8N
           TS=$(date +%s)
           HC=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
             -X POST "${N8N_BASE_URL}/webhook/vk-events" \
@@ -27,14 +26,13 @@ jobs:
           echo "Webhook response: HTTP ${HC}"
           sleep 20
 
-          # 2. Get detailed execution info
-          echo ""
-          echo "=== N8N Executions (last 5) ==="
+          # 2. Детальная диагностика выполнений
           python3 << 'PYEOF'
           import json, urllib.request, os
 
           base = os.environ['N8N_BASE_URL']
           key = os.environ['N8N_API_KEY']
+          summary_file = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null')
 
           def api(path):
               req = urllib.request.Request(f"{base}{path}", headers={"X-N8N-API-KEY": key})
@@ -42,38 +40,38 @@ jobs:
                   return json.loads(r.read())
 
           execs = api("/api/v1/executions?limit=5")
-          summary_lines = []
+          report = []
 
           for e in execs.get('data', []):
               eid = e['id']
               status = e.get('status', '?')
               wf = e.get('workflowData', {}).get('name', '?')
-              line = f"#{eid} [{status}] {wf}"
-              summary_lines.append(line)
-              print(f"\n{'='*60}")
-              print(line)
-              print('='*60)
+              block = [f"### Execution #{eid} [{status}] {wf}"]
 
               try:
                   det = api(f"/api/v1/executions/{eid}?includeData=true")
               except Exception as ex:
-                  print(f"  Cannot get detail: {ex}")
+                  block.append(f"- Error getting detail: {ex}")
+                  report.append('\n'.join(block))
                   continue
+
+              # Workflow name from detail
+              wf_detail = det.get('workflowData', {}).get('name', wf)
+              if wf_detail != wf:
+                  block[0] = f"### Execution #{eid} [{status}] {wf_detail}"
 
               rd = det.get('data', {}).get('resultData', {})
 
-              # Top-level workflow error
+              # Top-level error
               top_err = rd.get('error')
               if top_err:
-                  if isinstance(top_err, dict):
-                      print(f"  WORKFLOW ERROR: {top_err.get('message', '')}".rstrip()[:500])
-                  else:
-                      print(f"  WORKFLOW ERROR: {str(top_err)[:500]}")
+                  msg = top_err.get('message', str(top_err)) if isinstance(top_err, dict) else str(top_err)
+                  block.append(f"- **WORKFLOW ERROR**: `{msg[:400]}`")
 
-              # Node-level results
+              # Node results
               run_data = rd.get('runData', {})
               if not run_data:
-                  print("  (no node data — workflow may have failed before nodes executed)")
+                  block.append("- _(no node data)_")
               else:
                   for nn, runs in run_data.items():
                       for r in runs:
@@ -82,14 +80,23 @@ jobs:
                           if r.get('error'):
                               em = r['error']
                               if isinstance(em, dict):
-                                  err_str = f" ERR: {em.get('message', '')[:250]}"
+                                  err_str = f" **ERR**: `{em.get('message', '')[:300]}`"
                               else:
-                                  err_str = f" ERR: {str(em)[:250]}"
-                          print(f"  [{s}] {nn}{err_str}")
+                                  err_str = f" **ERR**: `{str(em)[:300]}`"
+                          block.append(f"- [{s}] {nn}{err_str}")
 
-          # Write summary annotation
-          summary = " | ".join(summary_lines)
-          print(f"\n::notice title=Executions::{summary}")
+              report.append('\n'.join(block))
+
+          # Write to step summary (markdown)
+          with open(summary_file, 'w') as f:
+              f.write("## N8N Execution Report\n\n")
+              f.write('\n\n'.join(report))
+              f.write('\n')
+
+          # Also print for logs
+          for block in report:
+              print(block)
+              print()
           PYEOF
 
       - name: VK API check
@@ -97,7 +104,6 @@ jobs:
           VK_USER_TOKEN: ${{ secrets.VK_USER_TOKEN }}
         run: |
           set +e
-          echo "=== VK API TEST ==="
           WALL=$(curl -s --max-time 10 \
             "https://api.vk.com/method/wall.get?owner_id=-137949809&count=1&access_token=${VK_USER_TOKEN}&v=5.199")
           echo "$WALL" | python3 -c "
