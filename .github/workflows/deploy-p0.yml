@@ -261,6 +261,7 @@ jobs:
           Environment=N8N_PROTOCOL=http
           Environment=GENERIC_TIMEZONE=Europe/Moscow
           Environment=N8N_SECURE_COOKIE=false
+          Environment=N8N_BLOCK_ENV_ACCESS_IN_NODE=false
           ExecStart=/usr/bin/env n8n start
           Restart=always
           RestartSec=10
