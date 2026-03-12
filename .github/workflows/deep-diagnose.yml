@@ -1,0 +1,129 @@
+name: "Deep N8N Diagnostics"
+
+on:
+  push:
+    branches:
+      - 'claude/vk-token-*'
+    paths:
+      - '.github/workflows/deep-diagnose.yml'
+
+jobs:
+  diagnose:
+    name: "Deep N8N Diagnostics"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deep diagnostics
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          source /opt/p0-foundation/.env 2>/dev/null
+
+          echo "=== 1. N8N WEBHOOK_URL in .env ==="
+          grep -i "N8N_WEBHOOK\|WEBHOOK_URL" /opt/p0-foundation/.env 2>/dev/null || echo "No webhook URL in .env"
+          grep -i "N8N_WEBHOOK\|WEBHOOK_URL" /opt/p0-foundation/vk-longpoll/.env 2>/dev/null || echo "No webhook URL in vk-longpoll/.env"
+
+          echo ""
+          echo "=== 2. N8N Active Workflows with webhook paths ==="
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            http://localhost:5678/api/v1/workflows?limit=100 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+            active = 'ON' if w.get('active') else 'OFF'
+            nodes = w.get('nodes', [])
+            webhooks = [n for n in nodes if 'webhook' in n.get('type','').lower() or 'Webhook' in n.get('name','')]
+            for wh in webhooks:
+              path = wh.get('parameters',{}).get('path','?')
+              method = wh.get('parameters',{}).get('httpMethod','?')
+              print(f'[{active}] {w[\"name\"]}: webhook=/{path} method={method}')
+            if not webhooks and w.get('active'):
+              trigger = [n for n in nodes if 'trigger' in n.get('type','').lower()]
+              trig_types = [t.get('type','') for t in trigger]
+              print(f'[{active}] {w[\"name\"]}: triggers={trig_types}')
+          " 2>/dev/null
+
+          echo ""
+          echo "=== 3. Direct webhook test to vk-events ==="
+          R1=$(curl -s -w "\nHTTP_CODE:%{http_code}" --max-time 10 \
+            -X POST http://localhost:5678/webhook/vk-events \
+            -H "Content-Type: application/json" \
+            -d '{"type":"wall_reply_new","group_id":"'${VK_GROUP_ID}'","event_id":"diag_test","comment":{"id":99999,"from_id":1,"post_id":1,"text":"DIAG TEST","date":1710000000}}')
+          echo "Response: $R1"
+
+          echo ""
+          echo "=== 4. Direct webhook test to vk-ai-reply ==="
+          R2=$(curl -s -w "\nHTTP_CODE:%{http_code}" --max-time 15 \
+            -X POST http://localhost:5678/webhook/vk-ai-reply \
+            -H "Content-Type: application/json" \
+            -d '{"comment_id":99999,"from_id":1,"post_id":1,"text":"DIAG TEST price","date":"2026-03-12T13:00:00Z"}')
+          echo "Response: $R2"
+
+          echo ""
+          echo "=== 5. N8N Docker logs (last 50 lines, errors only) ==="
+          docker logs n8n-n8n-1 --tail 50 2>&1 | grep -i "error\|warn\|webhook\|execution\|fail" | tail -20
+
+          echo ""
+          echo "=== 6. N8N Docker logs (last 20 lines, all) ==="
+          docker logs n8n-n8n-1 --tail 20 2>&1
+
+          echo ""
+          echo "=== 7. N8N Executions (different query) ==="
+          # Try without filters
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "http://localhost:5678/api/v1/executions?limit=5&status=success" 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Success executions:', json.dumps(data, indent=2)[:500])
+          " 2>/dev/null
+          curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "http://localhost:5678/api/v1/executions?limit=5&status=error" 2>/dev/null | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Error executions:', json.dumps(data, indent=2)[:500])
+          " 2>/dev/null
+
+          echo ""
+          echo "=== 8. Port 5678 listening ==="
+          ss -tlnp | grep 5678 || echo "Port 5678 not listening"
+
+          echo ""
+          echo "=== 9. VK Long Poll health ==="
+          curl -s http://127.0.0.1:3100/health 2>/dev/null || echo "Health endpoint not responding"
+
+          REMOTE
+          )
+
+          echo "$RESULT"
+
+          # Split and send to Telegram (max 4096 chars)
+          echo "$RESULT" | head -60 | while IFS= read -r line; do
+            PART1="${PART1}
+          ${line}"
+          done
+
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=🔍 Deep N8N Diagnostics (1/2):
+          $(echo "$RESULT" | head -40)" > /dev/null 2>&1 || true
+
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=🔍 Deep N8N Diagnostics (2/2):
+          $(echo "$RESULT" | tail -40)" > /dev/null 2>&1 || true
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
