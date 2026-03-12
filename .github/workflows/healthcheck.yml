@@ -28,11 +28,11 @@ jobs:
           N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # Collect diagnostics via SSH, capture stdout
-          DIAG_OUTPUT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+          # Run diagnostics on VPS, capture output to file
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "N8N_API_KEY=$N8N_API_KEY" "N8N_BASE_URL=$N8N_BASE_URL" \
-            'bash -s' << 'REMOTE'
+            'bash -s' > /tmp/diag_output.txt 2>&1 << 'REMOTE'
 
           MSG=""
           add() { MSG="${MSG}${1}\n"; }
@@ -100,14 +100,14 @@ jobs:
           WH_LOCAL=$(curl -s -w "|HTTP:%{http_code}" --max-time 5 \
             -X POST http://localhost:5678/webhook/vk-events \
             -H "Content-Type: application/json" \
-            -d "{\"type\":\"system\",\"event\":\"diag_test\"}" 2>&1)
+            -d '{"type":"system","event":"diag_test"}' 2>&1)
           WH_LOCAL_CODE=$(echo "$WH_LOCAL" | grep -o 'HTTP:[0-9]*')
           add "Webhook localhost: $WH_LOCAL_CODE"
 
           WH_EXT=$(curl -s -w "|HTTP:%{http_code}" --max-time 10 \
             -X POST "${N8N_API_URL}/webhook/vk-events" \
             -H "Content-Type: application/json" \
-            -d "{\"type\":\"system\",\"event\":\"diag_test\"}" 2>&1)
+            -d '{"type":"system","event":"diag_test"}' 2>&1)
           WH_EXT_CODE=$(echo "$WH_EXT" | grep -o 'HTTP:[0-9]*')
           WH_EXT_BODY=$(echo "$WH_EXT" | head -c 150)
           add "Webhook external: $WH_EXT_CODE ($WH_EXT_BODY)"
@@ -145,31 +145,28 @@ jobs:
           JOURNAL=$(journalctl -u vk-longpoll -n 5 --no-pager -o short-iso 2>&1 | tail -5)
           add "$JOURNAL"
 
-          # Output to stdout (captured by runner)
+          # Output to stdout (captured to file on runner)
           printf "$MSG"
 
           REMOTE
-          )
 
-          # Save to file for next steps
-          echo "$DIAG_OUTPUT" | tee /tmp/diag_output.txt
+          # Show output (visible in Actions logs)
+          echo "===== DIAGNOSTICS ====="
+          cat /tmp/diag_output.txt
+          echo "===== END ====="
 
-          # Write Job Summary (visible on Actions run page)
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "$DIAG_OUTPUT" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # Write Job Summary
+          {
+            echo '```'
+            cat /tmp/diag_output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
           # Send to Telegram
+          DIAG_TEXT=$(cat /tmp/diag_output.txt)
           curl -s --max-time 15 "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TG_CHAT}" \
-            --data-urlencode "text=${DIAG_OUTPUT}" > /dev/null 2>&1
-
-          # Save as output for gh api access
-          {
-            echo 'diagnostics<<DIAG_EOF'
-            echo "$DIAG_OUTPUT"
-            echo 'DIAG_EOF'
-          } >> "$GITHUB_OUTPUT"
+            --data-urlencode "text=${DIAG_TEXT}" > /dev/null 2>&1 || true
 
       - name: Cleanup
         if: always()
