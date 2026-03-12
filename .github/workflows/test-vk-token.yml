@@ -24,7 +24,7 @@ jobs:
       - name: "Test 1 — VK Community Token (groups.getById)"
         id: test_community
         run: |
-          RESULT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
 
           source /opt/p0-foundation/.env 2>/dev/null
@@ -100,7 +100,7 @@ jobs:
       - name: "Test 2 — VK Long Poll Listener Service"
         id: test_listener
         run: |
-          RESULT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
 
           echo "=== VK LONG POLL LISTENER ==="
@@ -137,7 +137,7 @@ jobs:
       - name: "Test 3 — VK User Long Poll (optional)"
         id: test_user_lp
         run: |
-          RESULT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
 
           echo "=== VK USER LONG POLL ==="
@@ -173,7 +173,7 @@ jobs:
       - name: "Test 4 — N8N Workflows Status"
         id: test_n8n
         run: |
-          RESULT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
 
           echo "=== N8N WORKFLOWS STATUS ==="
@@ -215,7 +215,7 @@ jobs:
       - name: "Test 5 — N8N Webhook endpoint"
         id: test_webhook
         run: |
-          RESULT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+          RESULT=$(ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
 
           echo "=== N8N WEBHOOK TEST ==="
@@ -254,13 +254,30 @@ jobs:
           )
           echo "$RESULT"
 
-      - name: "Summary"
+      - name: "Send results to Telegram"
         if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
         run: |
-          echo "══════════════════════════════════════"
-          echo "  VK TOKEN & SERVICES TEST COMPLETE"
-          echo "  $(date '+%d.%m.%Y %H:%M:%S UTC')"
-          echo "══════════════════════════════════════"
+          # Collect all step outcomes
+          MSG="🔍 VK Token & Services Test
+          ────────────────────────
+          $(date '+%d.%m.%Y %H:%M UTC')
+          Branch: claude/vk-token-implementation
+
+          Steps:
+          1️⃣ Community Token: ${{ steps.test_community.outcome }}
+          2️⃣ Long Poll Listener: ${{ steps.test_listener.outcome }}
+          3️⃣ User Long Poll: ${{ steps.test_user_lp.outcome }}
+          4️⃣ N8N Workflows: ${{ steps.test_n8n.outcome }}
+          5️⃣ Webhook Test: ${{ steps.test_webhook.outcome }}
+
+          Run: https://github.com/pavelluka0605-stack/agentic-rag/actions/runs/${{ github.run_id }}"
+
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
 
       - name: Cleanup
         if: always()
