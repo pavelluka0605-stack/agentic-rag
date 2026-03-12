@@ -5,7 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "vk-events",
-        "responseMode": "lastNode",
+        "responseMode": "onReceived",
         "options": {}
       },
       "id": "webhook-vk",
@@ -412,17 +412,6 @@
       "typeVersion": 4.2,
       "position": [1560, 550],
       "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\"status\":\"ok\"}"
-      },
-      "id": "respond-ok",
-      "name": "Respond OK",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [1780, 400]
     }
   ],
   "connections": {
@@ -446,7 +435,7 @@
       "main": [[ { "node": "Telegram: New DM", "type": "main", "index": 0 } ]]
     },
     "Telegram: New DM": {
-      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+      "main": [[ ]]
     },
     "Extract: Comment": {
       "main": [[ { "node": "Log: Comment", "type": "main", "index": 0 } ]]
@@ -462,7 +451,6 @@
     },
     "Telegram: New Comment": {
       "main": [[
-        { "node": "Respond OK", "type": "main", "index": 0 },
         { "node": "Call: AI Reply", "type": "main", "index": 0 }
       ]]
     },
@@ -473,7 +461,7 @@
       "main": [[ { "node": "Telegram: New Post", "type": "main", "index": 0 } ]]
     },
     "Telegram: New Post": {
-      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+      "main": [[ ]]
     },
     "IF: LP Error?": {
       "main": [
@@ -482,13 +470,13 @@
       ]
     },
     "Telegram: LP Error": {
-      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+      "main": [[ ]]
     },
     "Telegram: LP Started": {
-      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+      "main": [[ ]]
     },
     "Log: Other Event": {
-      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+      "main": [[ ]]
     }
   },
   "settings": {
