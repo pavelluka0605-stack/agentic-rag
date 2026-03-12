@@ -24,11 +24,12 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT_ID }}
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "TG_TOKEN=$TG_TOKEN" "TG_CHAT=$TG_CHAT" "RUN_URL=$RUN_URL" "N8N_API_KEY=$N8N_API_KEY" \
+            "TG_TOKEN=$TG_TOKEN" "TG_CHAT=$TG_CHAT" "RUN_URL=$RUN_URL" "N8N_API_KEY=$N8N_API_KEY" "N8N_BASE_URL=$N8N_BASE_URL" \
             'bash -s' << 'REMOTE'
 
           send_tg() {
@@ -53,15 +54,22 @@ jobs:
           LP_HEALTH=$(curl -s --max-time 3 http://127.0.0.1:3100/health 2>&1 || echo "NO_RESPONSE")
           add "LP Health: $LP_HEALTH"
 
-          # 3. N8N Workflows via API (localhost)
+          # 3. N8N Workflows via API
           add ""
           add "--- N8N Workflows ---"
-          WF_LIST=$(curl -s --max-time 5 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "http://localhost:5678/api/v1/workflows?limit=100" 2>&1)
+          # Try external URL first (works in deploy), fallback to localhost
+          N8N_API_URL="${N8N_BASE_URL:-http://localhost:5678}"
+          WF_LIST=$(curl -s --max-time 10 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_API_URL}/api/v1/workflows?limit=100" 2>&1)
+          # Show raw response snippet for debugging
+          RAW_SNIPPET=$(echo "$WF_LIST" | head -c 120)
+          add "API(${N8N_API_URL}): ${RAW_SNIPPET}"
+          add ""
           WF_INFO=$(echo "$WF_LIST" | python3 -c "
           import sys,json
           try:
               data = json.load(sys.stdin).get('data', [])
+              if not data: print('  (no workflows found)')
               for w in sorted(data, key=lambda x: x.get('name','')):
                   st = 'ON' if w.get('active') else 'OFF'
                   print(f'  {st} {w[\"name\"]} (id={w[\"id\"]})')
@@ -73,23 +81,25 @@ jobs:
           add ""
           ACTIVATED=$(echo "$WF_LIST" | python3 -c "
           import sys,json
-          data = json.load(sys.stdin).get('data', [])
-          inactive = [w for w in data if w.get('name','').startswith('P0-') and not w.get('active')]
-          for w in inactive:
-              print(w['id'], w['name'])
+          try:
+              data = json.load(sys.stdin).get('data', [])
+              inactive = [w for w in data if w.get('name','').startswith('P0-') and not w.get('active')]
+              for w in inactive:
+                  print(w['id'], w['name'])
+          except: pass
           " 2>/dev/null)
 
           if [ -n "$ACTIVATED" ]; then
             add "Activating inactive P0 workflows..."
             echo "$ACTIVATED" | while read -r wf_id wf_name; do
-              resp=$(curl -s -X POST "http://localhost:5678/api/v1/workflows/${wf_id}/activate" \
+              resp=$(curl -s -X POST "${N8N_API_URL}/api/v1/workflows/${wf_id}/activate" \
                 -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
                 -H "Content-Type: application/json" 2>&1)
               if echo "$resp" | grep -q '"active":true'; then
                 add "  ✓ ${wf_name} activated"
               else
                 # Fallback: PUT with active:true
-                wf_body=$(curl -s "http://localhost:5678/api/v1/workflows/${wf_id}" \
+                wf_body=$(curl -s "${N8N_API_URL}/api/v1/workflows/${wf_id}" \
                   -H "X-N8N-API-KEY: ${N8N_API_KEY}" 2>&1)
                 put_body=$(echo "$wf_body" | python3 -c "
           import sys,json
@@ -98,7 +108,7 @@ jobs:
           if 'staticData' in wf: out['staticData']=wf['staticData']
           print(json.dumps(out))
           " 2>/dev/null)
-                resp2=$(curl -s -X PUT "http://localhost:5678/api/v1/workflows/${wf_id}" \
+                resp2=$(curl -s -X PUT "${N8N_API_URL}/api/v1/workflows/${wf_id}" \
                   -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
                   -H "Content-Type: application/json" \
                   -d "$put_body" 2>&1)
