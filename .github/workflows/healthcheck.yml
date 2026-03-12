@@ -150,10 +150,8 @@ jobs:
 
           REMOTE
 
-          # Show output (visible in Actions logs)
-          echo "===== DIAGNOSTICS ====="
+          # Show output
           cat /tmp/diag_output.txt
-          echo "===== END ====="
 
           # Write Job Summary
           {
@@ -161,6 +159,10 @@ jobs:
             cat /tmp/diag_output.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # Write as annotation (readable via check-runs API)
+          DIAG_ONELINE=$(cat /tmp/diag_output.txt | tr '\n' ' | ' | head -c 3000)
+          echo "::notice title=Diagnostics::${DIAG_ONELINE}"
 
           # Send to Telegram
           DIAG_TEXT=$(cat /tmp/diag_output.txt)
