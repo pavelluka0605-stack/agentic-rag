@@ -1,0 +1,533 @@
+{
+  "name": "P0-08_VK_Comment_Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vk-ai-process",
+        "options": {}
+      },
+      "id": "webhook-process",
+      "name": "Webhook: VK Comment",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400],
+      "webhookId": "vk-ai-process"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Flatten webhook v2 body\nreturn $input.all().map(item => ({\n  json: item.json.body || item.json\n}));"
+      },
+      "id": "flatten-body",
+      "name": "Flatten: Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [340, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build dedup key and validate input\nconst d = $input.item.json;\nconst commentId = d.comment_id || d.id;\nconst postId = d.post_id;\nconst fromId = d.from_id;\nconst text = (d.text || '').trim();\nconst dedupKey = postId + '_' + commentId;\n\n// Skip if from_id is negative (bot/group) or text is empty\nconst skipReason = fromId < 0 ? 'bot_comment' : (!text ? 'empty_text' : '');\n\nreturn [{\n  json: {\n    comment_id: commentId,\n    post_id: postId,\n    from_id: fromId,\n    owner_id: d.owner_id || -137949809,\n    text: text,\n    date: d.date || new Date().toISOString(),\n    event_type: d.event_type || 'photo_comment_new',\n    dedup_key: dedupKey,\n    skip_reason: skipReason\n  }\n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate: Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $json.skip_reason }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-skip",
+      "name": "IF: Should Skip?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [620, 400]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Спрос"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "ID_записи",
+              "lookupValue": "={{ $('Validate: Input').item.json.dedup_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dedup-check",
+      "name": "Dedup: Check Спрос",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [820, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if dedup found existing record\nconst items = $input.all();\nconst hasData = items.length > 0 && items[0].json && Object.keys(items[0].json).length > 0 && items[0].json.ID_записи;\nreturn [{ json: { is_duplicate: hasData } }];"
+      },
+      "id": "dedup-result",
+      "name": "Dedup: Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "dup-check",
+              "leftValue": "={{ $json.is_duplicate }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-duplicate",
+      "name": "IF: Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1140, 500]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.vk.com/method/wall.getById?posts={{ $('Validate: Input').item.json.owner_id }}_{{ $('Validate: Input').item.json.post_id }}&access_token=__VK_USER_TOKEN__&v=5.199",
+        "options": { "timeout": 10000 }
+      },
+      "id": "vk-get-post",
+      "name": "Context: Fetch Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1360, 600],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.vk.com/method/users.get?user_ids={{ $('Validate: Input').item.json.from_id }}&fields=first_name,last_name&access_token=__VK_USER_TOKEN__&v=5.199",
+        "options": { "timeout": 10000 }
+      },
+      "id": "vk-get-user",
+      "name": "Context: Fetch User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1360, 750],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect context from VK API responses and original input\nconst input = $('Validate: Input').item.json;\n\n// Get post context\nlet postText = '';\nlet postUrl = '';\ntry {\n  const postResp = $('Context: Fetch Post').item.json;\n  const items = postResp?.response?.items || postResp?.response || [];\n  if (items.length > 0) {\n    postText = (items[0].text || '').substring(0, 300);\n    postUrl = `https://vk.com/wall${input.owner_id}_${input.post_id}`;\n  }\n} catch(e) { /* post fetch failed, continue without context */ }\n\n// Get user name\nlet userName = '';\ntry {\n  const userResp = $('Context: Fetch User').item.json;\n  const users = userResp?.response || [];\n  if (users.length > 0) {\n    userName = (users[0].first_name || '') + ' ' + (users[0].last_name || '');\n    userName = userName.trim();\n  }\n} catch(e) { /* user fetch failed, continue without name */ }\n\n// Rule-based pre-parsing\nconst text = input.text;\nconst textUpper = text.toUpperCase().trim();\n\n// Detect sizes\nconst sizePatterns = ['XXL', '3XL', '2XL', 'XL', 'XS', 'S', 'M', 'L'];\nlet detectedSize = '';\nfor (const s of sizePatterns) {\n  if (new RegExp('\\\\b' + s + '\\\\b', 'i').test(textUpper)) {\n    detectedSize = s;\n    break;\n  }\n}\n\n// Detect quantity\nlet detectedQty = 0;\nconst numMatch = text.match(/(\\d+)\\s*(шт|штук|штуки)?/i);\nif (numMatch) {\n  const n = parseInt(numMatch[1]);\n  if (n >= 1 && n <= 99) detectedQty = n;\n}\n\n// Detect buy keywords\nconst buyKeywords = ['беру', 'куплю', 'купить', 'хочу', 'возьму', 'заказ', 'закажу', 'давай', 'мне'];\nconst hasBuyIntent = buyKeywords.some(kw => textUpper.includes(kw.toUpperCase()));\n\n// Detect question markers\nconst questionMarkers = ['?', 'сколько', 'есть', 'когда', 'как', 'какой', 'какая', 'можно'];\nconst hasQuestion = questionMarkers.some(m => text.toLowerCase().includes(m));\n\nreturn [{\n  json: {\n    ...input,\n    post_text: postText,\n    post_url: postUrl || `https://vk.com/wall${input.owner_id}_${input.post_id}`,\n    user_name: userName || 'VK ID ' + input.from_id,\n    pre_parse: {\n      size: detectedSize,\n      quantity: detectedQty,\n      has_buy_intent: hasBuyIntent,\n      has_question: hasQuestion\n    }\n  }\n}];"
+      },
+      "id": "build-context",
+      "name": "Build: Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 650]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer __OPENAI_API_KEY__" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o\",\n  \"temperature\": 0.2,\n  \"max_tokens\": 800,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Ты — AI-аналитик интернет-магазина одежды/мебели. Анализируй комментарии покупателей под постами VK.\\n\\nКонтекст поста (товар): {{ $json.post_text.replace(/\\\"/g, '\\\\\\\"').substring(0, 200) }}\\n\\nПре-парсинг (подсказка): размер={{ $json.pre_parse.size || 'не найден' }}, кол-во={{ $json.pre_parse.quantity || 'не указано' }}, покупка={{ $json.pre_parse.has_buy_intent }}, вопрос={{ $json.pre_parse.has_question }}\\n\\nОтветь СТРОГО в формате JSON без markdown:\\n{\\n  \\\"intent_type\\\": \\\"buy_complete\\\" | \\\"buy_incomplete\\\" | \\\"question\\\" | \\\"clarification\\\" | \\\"ignore\\\",\\n  \\\"confidence\\\": 0.0-1.0,\\n  \\\"product_name\\\": \\\"название товара из контекста поста\\\",\\n  \\\"size\\\": \\\"размер если указан (XS/S/M/L/XL/XXL)\\\",\\n  \\\"quantity\\\": число или 0 если не указано,\\n  \\\"color\\\": \\\"цвет если указан\\\",\\n  \\\"customer_question\\\": \\\"суть вопроса если это вопрос\\\",\\n  \\\"missing_fields\\\": [\\\"список недостающих полей\\\"],\\n  \\\"suggested_reply\\\": \\\"ответ клиенту на русском, 1-3 предложения\\\",\\n  \\\"should_create_order\\\": true/false,\\n  \\\"should_write_demand\\\": true/false\\n}\\n\\nПравила классификации:\\n- buy_complete: чёткое намерение купить + достаточно данных (товар + размер). Кол-во по умолчанию = 1.\\n- buy_incomplete: хочет купить, но не хватает данных (нет размера, неясен товар).\\n- question: вопрос о товаре/доставке/наличии, не покупка.\\n- clarification: нужно уточнить детали у клиента.\\n- ignore: спам, мусор, эмодзи, нерелевантный комментарий.\\n\\nshould_create_order=true ТОЛЬКО при buy_complete + confidence >= 0.8.\\nshould_write_demand=true для всех кроме ignore.\\nОтвечай кратко, дружелюбно, на русском.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Комментарий от {{ $json.user_name }}: {{ $json.text }}\"\n    }\n  ]\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "ai-classify",
+      "name": "AI: Classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 650]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and apply decision rules\nconst aiResp = $input.item.json;\nconst ctx = $('Build: Context').item.json;\n\nlet ai;\ntry {\n  let content = aiResp.choices[0].message.content;\n  if (content.includes('```')) {\n    content = content.replace(/```json?\\n?/g, '').replace(/```/g, '').trim();\n  }\n  ai = JSON.parse(content);\n} catch (e) {\n  // Fallback for unparseable AI response\n  ai = {\n    intent_type: 'question',\n    confidence: 0.3,\n    product_name: '',\n    size: ctx.pre_parse.size || '',\n    quantity: ctx.pre_parse.quantity || 0,\n    color: '',\n    customer_question: ctx.text,\n    missing_fields: ['all'],\n    suggested_reply: 'Спасибо за комментарий! Напишите нам в ЛС группы для подробной консультации.',\n    should_create_order: false,\n    should_write_demand: true\n  };\n}\n\n// --- DECISION ENGINE ---\nlet finalIntent = ai.intent_type || 'question';\nlet finalConfidence = ai.confidence || 0.5;\nlet shouldCreateOrder = false;\nlet shouldWriteDemand = true;\nlet status = 'new_demand';\n\n// Rule 1: buy_complete needs size and high confidence\nif (finalIntent === 'buy_complete') {\n  const hasSize = (ai.size || ctx.pre_parse.size || '') !== '';\n  if (finalConfidence >= 0.8 && hasSize) {\n    shouldCreateOrder = true;\n    status = 'order_created';\n    if (!ai.quantity || ai.quantity === 0) ai.quantity = 1; // safe default\n  } else if (finalConfidence >= 0.6) {\n    finalIntent = 'buy_incomplete';\n    status = 'clarification_requested';\n    if (!hasSize) ai.missing_fields = [...(ai.missing_fields || []), 'size'];\n    ai.suggested_reply = ai.suggested_reply || 'Подскажите, какой размер вам нужен? Доступны: XS, S, M, L, XL, XXL.';\n  } else {\n    finalIntent = 'buy_incomplete';\n    status = 'clarification_requested';\n  }\n}\n\n// Rule 2: buy_incomplete\nif (finalIntent === 'buy_incomplete') {\n  status = 'clarification_requested';\n  shouldCreateOrder = false;\n  if (!ai.suggested_reply || ai.suggested_reply.length < 10) {\n    const missing = (ai.missing_fields || []).join(', ') || 'детали заказа';\n    ai.suggested_reply = `Здравствуйте! Уточните, пожалуйста: ${missing}. Напишите нам в ЛС для оформления.`;\n  }\n}\n\n// Rule 3: question\nif (finalIntent === 'question') {\n  status = 'new_demand';\n  shouldCreateOrder = false;\n  if (!ai.suggested_reply || ai.suggested_reply.length < 10) {\n    ai.suggested_reply = 'Здравствуйте! Спасибо за вопрос. Напишите нам в ЛС группы — подробно проконсультируем!';\n  }\n}\n\n// Rule 4: clarification\nif (finalIntent === 'clarification') {\n  status = 'clarification_requested';\n  shouldCreateOrder = false;\n}\n\n// Rule 5: ignore — only if high confidence\nif (finalIntent === 'ignore') {\n  if (finalConfidence < 0.7) {\n    finalIntent = 'question';\n    status = 'new_demand';\n    ai.suggested_reply = 'Спасибо за комментарий! Если у вас есть вопросы — напишите нам в ЛС.';\n  } else {\n    status = 'ignored';\n    shouldWriteDemand = true; // still log\n  }\n}\n\n// Rule 6: Low confidence fallback\nif (finalConfidence < 0.5 && finalIntent !== 'ignore') {\n  shouldCreateOrder = false;\n  if (!ai.suggested_reply || ai.suggested_reply.length < 10) {\n    ai.suggested_reply = 'Спасибо за комментарий! Напишите нам в ЛС группы, ответим в ближайшее время.';\n  }\n}\n\nconst finalSize = ai.size || ctx.pre_parse.size || '';\nconst finalQty = ai.quantity || ctx.pre_parse.quantity || (shouldCreateOrder ? 1 : 0);\n\nreturn [{\n  json: {\n    // Original context\n    comment_id: ctx.comment_id,\n    post_id: ctx.post_id,\n    from_id: ctx.from_id,\n    owner_id: ctx.owner_id,\n    text: ctx.text,\n    date: ctx.date,\n    dedup_key: ctx.dedup_key,\n    post_text: ctx.post_text,\n    post_url: ctx.post_url,\n    user_name: ctx.user_name,\n    // AI classification\n    intent_type: finalIntent,\n    confidence: finalConfidence,\n    product_name: ai.product_name || '',\n    size: finalSize,\n    quantity: finalQty,\n    color: ai.color || '',\n    customer_question: ai.customer_question || '',\n    missing_fields: ai.missing_fields || [],\n    suggested_reply: ai.suggested_reply || '',\n    // Decision\n    should_create_order: shouldCreateOrder,\n    should_write_demand: shouldWriteDemand,\n    status: status\n  }\n}];"
+      },
+      "id": "decision-engine",
+      "name": "Decision: Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 650]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Спрос"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID_записи": "={{ $json.dedup_key }}",
+            "created_at": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "ID_поста_VK": "={{ $json.post_id }}",
+            "VK_ID_клиента": "={{ $json.from_id }}",
+            "Имя_клиента": "={{ $json.user_name }}",
+            "Текст_комментария": "={{ $json.text }}",
+            "intent_type": "={{ $json.intent_type }}",
+            "confidence": "={{ $json.confidence }}",
+            "product_name": "={{ $json.product_name }}",
+            "Размер": "={{ $json.size }}",
+            "Количество": "={{ $json.quantity }}",
+            "color": "={{ $json.color }}",
+            "Статус": "={{ $json.status }}",
+            "bluesales_order_id": "",
+            "reply_text": "={{ $json.suggested_reply }}",
+            "post_url": "={{ $json.post_url }}",
+            "Источник": "vk_comment"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "ID_записи", "displayName": "ID_записи", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "created_at", "displayName": "created_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "ID_поста_VK", "displayName": "ID_поста_VK", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "VK_ID_клиента", "displayName": "VK_ID_клиента", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "Имя_клиента", "displayName": "Имя_клиента", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Текст_комментария", "displayName": "Текст_комментария", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "intent_type", "displayName": "intent_type", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "confidence", "displayName": "confidence", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "product_name", "displayName": "product_name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Размер", "displayName": "Размер", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Количество", "displayName": "Количество", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": false},
+            {"id": "color", "displayName": "color", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "bluesales_order_id", "displayName": "bluesales_order_id", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "reply_text", "displayName": "reply_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "post_url", "displayName": "post_url", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Источник", "displayName": "Источник", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "sheets-demand",
+      "name": "Sheets: Write Спрос",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2220, 650],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $('Decision: Engine').item.json.intent_type }}",
+        "rules": {
+          "rules": [
+            { "value2": "buy_complete" },
+            { "value2": "buy_incomplete" },
+            { "value2": "question" },
+            { "value2": "clarification" },
+            { "value2": "ignore" }
+          ]
+        }
+      },
+      "id": "switch-intent",
+      "name": "Switch: Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [2440, 650]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://bluesales.ru/app/Customers/WebServer.aspx?login=__BLUESALES_LOGIN__&password=__BLUESALES_PASSWORD_HASH__&command=customers.add",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"vkId\": \"{{ $('Decision: Engine').item.json.from_id }}\",\n  \"firstName\": \"{{ $('Decision: Engine').item.json.user_name }}\",\n  \"source\": \"VK комментарий\",\n  \"tags\": [{ \"name\": \"AI-заказ\" }],\n  \"comment\": \"Авто: {{ $('Decision: Engine').item.json.product_name }} {{ $('Decision: Engine').item.json.size }} x{{ $('Decision: Engine').item.json.quantity }} | Пост: {{ $('Decision: Engine').item.json.post_id }} | Комментарий: {{ $('Decision: Engine').item.json.text.substring(0, 100) }}\"\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "bs-add-customer",
+      "name": "BlueSales: Add Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2680, 350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.vk.com/method/wall.createComment?owner_id={{ $('Decision: Engine').item.json.owner_id }}&post_id={{ $('Decision: Engine').item.json.post_id }}&reply_to_comment={{ $('Decision: Engine').item.json.comment_id }}&message={{ encodeURIComponent($('Decision: Engine').item.json.suggested_reply) }}&access_token=__VK_USER_TOKEN__&v=5.199",
+        "options": { "timeout": 15000 }
+      },
+      "id": "vk-reply-buy",
+      "name": "VK: Reply Order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2920, 350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"✅ <b>Заказ создан</b>\\n\\n📝 Пост: {{ $('Decision: Engine').item.json.post_url }}\\n👤 {{ $('Decision: Engine').item.json.user_name }} (VK ID {{ $('Decision: Engine').item.json.from_id }})\\n🛒 {{ $('Decision: Engine').item.json.product_name || 'Товар' }} | {{ $('Decision: Engine').item.json.size }} | x{{ $('Decision: Engine').item.json.quantity }}\\n🤖 AI: {{ $('Decision: Engine').item.json.intent_type }} ({{ $('Decision: Engine').item.json.confidence }})\\n💬 {{ $('Decision: Engine').item.json.suggested_reply.substring(0, 150) }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
+      },
+      "id": "tg-order",
+      "name": "TG: Order Created",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3140, 350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.vk.com/method/wall.createComment?owner_id={{ $('Decision: Engine').item.json.owner_id }}&post_id={{ $('Decision: Engine').item.json.post_id }}&reply_to_comment={{ $('Decision: Engine').item.json.comment_id }}&message={{ encodeURIComponent($('Decision: Engine').item.json.suggested_reply) }}&access_token=__VK_USER_TOKEN__&v=5.199",
+        "options": { "timeout": 15000 }
+      },
+      "id": "vk-reply-clarify",
+      "name": "VK: Reply Clarify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2680, 550],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"❓ <b>Уточнение</b>\\n\\n📝 {{ $('Decision: Engine').item.json.post_url }}\\n👤 {{ $('Decision: Engine').item.json.user_name }}\\n💬 {{ $('Decision: Engine').item.json.text.substring(0, 100) }}\\n🤖 {{ $('Decision: Engine').item.json.intent_type }} ({{ $('Decision: Engine').item.json.confidence }})\\n📋 Не хватает: {{ ($('Decision: Engine').item.json.missing_fields || []).join(', ') || '-' }}\\n💬 {{ $('Decision: Engine').item.json.suggested_reply.substring(0, 150) }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
+      },
+      "id": "tg-clarify",
+      "name": "TG: Clarification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2920, 550],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.vk.com/method/wall.createComment?owner_id={{ $('Decision: Engine').item.json.owner_id }}&post_id={{ $('Decision: Engine').item.json.post_id }}&reply_to_comment={{ $('Decision: Engine').item.json.comment_id }}&message={{ encodeURIComponent($('Decision: Engine').item.json.suggested_reply) }}&access_token=__VK_USER_TOKEN__&v=5.199",
+        "options": { "timeout": 15000 }
+      },
+      "id": "vk-reply-question",
+      "name": "VK: Reply Question",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2680, 750],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"💡 <b>Консультация</b>\\n\\n📝 {{ $('Decision: Engine').item.json.post_url }}\\n👤 {{ $('Decision: Engine').item.json.user_name }}\\n💬 {{ $('Decision: Engine').item.json.text.substring(0, 100) }}\\n🤖 {{ $('Decision: Engine').item.json.intent_type }} ({{ $('Decision: Engine').item.json.confidence }})\\n💬 {{ $('Decision: Engine').item.json.suggested_reply.substring(0, 150) }}\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
+      },
+      "id": "tg-question",
+      "name": "TG: Question",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2920, 750],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.vk.com/method/wall.createComment?owner_id={{ $('Decision: Engine').item.json.owner_id }}&post_id={{ $('Decision: Engine').item.json.post_id }}&reply_to_comment={{ $('Decision: Engine').item.json.comment_id }}&message={{ encodeURIComponent($('Decision: Engine').item.json.suggested_reply) }}&access_token=__VK_USER_TOKEN__&v=5.199",
+        "options": { "timeout": 15000 }
+      },
+      "id": "vk-reply-followup",
+      "name": "VK: Reply Follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2680, 950],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot__TG_BOT_TOKEN__/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"__TG_CHAT_ID__\",\n  \"text\": \"🔕 <b>Игнор</b>\\n\\n👤 {{ $('Decision: Engine').item.json.user_name }}\\n💬 {{ $('Decision: Engine').item.json.text.substring(0, 80) }}\\n🤖 ignore ({{ $('Decision: Engine').item.json.confidence }})\\n\\n⏰ {{ $now.format('dd.MM.yyyy HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {}
+      },
+      "id": "tg-ignore",
+      "name": "TG: Ignored",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2680, 1100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Логи_N8N"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $now.format('yyyy-MM-dd HH:mm:ss') }}",
+            "Workflow": "VK_Comment_Processor",
+            "Тип": "={{ $('Decision: Engine').item.json.intent_type }}",
+            "Событие": "AI обработка комментария",
+            "Детали": "={{ JSON.stringify({ from_id: $('Decision: Engine').item.json.from_id, post_id: $('Decision: Engine').item.json.post_id, intent: $('Decision: Engine').item.json.intent_type, confidence: $('Decision: Engine').item.json.confidence, reply: $('Decision: Engine').item.json.suggested_reply.substring(0, 200) }) }}",
+            "Статус": "success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Workflow", "displayName": "Workflow", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Тип", "displayName": "Тип", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Событие", "displayName": "Событие", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Детали", "displayName": "Детали", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false},
+            {"id": "Статус", "displayName": "Статус", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false}
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-result",
+      "name": "Log: Result",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3360, 650],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook: VK Comment": {
+      "main": [[ { "node": "Flatten: Body", "type": "main", "index": 0 } ]]
+    },
+    "Flatten: Body": {
+      "main": [[ { "node": "Validate: Input", "type": "main", "index": 0 } ]]
+    },
+    "Validate: Input": {
+      "main": [[ { "node": "IF: Should Skip?", "type": "main", "index": 0 } ]]
+    },
+    "IF: Should Skip?": {
+      "main": [
+        [],
+        [{ "node": "Dedup: Check Спрос", "type": "main", "index": 0 }]
+      ]
+    },
+    "Dedup: Check Спрос": {
+      "main": [[ { "node": "Dedup: Result", "type": "main", "index": 0 } ]]
+    },
+    "Dedup: Result": {
+      "main": [[ { "node": "IF: Duplicate?", "type": "main", "index": 0 } ]]
+    },
+    "IF: Duplicate?": {
+      "main": [
+        [],
+        [
+          { "node": "Context: Fetch Post", "type": "main", "index": 0 },
+          { "node": "Context: Fetch User", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Context: Fetch Post": {
+      "main": [[ { "node": "Build: Context", "type": "main", "index": 0 } ]]
+    },
+    "Context: Fetch User": {
+      "main": [[ ]]
+    },
+    "Build: Context": {
+      "main": [[ { "node": "AI: Classify", "type": "main", "index": 0 } ]]
+    },
+    "AI: Classify": {
+      "main": [[ { "node": "Decision: Engine", "type": "main", "index": 0 } ]]
+    },
+    "Decision: Engine": {
+      "main": [[ { "node": "Sheets: Write Спрос", "type": "main", "index": 0 } ]]
+    },
+    "Sheets: Write Спрос": {
+      "main": [[ { "node": "Switch: Intent", "type": "main", "index": 0 } ]]
+    },
+    "Switch: Intent": {
+      "main": [
+        [{ "node": "BlueSales: Add Customer", "type": "main", "index": 0 }],
+        [{ "node": "VK: Reply Clarify", "type": "main", "index": 0 }],
+        [{ "node": "VK: Reply Question", "type": "main", "index": 0 }],
+        [{ "node": "VK: Reply Follow-up", "type": "main", "index": 0 }],
+        [{ "node": "TG: Ignored", "type": "main", "index": 0 }]
+      ]
+    },
+    "BlueSales: Add Customer": {
+      "main": [[ { "node": "VK: Reply Order", "type": "main", "index": 0 } ]]
+    },
+    "VK: Reply Order": {
+      "main": [[ { "node": "TG: Order Created", "type": "main", "index": 0 } ]]
+    },
+    "TG: Order Created": {
+      "main": [[ { "node": "Log: Result", "type": "main", "index": 0 } ]]
+    },
+    "VK: Reply Clarify": {
+      "main": [[ { "node": "TG: Clarification", "type": "main", "index": 0 } ]]
+    },
+    "TG: Clarification": {
+      "main": [[ { "node": "Log: Result", "type": "main", "index": 0 } ]]
+    },
+    "VK: Reply Question": {
+      "main": [[ { "node": "TG: Question", "type": "main", "index": 0 } ]]
+    },
+    "TG: Question": {
+      "main": [[ { "node": "Log: Result", "type": "main", "index": 0 } ]]
+    },
+    "VK: Reply Follow-up": {
+      "main": [[ { "node": "TG: Clarification", "type": "main", "index": 0 } ]]
+    },
+    "TG: Ignored": {
+      "main": [[ { "node": "Log: Result", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
