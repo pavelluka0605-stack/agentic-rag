@@ -22,8 +22,47 @@ jobs:
           add() { MSG="${MSG}${1}
           "; }
 
-          # 1. Send test event
-          add "=== STEP 1: Send test photo_comment_new ==="
+          # 1. Get current P0-03 from N8N API to verify switch rules
+          add "=== STEP 1: Check P0-03 switch rules in N8N ==="
+          # Find P0-03 workflow ID
+          WF_LIST=$(curl -s --max-time 10 \
+            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_BASE_URL}/api/v1/workflows?limit=100" 2>&1)
+          P03_ID=$(echo "$WF_LIST" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          for w in d.get('data',[]):
+              if 'P0-03' in w.get('name',''):
+                  print(w['id'])
+                  break
+          " 2>/dev/null)
+          add "P0-03 workflow ID: ${P03_ID}"
+
+          if [ -n "$P03_ID" ]; then
+            WF_DETAIL=$(curl -s --max-time 10 \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              "${N8N_BASE_URL}/api/v1/workflows/${P03_ID}" 2>&1)
+            SWITCH_INFO=$(echo "$WF_DETAIL" | python3 -c "
+          import sys,json
+          wf = json.load(sys.stdin)
+          for node in wf.get('nodes',[]):
+              if 'switch' in node.get('name','').lower() or 'switch' in node.get('type','').lower():
+                  rules = node.get('parameters',{}).get('rules',{}).get('rules',[])
+                  print(f'Switch rules ({len(rules)}):')
+                  for i,r in enumerate(rules):
+                      print(f'  [{i}] {r.get(\"value2\",\"?\")}')
+          conns = wf.get('connections',{}).get('Switch: Event Type',{}).get('main',[])
+          print(f'Switch outputs ({len(conns)}):')
+          for i,c in enumerate(conns):
+              targets = [x.get('node','?') for x in c] if c else ['(empty)']
+              print(f'  [{i}] -> {\", \".join(targets)}')
+          " 2>/dev/null || echo "  Parse error")
+            add "$SWITCH_INFO"
+          fi
+
+          # 2. Send test event
+          add ""
+          add "=== STEP 2: Send test photo_comment_new ==="
           TIMESTAMP=$(date +%s)
           HTTP_CODE=$(curl -s -o /tmp/webhook_resp.txt -w "%{http_code}" --max-time 15 \
             -X POST "${N8N_BASE_URL}/webhook/vk-events" \
@@ -37,84 +76,45 @@ jobs:
                 \"id\": ${TIMESTAMP},
                 \"from_id\": 123456789,
                 \"post_id\": 99999,
-                \"text\": \"TEST M 2 - autotest pipeline\",
+                \"text\": \"TEST M 2 - autotest\",
                 \"date\": ${TIMESTAMP},
                 \"owner_id\": -137949809
               }
             }")
           RESP=$(cat /tmp/webhook_resp.txt 2>/dev/null)
-          add "Webhook response: HTTP ${HTTP_CODE} — ${RESP}"
+          add "HTTP ${HTTP_CODE}: ${RESP}"
 
-          # 2. Wait for processing
-          add ""
-          add "=== STEP 2: Wait 15s for N8N processing ==="
-          sleep 15
+          sleep 10
 
-          # 3. Check latest execution detail
+          # 3. Check execution
           add ""
-          add "=== STEP 3: Latest execution detail ==="
-          # Get latest execution ID
+          add "=== STEP 3: Latest execution ==="
           LATEST=$(curl -s --max-time 10 \
             -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/executions?limit=3" 2>&1)
-
-          EXEC_IDS=$(echo "$LATEST" | python3 -c "
+            "${N8N_BASE_URL}/api/v1/executions?limit=1" 2>&1)
+          EXEC_ID=$(echo "$LATEST" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+          DETAIL=$(curl -s --max-time 10 \
+            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+            "${N8N_BASE_URL}/api/v1/executions/${EXEC_ID}?includeData=true" 2>&1)
+          NODES_RAN=$(echo "$DETAIL" | python3 -c "
           import sys,json
-          d = json.load(sys.stdin)
-          for e in d.get('data',[])[:3]:
-              print(e['id'])
-          " 2>/dev/null)
-
-          for EXEC_ID in $EXEC_IDS; do
-            add "--- Execution $EXEC_ID ---"
-            DETAIL=$(curl -s --max-time 10 \
-              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              "${N8N_BASE_URL}/api/v1/executions/${EXEC_ID}?includeData=true" 2>&1)
-
-            DETAIL_INFO=$(echo "$DETAIL" | python3 -c "
-          import sys,json
-          try:
-              e = json.load(sys.stdin)
-              wf = e.get('workflowData',{}).get('name','?')
-              status = e.get('status','?')
-              print(f'Workflow: {wf} | Status: {status}')
-              rd = e.get('data',{}).get('resultData',{})
-              run_data = rd.get('runData',{})
-              for node_name, runs in run_data.items():
-                  for r in runs:
-                      s = r.get('executionStatus','?')
-                      err = ''
-                      if r.get('error'):
-                          em = r['error']
-                          err = ' ERR: ' + (em.get('message','') if isinstance(em,dict) else str(em))[:120]
-                      # Show output data summary for key nodes
-                      out = ''
-                      data = r.get('data',{}).get('main',[[]])
-                      if data and data[0]:
-                          items = data[0]
-                          out = f' items={len(items)}'
-                          if items and isinstance(items[0], dict):
-                              j = items[0].get('json',{})
-                              keys = list(j.keys())[:5]
-                              out += f' keys={keys}'
-                      print(f'  [{s}] {node_name}{out}{err}')
-          except Exception as ex:
-              print(f'Parse error: {ex}')
-          " 2>/dev/null || echo "  API/parse error")
-            add "$DETAIL_INFO"
-          done
-
-          # 4. LP health
-          add ""
-          add "=== STEP 4: LP Health ==="
-          mkdir -p ~/.ssh
-          echo "$VPS_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${VPS_PORT} ${VPS_HOST} >> ~/.ssh/known_hosts 2>/dev/null
-          LP_INFO=$(ssh -i ~/.ssh/deploy_key -p ${VPS_PORT} ${VPS_USER}@${VPS_HOST} \
-            "curl -s http://127.0.0.1:3100/health 2>/dev/null" 2>&1)
-          add "$LP_INFO"
-          rm -f ~/.ssh/deploy_key
+          e = json.load(sys.stdin)
+          print(f'Status: {e.get(\"status\")}')
+          rd = e.get('data',{}).get('resultData',{})
+          for node_name, runs in rd.get('runData',{}).items():
+              for r in runs:
+                  s = r.get('executionStatus','?')
+                  err = ''
+                  if r.get('error'):
+                      em = r['error']
+                      err = ' ERR: ' + (em.get('message','') if isinstance(em,dict) else str(em))[:120]
+                  out_count = 0
+                  data = r.get('data',{}).get('main',[[]])
+                  if data and data[0]:
+                      out_count = len(data[0])
+                  print(f'  [{s}] {node_name} (out={out_count}){err}')
+          " 2>/dev/null || echo "  Parse error")
+          add "$NODES_RAN"
 
           # Output
           ONELINE=$(echo "$MSG" | tr '\n' ' | ' | head -c 4000)
