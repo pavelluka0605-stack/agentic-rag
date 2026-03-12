@@ -159,8 +159,13 @@ jobs:
           add ""
           add "Run: $RUN_URL"
 
-          # Send to Telegram
+          # Print to stdout (visible in GitHub Actions logs)
           FINAL=$(printf "$MSG")
+          echo "========== DIAGNOSTICS OUTPUT =========="
+          echo "$FINAL"
+          echo "========== END DIAGNOSTICS =========="
+
+          # Send to Telegram
           send_tg "$FINAL"
 
           REMOTE
