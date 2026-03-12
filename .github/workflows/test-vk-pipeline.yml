@@ -9,42 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Send test photo_comment_new event
-        env:
-          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
-        run: |
-          echo "=== Sending test photo_comment_new event ==="
-          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" --max-time 15 \
-            -X POST "${N8N_BASE_URL}/webhook/vk-events" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "type": "photo_comment_new",
-              "group_id": 137949809,
-              "event_id": "test-event-'$(date +%s)'",
-              "received_at": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'",
-              "comment": {
-                "id": 99999,
-                "from_id": 123456789,
-                "post_id": 99999,
-                "text": "TEST M 2 - автотест пайплайна",
-                "date": '$(date +%s)',
-                "owner_id": -137949809
-              }
-            }')
-          echo "$RESPONSE"
-          HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
-          echo ""
-          echo "HTTP Status: $HTTP_CODE"
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Webhook accepted the event"
-          else
-            echo "❌ Webhook returned $HTTP_CODE"
-          fi
-
-      - name: Wait for N8N processing
-        run: sleep 10
-
-      - name: Check LP health & N8N executions
+      - name: Run full test
         env:
           N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
           N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
@@ -53,31 +18,80 @@ jobs:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          # Check recent N8N executions for P0-03
-          echo "=== Recent N8N executions ==="
+          MSG=""
+          add() { MSG="${MSG}${1}
+          "; }
+
+          # 1. Send test event
+          add "=== STEP 1: Send test photo_comment_new ==="
+          TIMESTAMP=$(date +%s)
+          HTTP_CODE=$(curl -s -o /tmp/webhook_resp.txt -w "%{http_code}" --max-time 15 \
+            -X POST "${N8N_BASE_URL}/webhook/vk-events" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"type\": \"photo_comment_new\",
+              \"group_id\": 137949809,
+              \"event_id\": \"test-${TIMESTAMP}\",
+              \"received_at\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\",
+              \"comment\": {
+                \"id\": ${TIMESTAMP},
+                \"from_id\": 123456789,
+                \"post_id\": 99999,
+                \"text\": \"TEST M 2 - autotest pipeline\",
+                \"date\": ${TIMESTAMP},
+                \"owner_id\": -137949809
+              }
+            }")
+          RESP=$(cat /tmp/webhook_resp.txt 2>/dev/null)
+          add "Webhook response: HTTP ${HTTP_CODE} — ${RESP}"
+
+          # 2. Wait for processing
+          add ""
+          add "=== STEP 2: Wait 10s for N8N processing ==="
+          sleep 10
+
+          # 3. Check N8N executions
+          add ""
+          add "=== STEP 3: Recent N8N executions ==="
           EXECS=$(curl -s --max-time 10 \
             -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
             "${N8N_BASE_URL}/api/v1/executions?limit=5" 2>&1)
-          echo "$EXECS" | python3 -c "
+          EXEC_INFO=$(echo "$EXECS" | python3 -c "
           import sys,json
           try:
               d = json.load(sys.stdin)
               for e in d.get('data', []):
                   wf = e.get('workflowData', {}).get('name', '?')
                   status = e.get('status', '?')
+                  err = ''
+                  if status == 'error':
+                      err = ' ERR: ' + str(e.get('data',{}).get('resultData',{}).get('error',{}).get('message','?'))[:100]
                   finished = e.get('stoppedAt', '?')
-                  print(f'  {wf}: {status} (finished: {finished})')
-          except:
-              print('  Parse error')
-          " 2>/dev/null || echo "  API error"
+                  print(f'  {wf}: {status} ({finished}){err}')
+          except Exception as ex:
+              print(f'  Parse error: {ex}')
+          " 2>/dev/null || echo "  API error")
+          add "$EXEC_INFO"
 
-          # Check VPS LP health
-          echo ""
-          echo "=== LP Health ==="
+          # 4. Check LP health via SSH
+          add ""
+          add "=== STEP 4: LP Health ==="
           mkdir -p ~/.ssh
           echo "$VPS_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${VPS_PORT} ${VPS_HOST} >> ~/.ssh/known_hosts 2>/dev/null
-          ssh -i ~/.ssh/deploy_key -p ${VPS_PORT} ${VPS_USER}@${VPS_HOST} \
-            "curl -s http://127.0.0.1:3100/health 2>/dev/null && echo '' && echo '--- Last 3 LP log ---' && journalctl -u vk-longpoll -n 3 --no-pager -o short-iso 2>&1"
+          LP_INFO=$(ssh -i ~/.ssh/deploy_key -p ${VPS_PORT} ${VPS_USER}@${VPS_HOST} \
+            "curl -s http://127.0.0.1:3100/health 2>/dev/null" 2>&1)
+          add "$LP_INFO"
           rm -f ~/.ssh/deploy_key
+
+          # Output as annotation
+          ONELINE=$(echo "$MSG" | tr '\n' ' | ' | head -c 3000)
+          echo "::notice title=TestResult::${ONELINE}"
+
+          # Summary
+          {
+            echo '```'
+            echo "$MSG"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
