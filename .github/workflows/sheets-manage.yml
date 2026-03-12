@@ -13,6 +13,7 @@ on:
           - delete-sheet-by-id
           - add-sheet
           - setup-svodka-formulas
+          - update-spros-headers
       sheet_name:
         description: 'Sheet name (for delete/add actions)'
         required: false
@@ -167,4 +168,37 @@ jobs:
               formula_resp.raise_for_status()
               print("  Formulas set for rows 2-50")
               print("Setup complete!")
+
+          elif ACTION == "update-spros-headers":
+              print("\nUpdating headers in Спрос sheet for P0-08...")
+              if "Спрос" not in sheets:
+                  print("ERROR: Sheet 'Спрос' not found")
+                  exit(1)
+
+              new_headers = [
+                  "ID_записи", "created_at", "ID_поста_VK", "VK_ID_клиента",
+                  "Имя_клиента", "Текст_комментария", "intent_type", "confidence",
+                  "product_name", "Размер", "Количество", "color", "Статус",
+                  "bluesales_order_id", "reply_text", "post_url", "Источник"
+              ]
+
+              # Read existing headers
+              existing = requests.get(
+                  f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}/values/Спрос!1:1",
+                  headers=headers
+              )
+              existing.raise_for_status()
+              old_headers = existing.json().get("values", [[]])[0] if existing.json().get("values") else []
+              print(f"  Old headers ({len(old_headers)}): {old_headers}")
+
+              # Write new headers
+              resp = requests.put(
+                  f"https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}/values/Спрос!A1:Q1",
+                  headers={**headers, "Content-Type": "application/json"},
+                  params={"valueInputOption": "RAW"},
+                  json={"values": [new_headers]}
+              )
+              resp.raise_for_status()
+              print(f"  New headers ({len(new_headers)}): {new_headers}")
+              print("Headers updated successfully!")
           PYEOF
