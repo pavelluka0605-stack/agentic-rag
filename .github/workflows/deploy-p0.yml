@@ -427,6 +427,8 @@ jobs:
           N8N_WEBHOOK_URL=${N8N_WH_BASE}/webhook/vk-events
           CALLBACK_PORT=3102
           ENVEOF
+          # Удалить лишние пробелы от heredoc indent
+          sed -i 's/^          //' /opt/vk-callback/.env
 
           # Systemd unit
           cat > /etc/systemd/system/vk-callback.service << 'UNIT'
@@ -468,38 +470,120 @@ jobs:
 
             if [ -n "$N8N_CONF" ]; then
               echo "Found nginx config: $N8N_CONF"
-              # Проверяем, нет ли уже /vk-callback
-              if grep -q 'location /vk-callback' "$N8N_CONF"; then
-                echo "  /vk-callback location already exists — skipping"
-              else
-                echo "  Adding /vk-callback location..."
-                # Вставляем location блок перед последней закрывающей скобкой server {}
-                # Используем sed: находим последнюю } и вставляем перед ней
-                sed -i '/^}/i\
-    # VK Callback API proxy -> :3102\
-    location /vk-callback {\
-        proxy_pass http://127.0.0.1:3102/callback;\
-        proxy_set_header Host $host;\
-        proxy_set_header X-Real-IP $remote_addr;\
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
-        proxy_set_header X-Forwarded-Proto $scheme;\
-        proxy_read_timeout 10s;\
-    }' "$N8N_CONF"
+              echo "  Current config:"
+              cat "$N8N_CONF"
+              echo "  ---"
 
-                # Проверяем конфиг
-                if nginx -t 2>&1; then
-                  systemctl reload nginx
-                  echo "  ✓ Nginx reloaded with /vk-callback proxy"
-                else
-                  echo "  ✗ Nginx config test failed — reverting"
-                  sed -i '/# VK Callback API proxy/,/^    }/d' "$N8N_CONF"
-                fi
+              # Удалить старую (возможно неправильную) вставку, если есть
+              if grep -q 'location /vk-callback' "$N8N_CONF"; then
+                echo "  Removing old /vk-callback location for clean re-insert..."
+                sed -i '/# VK Callback API proxy/,/proxy_read_timeout.*10s;/{/proxy_read_timeout.*10s;/{N;d;};d;}' "$N8N_CONF"
+                # Удалить также саму location строку если осталась
+                sed -i '/location \/vk-callback/,/^[[:space:]]*}/d' "$N8N_CONF"
+              fi
+
+              echo "  Adding /vk-callback location..."
+              # Бэкап конфига
+              cp "$N8N_CONF" "${N8N_CONF}.bak"
+
+              # Используем Python для точной вставки в SSL server-блок
+              python3 << PYEOF
+import re
+
+with open("$N8N_CONF", "r") as f:
+    content = f.read()
+
+LOCATION_BLOCK = """
+    # VK Callback API proxy -> :3102
+    location /vk-callback {
+        proxy_pass http://127.0.0.1:3102/callback;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 10s;
+    }
+"""
+
+# Стратегия: найти SSL server-блок (listen 443 ssl) и вставить location перед
+# последним } этого блока. Ищем "location /" внутри SSL блока и вставляем ДО него.
+# Если location / есть — вставляем перед ним (nginx выберет более длинный prefix).
+# Если нет — вставляем перед последним } в файле.
+
+# Простой подход: вставляем перед первым "location /" ПОСЛЕ "listen 443"
+lines = content.split('\n')
+ssl_found = False
+insert_idx = None
+last_brace = None
+
+for i, line in enumerate(lines):
+    stripped = line.strip()
+    if '443' in stripped and 'listen' in stripped:
+        ssl_found = True
+    if ssl_found and stripped.startswith('location /') and not stripped.startswith('location /vk'):
+        insert_idx = i
+        break
+    if stripped == '}':
+        last_brace = i
+
+# Вставляем перед location / в SSL блоке, или перед последним }
+target = insert_idx if insert_idx else last_brace
+if target:
+    lines.insert(target, LOCATION_BLOCK)
+    with open("$N8N_CONF", "w") as f:
+        f.write('\n'.join(lines))
+    print(f"  Inserted at line {target}")
+else:
+    print("  ERROR: Could not find insertion point")
+PYEOF
+
+              # Показать результат
+              echo "  Config after insertion:"
+              cat "$N8N_CONF"
+              echo "  ---"
+
+              # Проверяем конфиг
+              if nginx -t 2>&1; then
+                systemctl reload nginx
+                echo "  ✓ Nginx reloaded with /vk-callback proxy"
+              else
+                echo "  ✗ Nginx config test failed — reverting from backup"
+                cp "${N8N_CONF}.bak" "$N8N_CONF"
+                nginx -t 2>&1 && systemctl reload nginx
               fi
             else
               echo "⚠ Nginx config for marbomebel.ru not found — manual setup needed"
             fi
           else
             echo "⚠ Nginx not installed — manual proxy setup needed"
+          fi
+
+          # ─── Тест endpoint напрямую ───
+          echo ""
+          echo "=== Testing VK Callback endpoint ==="
+          # Тест через localhost (прямой)
+          DIRECT=$(curl -s --max-time 5 -X POST http://127.0.0.1:3102/callback \
+            -H "Content-Type: application/json" \
+            -d "{\"type\":\"confirmation\",\"group_id\":${VK_GROUP_ID}}" 2>&1)
+          echo "  Direct :3102 response: '$DIRECT'"
+
+          # Тест через nginx (localhost)
+          NGINX_LOCAL=$(curl -s --max-time 5 -X POST http://127.0.0.1/vk-callback \
+            -H "Content-Type: application/json" \
+            -H "Host: n8n.marbomebel.ru" \
+            -d "{\"type\":\"confirmation\",\"group_id\":${VK_GROUP_ID}}" 2>&1)
+          echo "  Nginx localhost response: '$NGINX_LOCAL'"
+
+          # Тест через HTTPS (полный путь)
+          NGINX_SSL=$(curl -s --max-time 5 -X POST https://n8n.marbomebel.ru/vk-callback \
+            -H "Content-Type: application/json" \
+            -d "{\"type\":\"confirmation\",\"group_id\":${VK_GROUP_ID}}" 2>&1)
+          echo "  HTTPS response: '$NGINX_SSL'"
+
+          if [ "$DIRECT" = "${VK_CONFIRMATION_TOKEN}" ]; then
+            echo "  ✓ Confirmation token correct"
+          else
+            echo "  ✗ Expected '${VK_CONFIRMATION_TOKEN}', got '$DIRECT'"
           fi
           REMOTE_SCRIPT
 
