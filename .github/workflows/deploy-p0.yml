@@ -297,11 +297,13 @@ jobs:
 
           # .env для listener (берём из основного)
           source /opt/p0-foundation/.env
+          # Use external N8N URL for webhook (N8N registers webhooks on external URL only)
+          N8N_WH_BASE="${N8N_URL:-http://localhost:5678}"
           cat > /opt/vk-longpoll/.env << ENVEOF
           VK_TOKEN=${VK_TOKEN}
           VK_GROUP_ID=${VK_GROUP_ID}
           VK_API_VERSION=${VK_API_VERSION:-5.199}
-          N8N_WEBHOOK_URL=http://localhost:5678/webhook/vk-events
+          N8N_WEBHOOK_URL=${N8N_WH_BASE}/webhook/vk-events
           HEALTH_PORT=3100
           ENVEOF
 

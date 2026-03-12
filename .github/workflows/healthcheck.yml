@@ -118,9 +118,17 @@ jobs:
           N8N_LOG=$(journalctl -u n8n -n 5 --no-pager -o short-iso 2>&1 | tail -5)
           add "$N8N_LOG"
 
-          # 5c. LP .env
+          # 5c. Fix LP .env webhook URL if pointing to localhost
           LP_URL=$(grep N8N_WEBHOOK_URL /opt/vk-longpoll/.env 2>/dev/null || echo "NOT_FOUND")
           add "LP .env: $LP_URL"
+          if echo "$LP_URL" | grep -q "localhost" && [ -n "${N8N_BASE_URL:-}" ]; then
+            add "  Fixing LP webhook URL to ${N8N_BASE_URL}..."
+            sed -i "s|N8N_WEBHOOK_URL=.*|N8N_WEBHOOK_URL=${N8N_BASE_URL}/webhook/vk-events|" /opt/vk-longpoll/.env
+            systemctl restart vk-longpoll 2>/dev/null || true
+            sleep 2
+            NEW_LP_URL=$(grep N8N_WEBHOOK_URL /opt/vk-longpoll/.env 2>/dev/null)
+            add "  Updated: $NEW_LP_URL"
+          fi
 
           # 6. VK LP Settings
           source /opt/p0-foundation/.env 2>/dev/null
