@@ -457,6 +457,50 @@ jobs:
             echo "✗ VK Callback Receiver failed to start"
             journalctl -u vk-callback -n 10 --no-pager
           fi
+
+          # ─── Nginx: проксирование /vk-callback → :3102 ───
+          if command -v nginx &>/dev/null; then
+            # Найти конфиг n8n (marbomebel.ru)
+            N8N_CONF=$(grep -rl 'n8n.marbomebel.ru\|server_name.*marbomebel' /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | head -1)
+            if [ -z "$N8N_CONF" ]; then
+              N8N_CONF=$(grep -rl 'proxy_pass.*5678' /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null | head -1)
+            fi
+
+            if [ -n "$N8N_CONF" ]; then
+              echo "Found nginx config: $N8N_CONF"
+              # Проверяем, нет ли уже /vk-callback
+              if grep -q 'location /vk-callback' "$N8N_CONF"; then
+                echo "  /vk-callback location already exists — skipping"
+              else
+                echo "  Adding /vk-callback location..."
+                # Вставляем location блок перед последней закрывающей скобкой server {}
+                # Используем sed: находим последнюю } и вставляем перед ней
+                sed -i '/^}/i\
+    # VK Callback API proxy -> :3102\
+    location /vk-callback {\
+        proxy_pass http://127.0.0.1:3102/callback;\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header X-Forwarded-Proto $scheme;\
+        proxy_read_timeout 10s;\
+    }' "$N8N_CONF"
+
+                # Проверяем конфиг
+                if nginx -t 2>&1; then
+                  systemctl reload nginx
+                  echo "  ✓ Nginx reloaded with /vk-callback proxy"
+                else
+                  echo "  ✗ Nginx config test failed — reverting"
+                  sed -i '/# VK Callback API proxy/,/^    }/d' "$N8N_CONF"
+                fi
+              fi
+            else
+              echo "⚠ Nginx config for marbomebel.ru not found — manual setup needed"
+            fi
+          else
+            echo "⚠ Nginx not installed — manual proxy setup needed"
+          fi
           REMOTE_SCRIPT
 
       # ─── 8. Импорт N8N Workflows ──────────────
