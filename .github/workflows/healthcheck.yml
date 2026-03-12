@@ -77,60 +77,61 @@ jobs:
           " 2>/dev/null || echo "API_ERR")
           add "$WF_INFO"
 
-          # 4. Auto-activate inactive P0 workflows (especially P0-03 for webhook)
+          # 4. Force re-activate P0-03 (deactivate then activate to re-register webhook)
           add ""
-          ACTIVATED=$(echo "$WF_LIST" | python3 -c "
+          P03_ID=$(echo "$WF_LIST" | python3 -c "
           import sys,json
-          try:
-              data = json.load(sys.stdin).get('data', [])
-              inactive = [w for w in data if w.get('name','').startswith('P0-') and not w.get('active')]
-              for w in inactive:
-                  print(w['id'], w['name'])
-          except: pass
+          data = json.load(sys.stdin).get('data', [])
+          for w in data:
+              if 'P0-03' in w.get('name',''): print(w['id']); break
           " 2>/dev/null)
 
-          if [ -n "$ACTIVATED" ]; then
-            add "Activating inactive P0 workflows..."
-            echo "$ACTIVATED" | while read -r wf_id wf_name; do
-              resp=$(curl -s -X POST "${N8N_API_URL}/api/v1/workflows/${wf_id}/activate" \
-                -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-                -H "Content-Type: application/json" 2>&1)
-              if echo "$resp" | grep -q '"active":true'; then
-                add "  ✓ ${wf_name} activated"
-              else
-                # Fallback: PUT with active:true
-                wf_body=$(curl -s "${N8N_API_URL}/api/v1/workflows/${wf_id}" \
-                  -H "X-N8N-API-KEY: ${N8N_API_KEY}" 2>&1)
-                put_body=$(echo "$wf_body" | python3 -c "
-          import sys,json
-          wf=json.load(sys.stdin)
-          out={'name':wf['name'],'nodes':wf.get('nodes',[]),'connections':wf.get('connections',{}),'settings':wf.get('settings',{}),'active':True}
-          if 'staticData' in wf: out['staticData']=wf['staticData']
-          print(json.dumps(out))
-          " 2>/dev/null)
-                resp2=$(curl -s -X PUT "${N8N_API_URL}/api/v1/workflows/${wf_id}" \
-                  -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-                  -H "Content-Type: application/json" \
-                  -d "$put_body" 2>&1)
-                if echo "$resp2" | grep -q '"active":true'; then
-                  add "  ✓ ${wf_name} activated (PUT)"
-                else
-                  add "  ✗ ${wf_name}: $(echo "$resp2" | head -c 150)"
-                fi
-              fi
-            done
+          if [ -n "$P03_ID" ]; then
+            add "Re-activating P0-03 (id=$P03_ID)..."
+            # Deactivate first
+            curl -s -X POST "${N8N_API_URL}/api/v1/workflows/${P03_ID}/deactivate" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" > /dev/null 2>&1
+            sleep 2
+            # Activate
+            REACTIVATE=$(curl -s -X POST "${N8N_API_URL}/api/v1/workflows/${P03_ID}/activate" \
+              -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+              -H "Content-Type: application/json" 2>&1)
+            if echo "$REACTIVATE" | grep -q '"active":true'; then
+              add "  ✓ P0-03 re-activated"
+            else
+              add "  ✗ P0-03: $(echo "$REACTIVATE" | head -c 200)"
+            fi
           else
-            add "All P0 workflows active"
+            add "P0-03 not found!"
           fi
 
-          # 5. Webhook test (after activation)
+          # 5. Webhook test — both localhost and external
           add ""
-          WH=$(curl -s -w "HTTP:%{http_code}" --max-time 5 \
+          sleep 3
+          WH_LOCAL=$(curl -s -w "|HTTP:%{http_code}" --max-time 5 \
             -X POST http://localhost:5678/webhook/vk-events \
             -H "Content-Type: application/json" \
             -d "{\"type\":\"system\",\"event\":\"diag_test\"}" 2>&1)
-          WH_SHORT=$(echo "$WH" | head -c 200)
-          add "Webhook: $WH_SHORT"
+          WH_LOCAL_CODE=$(echo "$WH_LOCAL" | grep -o 'HTTP:[0-9]*')
+          add "Webhook localhost: $WH_LOCAL_CODE"
+
+          WH_EXT=$(curl -s -w "|HTTP:%{http_code}" --max-time 10 \
+            -X POST "${N8N_API_URL}/webhook/vk-events" \
+            -H "Content-Type: application/json" \
+            -d "{\"type\":\"system\",\"event\":\"diag_test\"}" 2>&1)
+          WH_EXT_CODE=$(echo "$WH_EXT" | grep -o 'HTTP:[0-9]*')
+          WH_EXT_BODY=$(echo "$WH_EXT" | head -c 150)
+          add "Webhook external: $WH_EXT_CODE ($WH_EXT_BODY)"
+
+          # 5b. N8N journal for errors
+          add ""
+          add "--- N8N Journal ---"
+          N8N_LOG=$(journalctl -u n8n -n 5 --no-pager -o short-iso 2>&1 | tail -5)
+          add "$N8N_LOG"
+
+          # 5c. Show LP .env webhook URL
+          LP_URL=$(grep N8N_WEBHOOK_URL /opt/vk-longpoll/.env 2>/dev/null || echo "NOT_FOUND")
+          add "LP .env: $LP_URL"
 
           # 6. VK LP Settings
           source /opt/p0-foundation/.env 2>/dev/null
