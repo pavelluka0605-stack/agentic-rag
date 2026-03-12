@@ -17,6 +17,16 @@
     },
     {
       "parameters": {
+        "jsCode": "// Flatten webhook body to top-level JSON\n// N8N webhook v2 nests POST body under $json.body\nreturn $input.all().map(item => ({\n  json: item.json.body || item.json\n}));"
+      },
+      "id": "flatten-body",
+      "name": "Flatten: Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [350, 400]
+    },
+    {
+      "parameters": {
         "dataType": "string",
         "value1": "={{ $json.type }}",
         "rules": {
@@ -418,6 +428,9 @@
   ],
   "connections": {
     "Webhook: VK Events": {
+      "main": [[ { "node": "Flatten: Body", "type": "main", "index": 0 } ]]
+    },
+    "Flatten: Body": {
       "main": [[ { "node": "Switch: Event Type", "type": "main", "index": 0 } ]]
     },
     "Switch: Event Type": {
