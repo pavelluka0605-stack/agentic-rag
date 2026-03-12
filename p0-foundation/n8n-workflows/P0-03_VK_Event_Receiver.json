@@ -25,7 +25,9 @@
             { "value2": "wall_reply_new" },
             { "value2": "wall_reply_edit" },
             { "value2": "wall_post_new" },
-            { "value2": "system" }
+            { "value2": "system" },
+            { "value2": "photo_comment_new" },
+            { "value2": "photo_comment_edit" }
           ]
         }
       },
@@ -425,6 +427,8 @@
         [{ "node": "Extract: Comment", "type": "main", "index": 0 }],
         [{ "node": "Log: New Post", "type": "main", "index": 0 }],
         [{ "node": "IF: LP Error?", "type": "main", "index": 0 }],
+        [{ "node": "Extract: Comment", "type": "main", "index": 0 }],
+        [{ "node": "Extract: Comment", "type": "main", "index": 0 }],
         [{ "node": "Log: Other Event", "type": "main", "index": 0 }]
       ]
     },

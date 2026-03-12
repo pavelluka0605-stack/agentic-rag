@@ -217,6 +217,20 @@ function formatEvent(update) {
         },
       };
 
+    case 'photo_comment_new':
+    case 'photo_comment_edit':
+      return {
+        ...base,
+        comment: {
+          id: update.object.id,
+          from_id: update.object.from_id,
+          post_id: update.object.photo_id,  // map photo_id → post_id for unified processing
+          text: update.object.text,
+          date: update.object.date,
+          owner_id: update.object.photo_owner_id,
+        },
+      };
+
     case 'wall_reply_delete':
       return {
         ...base,
