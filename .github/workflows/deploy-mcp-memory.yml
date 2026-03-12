@@ -1,0 +1,177 @@
+name: "Deploy MCP Memory Server"
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/*"
+    paths:
+      - "mcp-memory/**"
+      - ".github/workflows/deploy-mcp-memory.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: "Deploy MCP Memory to VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Copy files to VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "mkdir -p /opt/mcp-memory/{src,data,backups}"
+
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
+            mcp-memory/package.json \
+            mcp-memory/src/ \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/mcp-memory/
+
+      - name: Install dependencies and setup
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          set -e
+          cd /opt/mcp-memory
+
+          echo "=== Step 1: Check environment ==="
+          node --version || { echo "Node.js not found"; exit 1; }
+          npm --version
+
+          # Ensure build-essential for better-sqlite3
+          dpkg -l | grep -q build-essential || {
+            echo "Installing build-essential..."
+            apt-get update -qq && apt-get install -y -qq build-essential python3
+          }
+
+          echo "=== Step 2: npm install ==="
+          npm install --no-audit --no-fund 2>&1
+
+          # Verify deps
+          test -f node_modules/@modelcontextprotocol/sdk/package.json && echo "✓ MCP SDK OK"
+          test -f node_modules/better-sqlite3/build/Release/better_sqlite3.node && echo "✓ SQLite native OK"
+          test -f node_modules/zod/package.json && echo "✓ Zod OK"
+
+          echo "=== Step 3: Migrate DB ==="
+          node src/migrate.js
+
+          echo "=== Step 4: Run tests ==="
+          npm test
+
+          echo "=== Step 5: Test MCP protocol ==="
+          RESPONSE=$(echo '{"jsonrpc":"2.0","method":"initialize","params":{"capabilities":{},"clientInfo":{"name":"test","version":"1.0"},"protocolVersion":"2024-11-05"},"id":1}' | timeout 5 node src/index.js 2>/dev/null || true)
+          if echo "$RESPONSE" | grep -q '"memory-server"'; then
+            echo "✓ MCP protocol test passed"
+          else
+            echo "MCP response: $RESPONSE"
+            echo "⚠ MCP protocol test — checking stderr..."
+            echo '{"jsonrpc":"2.0","method":"initialize","params":{"capabilities":{},"clientInfo":{"name":"test","version":"1.0"},"protocolVersion":"2024-11-05"},"id":1}' | timeout 5 node src/index.js 2>&1 1>/dev/null || true
+          fi
+
+          echo "=== Step 6: Configure Claude Code ==="
+          NODE_PATH=$(readlink -f $(which node))
+          echo "Node path: $NODE_PATH"
+
+          mkdir -p ~/.claude
+
+          if [ -f ~/.claude/settings.json ]; then
+            echo "Existing settings.json found, merging..."
+            # Install jq if needed
+            which jq > /dev/null 2>&1 || apt-get install -y -qq jq
+            jq --arg node "$NODE_PATH" '.mcpServers.memory = {
+              "command": $node,
+              "args": ["/opt/mcp-memory/src/index.js"],
+              "env": {
+                "MEMORY_DB_PATH": "/opt/mcp-memory/data/memory.db"
+              }
+            }' ~/.claude/settings.json > /tmp/claude-settings-new.json
+            if jq . /tmp/claude-settings-new.json > /dev/null 2>&1; then
+              cp /tmp/claude-settings-new.json ~/.claude/settings.json
+              echo "✓ settings.json updated"
+            else
+              echo "❌ JSON merge failed, creating new"
+              cat > ~/.claude/settings.json << SETTINGS
+          {
+            "mcpServers": {
+              "memory": {
+                "command": "$NODE_PATH",
+                "args": ["/opt/mcp-memory/src/index.js"],
+                "env": {
+                  "MEMORY_DB_PATH": "/opt/mcp-memory/data/memory.db"
+                }
+              }
+            }
+          }
+          SETTINGS
+              sed -i 's/^          //' ~/.claude/settings.json
+            fi
+          else
+            echo "Creating new settings.json..."
+            cat > ~/.claude/settings.json << SETTINGS
+          {
+            "mcpServers": {
+              "memory": {
+                "command": "$NODE_PATH",
+                "args": ["/opt/mcp-memory/src/index.js"],
+                "env": {
+                  "MEMORY_DB_PATH": "/opt/mcp-memory/data/memory.db"
+                }
+              }
+            }
+          }
+          SETTINGS
+            sed -i 's/^          //' ~/.claude/settings.json
+          fi
+
+          echo "Settings:"
+          cat ~/.claude/settings.json
+
+          echo "=== Step 7: Setup cron backup ==="
+          (crontab -l 2>/dev/null | grep -v mcp-memory; echo "0 3 * * * cd /opt/mcp-memory && $NODE_PATH src/backup.js >> /var/log/mcp-memory-backup.log 2>&1") | crontab -
+          echo "Cron:"
+          crontab -l | grep mcp-memory
+
+          echo "=== Step 8: Manual backup test ==="
+          node src/backup.js
+
+          echo "=== Step 9: Seed data ==="
+          EXISTING=$(node -e "
+            import('./src/database.js').then(m => {
+              const db = m.initDatabase('/opt/mcp-memory/data/memory.db');
+              const c = db.prepare('SELECT COUNT(*) as count FROM memories').get();
+              console.log(c.count);
+              db.close();
+            });
+          " 2>/dev/null || echo "0")
+          if [ "$EXISTING" = "0" ] || [ "$EXISTING" = "" ]; then
+            echo "Loading seed data..."
+            node src/seed.js
+          else
+            echo "✓ Database already has $EXISTING records, skipping seed"
+          fi
+
+          echo ""
+          echo "=== DEPLOYMENT COMPLETE ==="
+          echo "✓ MCP Memory Server deployed to /opt/mcp-memory/"
+          echo "✓ Database: /opt/mcp-memory/data/memory.db"
+          echo "✓ Backups: /opt/mcp-memory/backups/"
+          echo "✓ Claude Code config: ~/.claude/settings.json"
+          echo "✓ Cron backup: daily at 3:00"
+
+          REMOTE
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

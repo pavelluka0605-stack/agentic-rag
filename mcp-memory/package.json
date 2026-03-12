@@ -1,0 +1,23 @@
+{
+  "name": "mcp-memory-server",
+  "version": "1.0.0",
+  "description": "MCP Memory Server для Claude Code — персистентная память с SQLite + FTS5",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "migrate": "node src/migrate.js",
+    "backup": "node src/backup.js",
+    "stats": "node src/stats.js",
+    "test": "node src/test.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "better-sqlite3": "^11.7.0",
+    "zod": "^3.24.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
