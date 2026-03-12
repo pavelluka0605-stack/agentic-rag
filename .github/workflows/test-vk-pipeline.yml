@@ -9,118 +9,59 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Run full test
+      - name: Test VK API token
         env:
-          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
-          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
-          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
-          VK_TOKEN: ${{ secrets.VK_TOKEN }}
           VK_USER_TOKEN: ${{ secrets.VK_USER_TOKEN }}
         run: |
-          MSG=""
-          add() { MSG="${MSG}${1}
-          "; }
-
-          # 0. Check placeholder substitution in deployed workflows
-          add "=== STEP 0: Check deployed P0-07 ==="
-          ALL_WF=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/workflows?limit=100" 2>&1)
-          P07_ID=$(echo "$ALL_WF" | python3 -c "
-          import sys,json
-          for w in json.load(sys.stdin).get('data',[]):
-              if 'P0-07' in w['name']: print(w['id']); break
-          " 2>/dev/null)
-          if [ -n "$P07_ID" ]; then
-            WF_JSON=$(curl -s -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              "${N8N_BASE_URL}/api/v1/workflows/${P07_ID}" 2>&1)
-            PCHECK=$(echo "$WF_JSON" | python3 -c "
-          import sys,json,re
-          wf = json.load(sys.stdin)
-          raw = json.dumps(wf)
-          found = set(re.findall(r'__[A-Z_]+__', raw))
-          if found: print('UNSUBSTITUTED: ' + ', '.join(found))
-          else: print('All placeholders OK')
-          for node in wf.get('nodes',[]):
-              p = node.get('parameters',{})
-              body = p.get('body','')
-              if 'access_token' in str(body):
-                  m = re.search(r'access_token=([^&\"]{0,20})', body)
-                  if m: print(f'  {node[\"name\"]}: token_start={m.group(1)[:12]}')
-          " 2>/dev/null || echo "parse error")
-            add "$PCHECK"
-          fi
-
-          # 0b. Direct VK API test: check token permissions
-          add ""
-          add "=== STEP 0b: Direct VK API Test ==="
-          # Get a real post from the wall
+          echo "=== Direct VK API Test ==="
+          # Get wall posts
           WALL=$(curl -s --max-time 10 \
-            "https://api.vk.com/method/wall.get?owner_id=-137949809&count=3&access_token=${VK_USER_TOKEN}&v=5.199" 2>&1)
-          add "Wall posts: $(echo "$WALL" | python3 -c "
+            "https://api.vk.com/method/wall.get?owner_id=-137949809&count=1&access_token=${VK_USER_TOKEN}&v=5.199")
+          echo "wall.get: $(echo "$WALL" | python3 -c "
           import sys,json
           d = json.load(sys.stdin)
-          if 'error' in d: print('ERROR:', d['error']['error_msg'])
+          if 'error' in d: print('ERROR:', d['error'])
           else:
-              for p in d.get('response',{}).get('items',[]):
-                  print(f'  #{p[\"id\"]} ({p.get(\"post_type\",\"?\")}): {str(p.get(\"text\",\"\"))[:60]}')
-          " 2>/dev/null || echo "parse error")"
+              items = d.get('response',{}).get('items',[])
+              if items: print('OK, post #' + str(items[0]['id']))
+              else: print('NO POSTS')
+          " 2>/dev/null)"
 
-          # Try to create a test comment on the most recent post
-          REAL_POST_ID=$(echo "$WALL" | python3 -c "
+          # Get post ID
+          POST_ID=$(echo "$WALL" | python3 -c "
           import sys,json
           d = json.load(sys.stdin)
           items = d.get('response',{}).get('items',[])
           if items: print(items[0]['id'])
           " 2>/dev/null)
 
-          if [ -n "$REAL_POST_ID" ]; then
-            add "Testing wall.createComment on post #${REAL_POST_ID}..."
-            VK_REPLY=$(curl -s --max-time 10 \
-              "https://api.vk.com/method/wall.createComment?owner_id=-137949809&post_id=${REAL_POST_ID}&message=test_autocheck_$(date +%s)&access_token=${VK_USER_TOKEN}&v=5.199" 2>&1)
-            add "VK Reply: $(echo "$VK_REPLY" | head -c 300)"
+          if [ -n "$POST_ID" ]; then
+            echo "Testing wall.createComment on post #${POST_ID}..."
+            REPLY=$(curl -s --max-time 10 \
+              "https://api.vk.com/method/wall.createComment?owner_id=-137949809&post_id=${POST_ID}&message=test_autocheck_$(date +%s)&access_token=${VK_USER_TOKEN}&v=5.199")
+            echo "wall.createComment response: $REPLY"
 
-            # If comment was created, delete it
-            COMMENT_ID=$(echo "$VK_REPLY" | python3 -c "
+            COMMENT_ID=$(echo "$REPLY" | python3 -c "
             import sys,json
             d = json.load(sys.stdin)
             if 'response' in d: print(d['response'].get('comment_id',''))
             " 2>/dev/null)
+
             if [ -n "$COMMENT_ID" ]; then
-              add "  Comment created (id: $COMMENT_ID) — deleting..."
+              echo "SUCCESS: Comment created (id: $COMMENT_ID) — deleting..."
               curl -s --max-time 10 \
                 "https://api.vk.com/method/wall.deleteComment?owner_id=-137949809&comment_id=${COMMENT_ID}&access_token=${VK_USER_TOKEN}&v=5.199" >/dev/null 2>&1
-              add "  Deleted test comment"
+              echo "Deleted test comment"
+            else
+              echo "FAILED: No comment created. Full response above."
             fi
           fi
 
-          # 1. Test n8n Variables API
-          add "=== STEP 1: Test n8n Variables API ==="
-
-          # List existing variables
-          VARS_LIST=$(curl -s --max-time 10 \
-            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/variables" 2>&1)
-          add "Existing variables: $(echo "$VARS_LIST" | python3 -c "import sys,json; d=json.load(sys.stdin); print([v.get('key') for v in d.get('data',d if isinstance(d,list) else [])])" 2>/dev/null || echo "$VARS_LIST" | head -c 200)"
-
-          # Try to create a test variable
-          CREATE_RESP=$(curl -s -w "\nHTTP:%{http_code}" --max-time 10 \
-            -X POST "${N8N_BASE_URL}/api/v1/variables" \
-            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{"key":"TEST_VAR","value":"test123"}' 2>&1)
-          add "Create TEST_VAR: $(echo "$CREATE_RESP" | tail -1) $(echo "$CREATE_RESP" | head -1 | head -c 200)"
-
-          # Try to set GOOGLE_SPREADSHEET_ID
-          CREATE_RESP2=$(curl -s -w "\nHTTP:%{http_code}" --max-time 10 \
-            -X POST "${N8N_BASE_URL}/api/v1/variables" \
-            -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "{\"key\":\"GOOGLE_SPREADSHEET_ID\",\"value\":\"${SPREADSHEET_ID}\"}" 2>&1)
-          add "Create GOOGLE_SPREADSHEET_ID: $(echo "$CREATE_RESP2" | tail -1) $(echo "$CREATE_RESP2" | head -1 | head -c 200)"
-
-          # 2. Send test event
-          add ""
-          add "=== STEP 2: Send test ==="
+      - name: Send test event to N8N
+        env:
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+        run: |
           TIMESTAMP=$(date +%s)
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
             -X POST "${N8N_BASE_URL}/webhook/vk-events" \
@@ -134,46 +75,54 @@ jobs:
                 \"id\": ${TIMESTAMP},
                 \"from_id\": 123456789,
                 \"post_id\": 99999,
-                \"text\": \"TEST M 2 - autotest\",
+                \"text\": \"Здравствуйте, подскажите размеры дивана М\",
                 \"date\": ${TIMESTAMP},
                 \"owner_id\": -137949809
               }
             }")
-          add "Webhook: HTTP ${HTTP_CODE}"
-          sleep 12
+          echo "Webhook: HTTP ${HTTP_CODE}"
+          echo "Waiting 15s for processing..."
+          sleep 15
 
-          # 3. Check all recent executions
-          add ""
-          add "=== STEP 3: All recent executions ==="
+      - name: Check N8N executions
+        env:
+          N8N_BASE_URL: ${{ secrets.N8N_BASE_URL }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+        run: |
+          # Get latest executions
           LATEST=$(curl -s --max-time 10 \
             -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-            "${N8N_BASE_URL}/api/v1/executions?limit=10" 2>&1)
-          ALL_EXECS=$(echo "$LATEST" | python3 -c "
+            "${N8N_BASE_URL}/api/v1/executions?limit=5")
+
+          # Get the latest P0-07 execution with full data
+          EXEC_ID=$(echo "$LATEST" | python3 -c "
+          import sys,json
+          d = json.load(sys.stdin)
+          for e in d.get('data',[]):
+              print(e['id']); break
+          " 2>/dev/null)
+
+          echo "=== Latest executions ==="
+          echo "$LATEST" | python3 -c "
           import sys,json
           d = json.load(sys.stdin)
           for e in d.get('data',[]):
               wf = e.get('workflowData',{}).get('name','unknown')
-              status = e.get('status','?')
-              eid = e.get('id','?')
-              t = e.get('stoppedAt','?')
-              print(f'  [{status}] #{eid} {wf} ({t})')
-          " 2>/dev/null || echo "  Parse error")
-          add "$ALL_EXECS"
+              print(f'  [{e.get(\"status\")}] #{e[\"id\"]} {wf}')
+          "
 
-          # Get detail of latest 2 executions
-          EXEC_IDS=$(echo "$LATEST" | python3 -c "
+          # Get detail of first 2 executions
+          for EXEC_ID in $(echo "$LATEST" | python3 -c "
           import sys,json
           d = json.load(sys.stdin)
-          for e in d.get('data',[])[:2]:
-              print(e['id'])
-          " 2>/dev/null)
-          for EXEC_ID in $EXEC_IDS; do
-            add ""
-            add "--- Execution #${EXEC_ID} ---"
+          for e in d.get('data',[])[:2]: print(e['id'])
+          " 2>/dev/null); do
+            echo ""
+            echo "=== Execution #${EXEC_ID} ==="
             DETAIL=$(curl -s --max-time 10 \
               -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-              "${N8N_BASE_URL}/api/v1/executions/${EXEC_ID}?includeData=true" 2>&1)
-            NODES_RAN=$(echo "$DETAIL" | python3 -c "
+              "${N8N_BASE_URL}/api/v1/executions/${EXEC_ID}?includeData=true")
+            echo "$DETAIL" | python3 -c "
           import sys,json
           e = json.load(sys.stdin)
           wf = e.get('workflowData',{}).get('name','?')
@@ -185,20 +134,14 @@ jobs:
                   err = ''
                   if r.get('error'):
                       em = r['error']
-                      err = ' ERR: ' + (em.get('message','') if isinstance(em,dict) else str(em))[:120]
-                  # Show output data for VK Reply and key nodes
+                      err = ' ERR: ' + (em.get('message','') if isinstance(em,dict) else str(em))[:200]
                   out = ''
-                  if 'VK:' in node_name or 'OpenAI' in node_name or 'Telegram' in node_name:
+                  if 'VK:' in node_name:
                       try:
                           d = r.get('data',{}).get('main',[[]])[0]
                           if d:
-                              out = ' OUT: ' + json.dumps(d[0].get('json',{}), ensure_ascii=False)[:250]
+                              out = ' OUT: ' + json.dumps(d[0].get('json',{}), ensure_ascii=False)[:400]
                       except: pass
                   print(f'  [{s}] {node_name}{err}{out}')
-          " 2>/dev/null || echo "  Parse error")
-            add "$NODES_RAN"
+          "
           done
-
-          # Output
-          ONELINE=$(echo "$MSG" | tr '\n' ' | ' | head -c 4000)
-          echo "::notice title=TestResult::${ONELINE}"
