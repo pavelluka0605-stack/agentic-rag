@@ -476,7 +476,7 @@ let isStreaming = false;
 // --- Config ---
 function getConfig() {
   return {
-    url: localStorage.getItem('claude_api_url') || '',
+    url: localStorage.getItem('claude_api_url') || location.origin,
     token: localStorage.getItem('claude_api_token') || '',
   };
 }
@@ -610,8 +610,19 @@ function sendQuick(text) {
 
 async function sendMessage(text) {
   const cfg = getConfig();
-  if (!cfg.url || !cfg.token) {
-    toggleSettings();
+  if (!cfg.token) {
+    // Show hint and open settings with highlighted token field
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+    if (!sidebar.classList.contains('open')) {
+      sidebar.classList.add('open');
+      overlay.classList.add('open');
+    }
+    const tokenInput = document.getElementById('cfgToken');
+    tokenInput.style.borderColor = 'var(--red)';
+    tokenInput.setAttribute('placeholder', 'Введите токен для подключения!');
+    tokenInput.focus();
+    setTimeout(() => { tokenInput.style.borderColor = ''; }, 3000);
     return;
   }
 
