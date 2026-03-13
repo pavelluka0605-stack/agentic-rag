@@ -668,6 +668,123 @@ async def api_voice_transcribe(audio: UploadFile = File(...)):
         os.unlink(tmp_path)
 
 
+@app.post("/api/photo")
+async def api_photo(
+    photo: UploadFile = File(...),
+    project: str = Form("default"),
+    prompt: str = Form(""),
+):
+    """Photo input: upload → GPT-4o Vision analyze → save to memory."""
+    import base64
+    from openai import OpenAI
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+
+    content = await photo.read()
+    if not content:
+        return {"error": "Empty file"}
+
+    b64 = base64.b64encode(content).decode()
+    ext = ""
+    if photo.filename and "." in photo.filename:
+        ext = photo.filename.rsplit(".", 1)[-1].lower()
+    mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+            "gif": "image/gif", "webp": "image/webp"}.get(ext, "image/jpeg")
+
+    user_prompt = prompt or "Опиши что на фото. Если это товар/мебель — укажи тип, материал, размеры, цвет. Если это скриншот — опиши содержимое."
+
+    messages = [
+        {"role": "system", "content": """Ты помощник CRM-системы мебельного бизнеса. Анализируй фото и отвечай JSON:
+{"title":"краткий заголовок","description":"подробное описание","category":"wiki|devops|knowledge|step","kind":"note|command|config|pattern|action","tags":["tag1","tag2"],"priority":0}
+
+Типичные категории:
+- Фото товара/мебели → wiki, kind=note, tags: ["фото","товар"]
+- Скриншот ошибки/лога → devops, kind=incident
+- Схема/диаграмма → knowledge, kind=pattern
+- Всё остальное → wiki, kind=note"""},
+        {"role": "user", "content": [
+            {"type": "text", "text": user_prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+        ]},
+    ]
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages,
+        max_tokens=1000,
+        temperature=0,
+    )
+    raw = response.choices[0].message.content.strip()
+
+    import json
+    try:
+        meta = json.loads(raw)
+    except json.JSONDecodeError:
+        meta = {"title": "Фото", "description": raw, "category": "wiki",
+                "kind": "note", "tags": ["фото"], "priority": 0}
+
+    tags = meta.get("tags", ["фото"])
+    if "фото" not in tags:
+        tags.append("фото")
+
+    step = memory_store.add_step(
+        action=f"{meta.get('kind', 'note')}: {meta.get('title', 'Фото')}",
+        result=meta.get("description", raw),
+        status="success",
+        context=f"photo input | file: {photo.filename or 'unknown'}",
+        tags=tags,
+        project=project,
+        source="photo",
+        category=meta.get("category", "wiki"),
+        kind=meta.get("kind", "note"),
+        priority=meta.get("priority", 0),
+    )
+
+    return {
+        "id": step["id"],
+        "title": meta.get("title"),
+        "description": meta.get("description"),
+        "category": meta.get("category"),
+        "kind": meta.get("kind"),
+        "tags": tags,
+        "priority": meta.get("priority", 0),
+    }
+
+
+@app.post("/api/photo/analyze")
+async def api_photo_analyze(
+    photo: UploadFile = File(...),
+    prompt: str = Form(""),
+):
+    """Only analyze photo, don't save — for preview."""
+    import base64
+    from openai import OpenAI
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+
+    content = await photo.read()
+    if not content:
+        return {"error": "Empty file"}
+
+    b64 = base64.b64encode(content).decode()
+    ext = ""
+    if photo.filename and "." in photo.filename:
+        ext = photo.filename.rsplit(".", 1)[-1].lower()
+    mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+            "gif": "image/gif", "webp": "image/webp"}.get(ext, "image/jpeg")
+
+    user_prompt = prompt or "Опиши что на фото."
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": [
+            {"type": "text", "text": user_prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+        ]}],
+        max_tokens=1000,
+    )
+
+    return {"description": response.choices[0].message.content.strip()}
+
+
 @app.delete("/api/clear")
 def api_clear(project: str | None = None):
     memory_store.clear(project)
