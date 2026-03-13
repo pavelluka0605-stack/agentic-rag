@@ -1,0 +1,133 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-101-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Fri Mar 13 15:51:52 UTC 2026
+
+  System load:  0.0                Processes:             149
+  Usage of /:   55.2% of 47.39GB   Users logged in:       1
+  Memory usage: 46%                IPv4 address for eth0: 72.56.127.126
+  Swap usage:   21%
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+4 updates can be applied immediately.
+To see these additional updates run: apt list --upgradable
+
+1 additional security update can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+1 updates could not be installed automatically. For more details,
+see /var/log/unattended-upgrades/unattended-upgrades.log
+
+=== DEEP DIAGNOSTICS Fri Mar 13 15:52:45 UTC 2026 ===
+--- 1. PM2 status ---
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 571523   │ 28s    │ 0    │ online    │ 0%       │ 55.0mb   │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+--- 2. PM2 logs (last 40 lines) ---
+[TAILING] Tailing last 40 lines for [claude-chat] process (change the value with --lines option)
+/root/.pm2/logs/claude-chat-error.log last 40 lines:
+/root/.pm2/logs/claude-chat-out.log last 40 lines:
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+
+
+--- 3. Health check ---
+Health: {"status":"ok","uptime":29.090191426,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:52:46.108Z"}
+
+--- 4. Claude CLI check ---
+/usr/bin/claude
+2.1.71 (Claude Code)
+
+--- 5. Test /api/chat request ---
+Chat response: *   Trying 127.0.0.1:3847...
+* Connected to 127.0.0.1 (127.0.0.1) port 3847
+> POST /api/chat HTTP/1.1
+> Host: 127.0.0.1:3847
+> User-Agent: curl/8.5.0
+> Accept: */*
+> Content-Type: application/json
+> Authorization: Bearer cfc6b39d4152f7dc6a49b8445d1bb4fe45e742af56eb5581d2b8e23179d2acc6
+> Content-Length: 41
+> 
+} [41 bytes data]
+< HTTP/1.1 200 OK
+< X-Powered-By: Express
+< RateLimit-Policy: 10;w=60
+< RateLimit-Limit: 10
+< RateLimit-Remaining: 7
+< RateLimit-Reset: 53
+< Content-Type: text/event-stream
+< Cache-Control: no-cache
+< Connection: keep-alive
+< X-Request-Id: 43171aa6-1cf7-4628-930c-1956d8d8ccbb
+< Date: Fri, 13 Mar 2026 15:52:46 GMT
+< Transfer-Encoding: chunked
+< 
+{ [68 bytes data]
+* Connection #0 to host 127.0.0.1 left intact
+data: {"type":"start","id":"43171aa6-1cf7-4628-930c-1956d8d8ccbb"}
+
+data: {"type":"chunk","text":"Done. The command ran successfully.\n"}
+
+data: {"type":"done","elapsed":"11.7","code":0}
+
+--- 6. .env file check ---
+BEARER_TOKEN=cfc6b39d4152f7dc6a49b8445d1bb4fe45e742af56eb5581d2b8e23179d2acc6
+PORT=3847
+
+--- 7. Process tree ---
+ Describing process with id 0 - name claude-chat 
+┌───────────────────┬───────────────────────────────────────┐
+│ status            │ online                                │
+│ name              │ claude-chat                           │
+│ namespace         │ default                               │
+│ version           │ 1.0.0                                 │
+│ restarts          │ 0                                     │
+│ uptime            │ 41s                                   │
+│ script path       │ /opt/claude-chat/server.js            │
+│ script args       │ N/A                                   │
+│ error log path    │ /root/.pm2/logs/claude-chat-error.log │
+│ out log path      │ /root/.pm2/logs/claude-chat-out.log   │
+│ pid path          │ /root/.pm2/pids/claude-chat-0.pid     │
+│ interpreter       │ node                                  │
+│ interpreter args  │ N/A                                   │
+│ script id         │ 0                                     │
+│ exec cwd          │ /opt/claude-chat                      │
+│ exec mode         │ fork_mode                             │
+│ node.js version   │ 20.20.1                               │
+│ node env          │ N/A                                   │
+
+--- 8. Node path and env ---
+node ok, pid 572421
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+
+=== END DIAGNOSTICS ===
