@@ -1,8 +1,10 @@
-=== FIX v4 — Traefik file provider Fri Mar 13 14:08:48 UTC 2026 ===
---- App check ---
-{"status":"ok","uptime":4.884861431,"activeRequests":0,"timestamp":"2026-03-13T14:08:48.570Z"}Docker host IP: 172.17.0.1
---- Creating Traefik dynamic config ---
-Dynamic config:
+=== URGENT FIX v5 Fri Mar 13 14:13:43 UTC 2026 ===
+--- Stopping NGINX ---
+NGINX stopped
+Synchronizing state of nginx.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install disable nginx
+Removed "/etc/systemd/system/multi-user.target.wants/nginx.service".
+--- Dynamic config ---
 http:
   routers:
     chat-marbomebel:
@@ -18,155 +20,38 @@ http:
       loadBalancer:
         servers:
           - url: "http://172.17.0.1:3847"
-
---- Updating compose.yaml ---
-Current compose:
-services:
-  traefik:
-    image: "traefik"
-    restart: always
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
-      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
-      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - traefik_data:/letsencrypt
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-
-  n8n:
-    image: docker.n8n.io/n8nio/n8n
-    restart: always
-    ports:
-      - "127.0.0.1:5678:5678"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.n8n.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`)
-      - traefik.http.routers.n8n.tls=true
-      - traefik.http.routers.n8n.entrypoints=web,websecure
-      - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
-      - traefik.http.middlewares.n8n.headers.SSLRedirect=true
-      - traefik.http.middlewares.n8n.headers.STSSeconds=315360000
-      - traefik.http.middlewares.n8n.headers.browserXSSFilter=true
-      - traefik.http.middlewares.n8n.headers.contentTypeNosniff=true
-      - traefik.http.middlewares.n8n.headers.forceSTSHeader=true
-      - traefik.http.middlewares.n8n.headers.SSLHost=${DOMAIN_NAME}
-      - traefik.http.middlewares.n8n.headers.STSIncludeSubdomains=true
-      - traefik.http.middlewares.n8n.headers.STSPreload=true
-      - traefik.http.routers.n8n.middlewares=n8n@docker
-    environment:
-      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
-      - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=https
-      - N8N_RUNNERS_ENABLED=true
-      - NODE_ENV=production
-      - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
-      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
-      - TZ=${GENERIC_TIMEZONE}
-    volumes:
-      - n8n_data:/home/node/.n8n
-      - ./local-files:/files
-
-volumes:
-  n8n_data:
-  traefik_data:
-
-Adding file provider to Traefik...
-Updated successfully
-Updated compose:
-services:
-  traefik:
-    image: traefik
-    restart: always
-    command:
-    - --api.insecure=true
-    - --providers.docker=true
-    - --providers.docker.exposedbydefault=false
-    - --entrypoints.web.address=:80
-    - --entrypoints.web.http.redirections.entryPoint.to=websecure
-    - --entrypoints.web.http.redirections.entrypoint.scheme=https
-    - --entrypoints.websecure.address=:443
-    - --certificatesresolvers.mytlschallenge.acme.tlschallenge=true
-    - --certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}
-    - --certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json
-    - --providers.file.directory=/dynamic
-    - --providers.file.watch=true
-    ports:
-    - 80:80
-    - 443:443
-    volumes:
-    - traefik_data:/letsencrypt
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-    - ./dynamic:/dynamic:ro
-  n8n:
-    image: docker.n8n.io/n8nio/n8n
-    restart: always
-    ports:
-    - 127.0.0.1:5678:5678
-    labels:
-    - traefik.enable=true
-    - traefik.http.routers.n8n.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`)
-    - traefik.http.routers.n8n.tls=true
-    - traefik.http.routers.n8n.entrypoints=web,websecure
-    - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
-    - traefik.http.middlewares.n8n.headers.SSLRedirect=true
-    - traefik.http.middlewares.n8n.headers.STSSeconds=315360000
-    - traefik.http.middlewares.n8n.headers.browserXSSFilter=true
-    - traefik.http.middlewares.n8n.headers.contentTypeNosniff=true
-    - traefik.http.middlewares.n8n.headers.forceSTSHeader=true
-    - traefik.http.middlewares.n8n.headers.SSLHost=${DOMAIN_NAME}
-    - traefik.http.middlewares.n8n.headers.STSIncludeSubdomains=true
-    - traefik.http.middlewares.n8n.headers.STSPreload=true
-    - traefik.http.routers.n8n.middlewares=n8n@docker
-    environment:
-    - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
-    - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
-    - N8N_PORT=5678
-    - N8N_PROTOCOL=https
-    - N8N_RUNNERS_ENABLED=true
-    - NODE_ENV=production
-    - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
-    - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
-    - TZ=${GENERIC_TIMEZONE}
-    volumes:
-    - n8n_data:/home/node/.n8n
-    - ./local-files:/files
-volumes:
-  n8n_data: null
-  traefik_data: null
-
---- Restarting Traefik ---
- Container n8n-traefik-traefik-1  Recreate
- Container n8n-traefik-traefik-1  Recreated
+--- Starting Traefik ---
+ Container n8n-traefik-n8n-1  Recreate
+ Container n8n-traefik-n8n-1  Recreated
  Container n8n-traefik-traefik-1  Starting
-Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint n8n-traefik-traefik-1 (204188e1f52d71447efac3035b6db112a7cc051f0e670030330c2843d2302359): failed to bind host port for 0.0.0.0:80:172.19.0.2:80/tcp: address already in use
-/tmp/fix-proxy.sh: line 109: docker-compose: command not found
-Compose restart failed
---- Traefik logs (last 10 lines) ---
+ Container n8n-traefik-n8n-1  Starting
+ Container n8n-traefik-traefik-1  Started
+Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint n8n-traefik-n8n-1 (8b4612cb71c7afbc7c55beae9c1061cf01667fe4db363de546382f06076737cf): failed to bind host port for 127.0.0.1:5678:172.19.0.7:5678/tcp: address already in use
+Compose up failed
+--- Traefik logs ---
 
 === VERIFICATION ===
-Direct :3847:
-{"status":"ok","uptime":11.155821187,"activeRequests":0,"timestamp":"2026-03-13T14:08:54.841Z"}
-HTTPS chat.marbomebel.ru:
-FAIL
-
-HTTP chat.marbomebel.ru:
-{"status":"ok","uptime":11.277648841,"activeRequests":0,"timestamp":"2026-03-13T14:08:54.962Z"}
-HTTPS n8n.marbomebel.ru (should still work):
-HTTP 000FAIL
-
+App :3847:
+{"status":"ok","uptime":16.759214419,"activeRequests":0,"timestamp":"2026-03-13T14:13:55.598Z"}
+n8n.marbomebel.ru HTTPS:
+HTTP 200
+chat.marbomebel.ru HTTPS:
+{"status":"ok","uptime":16.932155422,"activeRequests":0,"timestamp":"2026-03-13T14:13:55.770Z"}
+chat.marbomebel.ru HTTP (should redirect):
+HTTP 301
 Ports:
-LISTEN 0      511          0.0.0.0:80         0.0.0.0:*    users:(("nginx",pid=562218,fd=5),("nginx",pid=560124,fd=5),("nginx",pid=560123,fd=5))                                                                             
-RESULT: NEEDS_TIME_FOR_TLS
-(Traefik needs ~30s to get Let's Encrypt cert, try again in 1 min)
+LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=564002,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=564014,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=564008,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=564021,fd=7))                                                                                                                          
+
+Docker:
+NAMES                   STATUS                PORTS
+n8n-traefik-traefik-1   Up 10 seconds         0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+n8n-postgres-1          Up 4 days             5432/tcp
+n8n-voice-app-1         Up 4 days             80/tcp
+n8n-n8n-1               Up 3 days             5678/tcp
+openclaw                Up 9 days (healthy)   
+
+RESULT: SUCCESS — chat.marbomebel.ru WORKS!
 === DONE ===
