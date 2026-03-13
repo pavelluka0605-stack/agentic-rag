@@ -9,6 +9,8 @@ on:
     paths:
       - "p0-foundation/**"
       - ".github/workflows/deploy-p0.yml"
+      - "*.py"
+      - "requirements.txt"
   workflow_dispatch:
     inputs:
       action:
@@ -17,9 +19,10 @@ on:
         default: "full"
         type: choice
         options:
-          - full          # Полный деплой (N8N + Long Poll + workflows)
+          - full          # Полный деплой (N8N + Long Poll + workflows + webapp)
           - longpoll      # Только VK Long Poll listener
           - workflows     # Только N8N workflows
+          - webapp        # Только FastAPI webapp (web.py)
           - healthcheck   # Проверка всех сервисов
 
 # ─── Secrets (настроить в GitHub → Settings → Secrets) ───
@@ -391,6 +394,81 @@ jobs:
           else
             echo "✗ VK User Long Poll failed to start"
             journalctl -u vk-user-longpoll -n 10 --no-pager
+          fi
+          REMOTE_SCRIPT
+
+      # ─── 7c. FastAPI Webapp (chat.marbomebel.ru) ──
+      - name: Deploy FastAPI Webapp
+        if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'webapp' || github.event.inputs.action == '' }}
+        run: |
+          # Copy Python files to VPS
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            web.py memory_store.py retriever.py reasoning_agent.py \
+            exporter.py agents.py bluesales.py bluesales_config.py \
+            devops_mem.py knowledge_base.py wiki.py rag.py \
+            requirements.txt \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/p0-foundation/
+
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
+
+          mkdir -p /opt/webapp
+          cp /opt/p0-foundation/web.py /opt/webapp/
+          cp /opt/p0-foundation/memory_store.py /opt/webapp/
+          cp /opt/p0-foundation/retriever.py /opt/webapp/
+          cp /opt/p0-foundation/reasoning_agent.py /opt/webapp/
+          cp /opt/p0-foundation/exporter.py /opt/webapp/
+          cp /opt/p0-foundation/agents.py /opt/webapp/
+          cp /opt/p0-foundation/bluesales.py /opt/webapp/
+          cp /opt/p0-foundation/bluesales_config.py /opt/webapp/
+          cp /opt/p0-foundation/devops_mem.py /opt/webapp/
+          cp /opt/p0-foundation/knowledge_base.py /opt/webapp/
+          cp /opt/p0-foundation/wiki.py /opt/webapp/
+          cp /opt/p0-foundation/rag.py /opt/webapp/
+          cp /opt/p0-foundation/requirements.txt /opt/webapp/
+
+          # Install Python dependencies
+          if ! command -v pip3 &>/dev/null; then
+            apt-get update -qq && apt-get install -y -qq python3-pip python3-venv
+          fi
+
+          # Create venv if not exists
+          if [ ! -d /opt/webapp/venv ]; then
+            python3 -m venv /opt/webapp/venv
+          fi
+          /opt/webapp/venv/bin/pip install -q -r /opt/webapp/requirements.txt
+
+          # Systemd unit for FastAPI webapp
+          cat > /etc/systemd/system/webapp.service << 'UNIT'
+          [Unit]
+          Description=FastAPI Webapp (chat.marbomebel.ru)
+          After=network.target
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/webapp
+          EnvironmentFile=/opt/p0-foundation/.env
+          ExecStart=/opt/webapp/venv/bin/uvicorn web:app --host 0.0.0.0 --port 8000
+          Restart=always
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          # Remove heredoc indentation
+          sed -i 's/^          //' /etc/systemd/system/webapp.service
+
+          systemctl daemon-reload
+          systemctl enable webapp
+          systemctl restart webapp
+          sleep 3
+
+          if systemctl is-active --quiet webapp; then
+            echo "✓ FastAPI webapp running on :8000"
+          else
+            echo "✗ FastAPI webapp failed to start"
+            journalctl -u webapp -n 15 --no-pager
           fi
           REMOTE_SCRIPT
 
@@ -961,6 +1039,15 @@ jobs:
             fi
           else
             echo "⚪ VK User Long Poll: не запущен (VK_USER_TOKEN не задан?)"
+          fi
+          echo ""
+
+          # ─── FastAPI Webapp ──────────────────────
+          if systemctl is-active --quiet webapp 2>/dev/null; then
+            WEB_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:8000/ 2>/dev/null)
+            echo "✅ FastAPI webapp: active (HTTP $WEB_CODE on :8000)"
+          else
+            echo "⚪ FastAPI webapp: не запущен"
           fi
           echo ""
 
