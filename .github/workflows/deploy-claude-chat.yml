@@ -73,7 +73,30 @@ jobs:
       - name: Run proxy fix with diagnostics
         run: |
           $SCP_CMD claude-chat/fix-proxy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/fix-proxy.sh
-          $SSH_CMD "chmod +x /tmp/fix-proxy.sh && TG_BOT_TOKEN=${{ secrets.TG_BOT_TOKEN }} TG_CHAT_ID=${{ secrets.TG_CHAT_ID }} bash /tmp/fix-proxy.sh"
+          $SSH_CMD "chmod +x /tmp/fix-proxy.sh && TG_BOT_TOKEN=${{ secrets.TG_BOT_TOKEN }} TG_CHAT_ID=${{ secrets.TG_CHAT_ID }} bash /tmp/fix-proxy.sh" || true
+
+      - name: Fetch diagnostics from VPS
+        if: always()
+        run: |
+          $SCP_CMD ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/proxy-diag.txt /tmp/proxy-diag.txt || echo "No diag file"
+          if [ -f /tmp/proxy-diag.txt ]; then
+            echo "--- DIAGNOSTICS OUTPUT ---"
+            cat /tmp/proxy-diag.txt
+            echo "--- END ---"
+            mkdir -p diagnostics
+            cp /tmp/proxy-diag.txt diagnostics/proxy-diag-$(date +%Y%m%d-%H%M%S).txt
+          fi
+
+      - name: Commit diagnostics to repo
+        if: always()
+        run: |
+          if [ -d diagnostics ] && ls diagnostics/*.txt 1>/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add diagnostics/
+            git commit -m "auto: proxy diagnostics $(date +%Y%m%d-%H%M%S)" || echo "Nothing to commit"
+            git push origin HEAD:${{ github.ref_name }} || echo "Push failed"
+          fi
 
       - name: Healthcheck
         run: |
