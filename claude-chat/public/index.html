@@ -411,7 +411,7 @@ html, body {
       <div class="welcome-logo">&#9671;</div>
       <h2>Claude VPS Chat</h2>
       <p>Управление VPS через Claude Code CLI</p>
-      <p style="font-size:10px;color:var(--text2);opacity:0.5" id="appVer">v3</p>
+      <p style="font-size:10px;color:var(--text2);opacity:0.5" id="appVer">v4</p>
       <div class="welcome-cmds">
         <div class="welcome-cmd" onclick="sendQuick('Покажи статус VPS: аптайм, память, диск, нагрузка')">
           Статус VPS
@@ -526,18 +526,23 @@ function toggleSettings() {
 }
 
 // --- Chat ---
+// Keep welcome element reference (survives innerHTML wipes)
+let welcomeHtml = '';
+
 function renderMessages() {
   const el = document.getElementById('messages');
-  const welcome = document.getElementById('welcome');
+
+  // Capture welcome HTML on first call
+  if (!welcomeHtml) {
+    const w = document.getElementById('welcome');
+    if (w) welcomeHtml = w.outerHTML;
+  }
 
   if (messages.length === 0) {
-    welcome.style.display = 'flex';
-    el.innerHTML = '';
-    el.appendChild(welcome);
+    el.innerHTML = welcomeHtml;
     return;
   }
 
-  welcome.style.display = 'none';
   el.innerHTML = messages.map((m, i) => {
     const bubble = m.role === 'user' ? escapeHtml(m.content) : renderMarkdown(m.content);
     const meta = m.elapsed ? `${m.elapsed}s` : '';
