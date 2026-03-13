@@ -1,11 +1,11 @@
 require('dotenv').config();
-// Claude Chat v1.1 — redeploy with DNS chat.marbomebel.ru
 const express = require('express');
 const { spawn, execSync } = require('child_process');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3847;
@@ -14,6 +14,41 @@ const BEARER_TOKEN = process.env.BEARER_TOKEN;
 if (!BEARER_TOKEN) {
   console.error('BEARER_TOKEN not set in .env');
   process.exit(1);
+}
+
+// --- Find claude CLI ---
+function findClaude() {
+  // Common locations for claude CLI
+  const candidates = [
+    'claude',
+    '/usr/local/bin/claude',
+    '/usr/bin/claude',
+    path.join(os.homedir(), '.claude', 'bin', 'claude'),
+    path.join(os.homedir(), '.local', 'bin', 'claude'),
+    path.join(os.homedir(), '.npm-global', 'bin', 'claude'),
+  ];
+
+  // Try which first
+  try {
+    const found = execSync('which claude 2>/dev/null || command -v claude 2>/dev/null', { encoding: 'utf-8' }).trim();
+    if (found) return found;
+  } catch (_) {}
+
+  // Check candidate paths
+  for (const c of candidates) {
+    try {
+      if (c === 'claude') continue; // already tried via which
+      if (fs.existsSync(c)) return c;
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+const CLAUDE_PATH = findClaude();
+console.log(`Claude CLI: ${CLAUDE_PATH || 'NOT FOUND'}`);
+if (!CLAUDE_PATH) {
+  console.warn('WARNING: claude CLI not found. Chat will use fallback shell mode.');
 }
 
 // --- Middleware ---
@@ -52,6 +87,7 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     uptime: process.uptime(),
     activeRequests,
+    claudeCli: CLAUDE_PATH || 'not found (fallback: bash)',
     timestamp: new Date().toISOString(),
   });
 });
@@ -140,8 +176,54 @@ app.post('/api/chat', auth, (req, res) => {
 
   const startTime = Date.now();
 
-  // Spawn claude --print
-  const child = spawn('claude', ['--print', prompt], {
+  if (!CLAUDE_PATH) {
+    // Fallback: run command directly via bash if it looks like a shell command
+    const child = spawn('bash', ['-lc', message], {
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 30000,
+    });
+    runningProcesses.set(requestId, child);
+    let output = '';
+
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString();
+      output += text;
+      res.write(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`);
+    });
+    child.stderr.on('data', (chunk) => {
+      const text = chunk.toString();
+      res.write(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`);
+    });
+    child.on('close', (code) => {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      if (!output) {
+        res.write(`data: ${JSON.stringify({ type: 'chunk', text: `[exit code: ${code}]` })}\n\n`);
+      }
+      res.write(`data: ${JSON.stringify({ type: 'done', elapsed, code })}\n\n`);
+      res.end();
+      activeRequests--;
+      runningProcesses.delete(requestId);
+    });
+    child.on('error', (err) => {
+      res.write(`data: ${JSON.stringify({ type: 'error', text: err.message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'done', elapsed: '0', code: 1 })}\n\n`);
+      res.end();
+      activeRequests--;
+      runningProcesses.delete(requestId);
+    });
+    req.on('close', () => {
+      if (runningProcesses.has(requestId)) {
+        child.kill('SIGTERM');
+        runningProcesses.delete(requestId);
+        activeRequests--;
+      }
+    });
+    return;
+  }
+
+  // Spawn claude CLI
+  const child = spawn(CLAUDE_PATH, ['--print', prompt], {
     env: { ...process.env, NO_COLOR: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 120000, // 2 min timeout

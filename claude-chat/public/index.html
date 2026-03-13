@@ -632,6 +632,7 @@ async function sendMessage(text) {
   messages.push({ role: 'assistant', content: '', elapsed: null });
   isStreaming = true;
   updateSendBtn();
+  renderMessages();
 
   const el = document.getElementById('messages');
   let fullText = '';

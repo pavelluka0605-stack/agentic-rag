@@ -97,10 +97,20 @@ if pm2 describe "$APP_NAME" &>/dev/null; then
   echo "  Stopped existing $APP_NAME"
 fi
 
-# 5. Start with PM2
+# 5. Start with PM2 (preserve full PATH for claude CLI)
 echo "[5/6] Starting with PM2..."
 cd "$APP_DIR"
-pm2 start server.js --name "$APP_NAME" --cwd "$APP_DIR"
+
+# Check if claude CLI is available
+CLAUDE_BIN=$(which claude 2>/dev/null || command -v claude 2>/dev/null || echo "")
+echo "  Claude CLI: ${CLAUDE_BIN:-NOT FOUND}"
+if [ -z "$CLAUDE_BIN" ]; then
+  echo "  WARNING: claude CLI not found. Install: npm install -g @anthropic-ai/claude-code"
+  echo "  Fallback: bash shell mode will be used"
+fi
+
+# Start with current PATH so PM2 can find claude
+pm2 start server.js --name "$APP_NAME" --cwd "$APP_DIR" --update-env
 pm2 save
 
 # 6. Setup PM2 startup (if not already)
