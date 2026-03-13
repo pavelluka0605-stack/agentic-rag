@@ -1,70 +1,104 @@
-=== DIAGNOSTICS Fri Mar 13 13:53:11 UTC 2026 ===
---- App :3847 ---
-{"status":"ok","uptime":5.671395422,"activeRequests":0,"timestamp":"2026-03-13T13:53:11.335Z"}
---- Port 80 ---
-LISTEN 0      511          0.0.0.0:80         0.0.0.0:*    users:(("nginx",pid=558713,fd=5),("nginx",pid=557916,fd=5),("nginx",pid=552632,fd=5))                                                                             
-LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=60014,fd=7))                                                                                                                           
---- Port 443 ---
-LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=60020,fd=7))                                                                                                                           
-LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=60028,fd=7))                                                                                                                           
---- Web servers ---
-Caddy bin: none
-Caddy active: inactive
-inactive
-Caddy version: none
-Nginx bin: /usr/sbin/nginx
-Nginx active: active
---- Caddyfile search ---
-Using Caddyfile: NOT_FOUND
---- All TCP ports ---
-State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                                                                                                                                                            
-LISTEN 0      4096      127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=52775,fd=17))                                                                                                                       
-LISTEN 0      511        127.0.0.1:5679       0.0.0.0:*    users:(("node",pid=510947,fd=24))                                                                                                                                 
-LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*    users:(("sshd",pid=538872,fd=3),("systemd",pid=1,fd=114))                                                                                                         
-LISTEN 0      511          0.0.0.0:80         0.0.0.0:*    users:(("nginx",pid=558713,fd=5),("nginx",pid=557916,fd=5),("nginx",pid=552632,fd=5))                                                                             
-LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=60020,fd=7))                                                                                                                           
-LISTEN 0      511        127.0.0.1:3100       0.0.0.0:*    users:(("node",pid=510101,fd=19))                                                                                                                                 
-LISTEN 0      511        127.0.0.1:3101       0.0.0.0:*    users:(("node",pid=510273,fd=19))                                                                                                                                 
-LISTEN 0      4096       127.0.0.1:46075      0.0.0.0:*    users:(("containerd",pid=711,fd=9))                                                                                                                               
-LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=52775,fd=15))                                                                                                                       
-LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=558740,fd=20))                                                                                                                      
-LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*    users:(("uvicorn",pid=301523,fd=6))                                                                                                                               
-LISTEN 0      128          0.0.0.0:10050      0.0.0.0:*    users:(("zabbix_agentd",pid=708,fd=4),("zabbix_agentd",pid=707,fd=4),("zabbix_agentd",pid=706,fd=4),("zabbix_agentd",pid=705,fd=4),("zabbix_agentd",pid=681,fd=4))
-LISTEN 0      511          0.0.0.0:3102       0.0.0.0:*    users:(("node",pid=510445,fd=18))                                                                                                                                 
-LISTEN 0      4096            [::]:22            [::]:*    users:(("sshd",pid=538872,fd=4),("systemd",pid=1,fd=115))                                                                                                         
-LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=60014,fd=7))                                                                                                                           
-LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=60028,fd=7))                                                                                                                           
-LISTEN 0      511                *:5678             *:*    users:(("node",pid=510947,fd=21))                                                                                                                                 
---- PM2 ---
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 558740   │ 5s     │ 0    │ online    │ 0%       │ 59.8mb   │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
---- Caddy service file ---
-No caddy service file
---- Caddy admin API /config/ ---
-No Caddy admin API
+=== FIX HTTPS PROXY Fri Mar 13 13:57:49 UTC 2026 ===
+--- Docker on 443 ---
+PID on 443: 60020
+Docker containers on 443: dddcfbe32162 n8n-traefik-traefik-1 0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+NAMES                   PORTS
+n8n-postgres-1          5432/tcp
+n8n-voice-app-1         80/tcp
+n8n-n8n-1               5678/tcp
+n8n-traefik-traefik-1   0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+openclaw                
+--- Current NGINX config ---
+server {
+    listen 80;
+    server_name chat.marbomebel.ru;
 
+    location / {
+        proxy_pass http://127.0.0.1:3847;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+}
+--- nginx.conf includes ---
+include /etc/nginx/modules-enabled/*.conf;
+	include /etc/nginx/mime.types;
+	include /etc/nginx/conf.d/*.conf;
+	include /etc/nginx/sites-enabled/*;
+--- Installing certbot ---
+Certbot already installed: certbot 2.9.0
+--- Docker inspect ---
+Container on 443: /n8n-traefik-traefik-1 (traefik)
+Docker reverse proxy detected: traefik
+Traefik in Docker! Need to add labels or file provider config
 
-=== FIXING ===
-App healthy on :3847
-Strategy: NGINX
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-nginx config OK
-NGINX configured
+--- Strategy: NGINX SSL ---
+Trying certbot...
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Requesting a certificate for chat.marbomebel.ru
+
+Certbot failed to authenticate some domains (authenticator: nginx). The Certificate Authority reported these problems:
+  Domain: chat.marbomebel.ru
+  Type:   unauthorized
+  Detail: 72.56.127.126: Invalid response from https://chat.marbomebel.ru/.well-known/acme-challenge/F_0jZ6DJmTDXcT6Xw6LPtS4ZuriUbRVBRU9Yp7su0iM: 404
+
+Hint: The Certificate Authority failed to verify the temporary nginx configuration changes made by Certbot. Ensure the listed domains point to this nginx server and that it is accessible from the internet.
+
+Some challenges have failed.
+Ask for help or search for solutions at https://community.letsencrypt.org. See the logfile /var/log/letsencrypt/letsencrypt.log or re-run Certbot with -v for more details.
+Certbot failed. Trying alternative...
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Requesting a certificate for chat.marbomebel.ru
+
+Certbot failed to authenticate some domains (authenticator: webroot). The Certificate Authority reported these problems:
+  Domain: chat.marbomebel.ru
+  Type:   unauthorized
+  Detail: 72.56.127.126: Invalid response from https://chat.marbomebel.ru/.well-known/acme-challenge/VNw8uwMFZav_FubSKxOs-BzAV0JbR0FpT8XSrAmT6gU: 404
+
+Hint: The Certificate Authority failed to download the temporary challenge files created by Certbot. Ensure that the listed domains serve their content from the provided --webroot-path/-w and that files created there can be downloaded from the internet.
+
+Some challenges have failed.
+Ask for help or search for solutions at https://community.letsencrypt.org. See the logfile /var/log/letsencrypt/letsencrypt.log or re-run Certbot with -v for more details.
+Webroot also failed. Trying standalone with port 80...
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Requesting a certificate for chat.marbomebel.ru
+
+Certbot failed to authenticate some domains (authenticator: standalone). The Certificate Authority reported these problems:
+  Domain: chat.marbomebel.ru
+  Type:   unauthorized
+  Detail: 72.56.127.126: Invalid response from https://chat.marbomebel.ru/.well-known/acme-challenge/pTM6H8dR2HrnrYXQdL3Jg4T6OH0EsDUSONHQ9RNG0tA: 404
+
+Hint: The Certificate Authority failed to download the challenge files from the temporary standalone webserver started by Certbot on port 80. Ensure that the listed domains point to this machine and that it can accept inbound connections from the internet.
+
+Some challenges have failed.
+Ask for help or search for solutions at https://community.letsencrypt.org. See the logfile /var/log/letsencrypt/letsencrypt.log or re-run Certbot with -v for more details.
+All certbot methods failed
+No SSL cert obtained
 
 === VERIFICATION ===
 Direct :3847:
-{"status":"ok","uptime":9.15730593,"activeRequests":0,"timestamp":"2026-03-13T13:53:14.821Z"}
-Proxy (Host header):
-{"status":"ok","uptime":9.175165828,"activeRequests":0,"timestamp":"2026-03-13T13:53:14.839Z"}
-HTTPS:
+{"status":"ok","uptime":28.989180064,"activeRequests":0,"timestamp":"2026-03-13T13:58:13.897Z"}
+HTTP proxy:
+{"status":"ok","uptime":29.014235341,"activeRequests":0,"timestamp":"2026-03-13T13:58:13.922Z"}
+HTTPS proxy:
 404 page not found
 
-HTTP:
-Moved Permanently
-RESULT: PROXY_OK
+External HTTP:
+FAIL
 
+External HTTPS:
+404 page not found
+
+--- Port status after fix ---
+LISTEN 0      511          0.0.0.0:80         0.0.0.0:*    users:(("nginx",pid=560125,fd=5),("nginx",pid=560124,fd=5),("nginx",pid=560123,fd=5))                                                                             
+LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=60020,fd=7))                                                                                                                           
+LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=60014,fd=7))                                                                                                                           
+LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=60028,fd=7))                                                                                                                           
+RESULT: HTTP_PROXY_OK_BUT_HTTPS_BROKEN
 === DONE ===
