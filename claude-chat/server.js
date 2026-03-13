@@ -1,4 +1,5 @@
 require('dotenv').config();
+// Claude Chat v1.1 — redeploy with DNS chat.marbomebel.ru
 const express = require('express');
 const { spawn, execSync } = require('child_process');
 const rateLimit = require('express-rate-limit');
