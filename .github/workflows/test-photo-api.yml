@@ -69,4 +69,4 @@ jobs:
             -d chat_id="$TG_CHAT_ID" \
             --data-urlencode "text=$(echo -e "$MSG")" > /dev/null 2>&1 || true
 
-          echo "Diagnostics complete"
+          echo "Diagnostics complete v2"
