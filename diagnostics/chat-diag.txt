@@ -4,9 +4,9 @@ Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-101-generic x86_64)
  * Management:     https://landscape.canonical.com
  * Support:        https://ubuntu.com/pro
 
- System information as of Fri Mar 13 15:51:52 UTC 2026
+ System information as of Fri Mar 13 15:57:28 UTC 2026
 
-  System load:  0.0                Processes:             149
+  System load:  0.08               Processes:             156
   Usage of /:   55.2% of 47.39GB   Users logged in:       1
   Memory usage: 46%                IPv4 address for eth0: 72.56.127.126
   Swap usage:   21%
@@ -28,12 +28,12 @@ Learn more about enabling ESM Apps service at https://ubuntu.com/esm
 1 updates could not be installed automatically. For more details,
 see /var/log/unattended-upgrades/unattended-upgrades.log
 
-=== DEEP DIAGNOSTICS Fri Mar 13 15:52:45 UTC 2026 ===
+=== DEEP DIAGNOSTICS Fri Mar 13 15:58:25 UTC 2026 ===
 --- 1. PM2 status ---
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 571523   │ 28s    │ 0    │ online    │ 0%       │ 55.0mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 573276   │ 30s    │ 0    │ online    │ 0%       │ 54.9mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
 --- 2. PM2 logs (last 40 lines) ---
@@ -58,10 +58,12 @@ see /var/log/unattended-upgrades/unattended-upgrades.log
 0|claude-c | Claude Chat server running on port 3847
 0|claude-c | Claude CLI: /usr/bin/claude
 0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
 
 
 --- 3. Health check ---
-Health: {"status":"ok","uptime":29.090191426,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:52:46.108Z"}
+Health: {"status":"ok","uptime":30.833453106,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:58:25.964Z"}
 
 --- 4. Claude CLI check ---
 /usr/bin/claude
@@ -81,24 +83,27 @@ Chat response: *   Trying 127.0.0.1:3847...
 } [41 bytes data]
 < HTTP/1.1 200 OK
 < X-Powered-By: Express
+< Access-Control-Allow-Origin: *
+< Access-Control-Allow-Headers: Content-Type, Authorization
+< Access-Control-Allow-Methods: GET, POST, OPTIONS
 < RateLimit-Policy: 10;w=60
 < RateLimit-Limit: 10
 < RateLimit-Remaining: 7
-< RateLimit-Reset: 53
+< RateLimit-Reset: 52
 < Content-Type: text/event-stream
 < Cache-Control: no-cache
 < Connection: keep-alive
-< X-Request-Id: 43171aa6-1cf7-4628-930c-1956d8d8ccbb
-< Date: Fri, 13 Mar 2026 15:52:46 GMT
+< X-Request-Id: 57ad4daf-8e1f-4a2e-b533-31e4f7434e22
+< Date: Fri, 13 Mar 2026 15:58:26 GMT
 < Transfer-Encoding: chunked
 < 
 { [68 bytes data]
 * Connection #0 to host 127.0.0.1 left intact
-data: {"type":"start","id":"43171aa6-1cf7-4628-930c-1956d8d8ccbb"}
+data: {"type":"start","id":"57ad4daf-8e1f-4a2e-b533-31e4f7434e22"}
 
-data: {"type":"chunk","text":"Done. The command ran successfully.\n"}
+data: {"type":"chunk","text":"```\nhello from diagnostics\n```\n"}
 
-data: {"type":"done","elapsed":"11.7","code":0}
+data: {"type":"done","elapsed":"11.1","code":0}
 
 --- 6. .env file check ---
 BEARER_TOKEN=cfc6b39d4152f7dc6a49b8445d1bb4fe45e742af56eb5581d2b8e23179d2acc6
@@ -112,7 +117,7 @@ PORT=3847
 │ namespace         │ default                               │
 │ version           │ 1.0.0                                 │
 │ restarts          │ 0                                     │
-│ uptime            │ 41s                                   │
+│ uptime            │ 43s                                   │
 │ script path       │ /opt/claude-chat/server.js            │
 │ script args       │ N/A                                   │
 │ error log path    │ /root/.pm2/logs/claude-chat-error.log │
@@ -127,7 +132,7 @@ PORT=3847
 │ node env          │ N/A                                   │
 
 --- 8. Node path and env ---
-node ok, pid 572421
+node ok, pid 574173
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
 
 === END DIAGNOSTICS ===
