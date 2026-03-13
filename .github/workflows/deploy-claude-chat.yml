@@ -119,133 +119,66 @@ jobs:
           echo "=== END DIAGNOSTICS ==="
           DIAG
 
-      - name: Fix proxy config
+      - name: Copy fix script to VPS
         run: |
-          $SSH_CMD << 'FIX'
+          cat > /tmp/fix-proxy.sh << 'SCRIPT'
+          #!/bin/bash
+          set -euo pipefail
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
 
           echo "=== FIXING PROXY ==="
-
-          # Detect what's serving port 80
           PORT80_PROC=$(ss -tlnp | grep ':80 ' | head -1 || true)
 
           if echo "$PORT80_PROC" | grep -q caddy; then
             echo "Caddy detected on port 80"
-
-            # Find Caddyfile
             CADDYFILE=""
             for f in /etc/caddy/Caddyfile /root/Caddyfile /opt/caddy/Caddyfile; do
               [ -f "$f" ] && CADDYFILE="$f" && break
             done
-
-            # Also check caddy config location
-            if [ -z "$CADDYFILE" ]; then
-              CADDYFILE=$(caddy environ 2>/dev/null | grep -oP 'CADDYFILE=\K.*' || true)
-            fi
-
-            if [ -z "$CADDYFILE" ]; then
-              echo "Can't find Caddyfile, creating /etc/caddy/Caddyfile"
-              mkdir -p /etc/caddy
-              CADDYFILE="/etc/caddy/Caddyfile"
-            fi
-
-            echo "Using Caddyfile: $CADDYFILE"
-            echo "Current content:"
+            [ -z "$CADDYFILE" ] && mkdir -p /etc/caddy && CADDYFILE="/etc/caddy/Caddyfile"
+            echo "Using: $CADDYFILE"
             cat "$CADDYFILE" 2>/dev/null || true
-
-            # Remove old chat entry if malformed, then add clean one
-            if grep -q "chat.marbomebel.ru" "$CADDYFILE"; then
-              echo "chat.marbomebel.ru already in Caddyfile, replacing..."
-              # Remove existing block (between chat.marbomebel.ru and next closing brace)
-              python3 -c "
-import re
-with open('$CADDYFILE') as f:
-    content = f.read()
-# Remove chat.marbomebel.ru block
-content = re.sub(r'\nchat\.marbomebel\.ru\s*\{[^}]*\}\n?', '\n', content)
-content = re.sub(r'chat\.marbomebel\.ru\s*\{[^}]*\}', '', content)
-with open('$CADDYFILE', 'w') as f:
-    f.write(content)
-"
-            fi
-
-            # Append clean config
-            cat >> "$CADDYFILE" << 'CADDY'
-
-chat.marbomebel.ru {
-    reverse_proxy 127.0.0.1:3847
-}
-CADDY
-
+            # Remove old entry
+            python3 -c "import re; f=open('$CADDYFILE'); c=f.read(); f.close(); c=re.sub(r'\nchat\.marbomebel\.ru\s*\{[^}]*\}\n?', '\n', c); c=re.sub(r'chat\.marbomebel\.ru\s*\{[^}]*\}', '', c); f=open('$CADDYFILE','w'); f.write(c); f.close()" 2>/dev/null || true
+            # Add clean entry
+            printf '\nchat.marbomebel.ru {\n    reverse_proxy 127.0.0.1:3847\n}\n' >> "$CADDYFILE"
             echo "Updated Caddyfile:"
             cat "$CADDYFILE"
-
-            # Validate and reload
             caddy validate --config "$CADDYFILE" 2>&1 || true
             caddy reload --config "$CADDYFILE" 2>&1 || systemctl reload caddy 2>&1 || systemctl restart caddy 2>&1
             echo "Caddy reloaded"
 
           elif echo "$PORT80_PROC" | grep -q nginx; then
-            echo "NGINX on port 80, configuring..."
-            cat > /etc/nginx/sites-enabled/chat-marbomebel << 'NGINX'
-server {
-    listen 80;
-    server_name chat.marbomebel.ru;
-    location / {
-        proxy_pass http://127.0.0.1:3847;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_read_timeout 300s;
-    }
-}
-NGINX
+            echo "NGINX on port 80"
+            printf 'server {\n    listen 80;\n    server_name chat.marbomebel.ru;\n    location / {\n        proxy_pass http://127.0.0.1:3847;\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_read_timeout 300s;\n    }\n}\n' > /etc/nginx/sites-enabled/chat-marbomebel
             nginx -t && systemctl reload nginx
 
           else
-            echo "Unknown service on port 80: $PORT80_PROC"
-            echo "Installing NGINX..."
-            # Stop whatever is on port 80
+            echo "Port 80: $PORT80_PROC"
             PORT80_PID=$(echo "$PORT80_PROC" | grep -oP 'pid=\K[0-9]+' || true)
             [ -n "$PORT80_PID" ] && kill "$PORT80_PID" && sleep 2
-
             apt-get update -qq && apt-get install -y -qq nginx
-            cat > /etc/nginx/sites-enabled/chat-marbomebel << 'NGINX'
-server {
-    listen 80;
-    server_name chat.marbomebel.ru;
-    location / {
-        proxy_pass http://127.0.0.1:3847;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_read_timeout 300s;
-    }
-}
-NGINX
+            printf 'server {\n    listen 80;\n    server_name chat.marbomebel.ru;\n    location / {\n        proxy_pass http://127.0.0.1:3847;\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection "upgrade";\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_read_timeout 300s;\n    }\n}\n' > /etc/nginx/sites-enabled/chat-marbomebel
             rm -f /etc/nginx/sites-enabled/default
             nginx -t && systemctl start nginx
           fi
 
-          # Final verification
           sleep 3
           echo "=== VERIFICATION ==="
           echo "Direct app:"
-          curl -s http://127.0.0.1:3847/api/health
+          curl -s http://127.0.0.1:3847/api/health || echo "FAIL"
           echo ""
           echo "Via proxy:"
-          curl -s -H "Host: chat.marbomebel.ru" http://127.0.0.1/api/health
-          echo ""
-          echo "Via domain:"
-          curl -s http://chat.marbomebel.ru/api/health 2>&1 | head -3
+          curl -s -H "Host: chat.marbomebel.ru" http://127.0.0.1/api/health || echo "FAIL"
           echo ""
           echo "=== DONE ==="
-          FIX
+          SCRIPT
+          $SCP_CMD /tmp/fix-proxy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/fix-proxy.sh
+
+      - name: Fix proxy config
+        run: |
+          $SSH_CMD "chmod +x /tmp/fix-proxy.sh && bash /tmp/fix-proxy.sh"
 
       - name: Healthcheck
         run: |
