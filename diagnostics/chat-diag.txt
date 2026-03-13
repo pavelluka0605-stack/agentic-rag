@@ -4,9 +4,9 @@ Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-101-generic x86_64)
  * Management:     https://landscape.canonical.com
  * Support:        https://ubuntu.com/pro
 
- System information as of Fri Mar 13 16:04:35 UTC 2026
+ System information as of Fri Mar 13 16:11:03 UTC 2026
 
-  System load:  0.0                Processes:             148
+  System load:  0.06               Processes:             150
   Usage of /:   55.2% of 47.39GB   Users logged in:       1
   Memory usage: 46%                IPv4 address for eth0: 72.56.127.126
   Swap usage:   21%
@@ -28,12 +28,12 @@ Learn more about enabling ESM Apps service at https://ubuntu.com/esm
 1 updates could not be installed automatically. For more details,
 see /var/log/unattended-upgrades/unattended-upgrades.log
 
-=== DEEP DIAGNOSTICS Fri Mar 13 16:05:32 UTC 2026 ===
+=== DEEP DIAGNOSTICS Fri Mar 13 16:11:57 UTC 2026 ===
 --- 1. PM2 status ---
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 575039   │ 29s    │ 0    │ online    │ 0%       │ 54.0mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 576792   │ 28s    │ 0    │ online    │ 0%       │ 54.9mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
 --- 2. PM2 logs (last 40 lines) ---
@@ -62,10 +62,12 @@ see /var/log/unattended-upgrades/unattended-upgrades.log
 0|claude-c | Claude Chat server running on port 3847
 0|claude-c | Claude CLI: /usr/bin/claude
 0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
 
 
 --- 3. Health check ---
-Health: {"status":"ok","uptime":30.245242367,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T16:05:32.997Z"}
+Health: {"status":"ok","uptime":28.990282635,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T16:11:57.624Z"}
 
 --- 4. Claude CLI check ---
 /usr/bin/claude
@@ -95,17 +97,17 @@ Chat response: *   Trying 127.0.0.1:3847...
 < Content-Type: text/event-stream
 < Cache-Control: no-cache
 < Connection: keep-alive
-< X-Request-Id: 92e8f739-a8ea-40bd-9ec4-33c1928e8535
-< Date: Fri, 13 Mar 2026 16:05:33 GMT
+< X-Request-Id: 6db4b681-036b-49e4-acdf-5a781d575663
+< Date: Fri, 13 Mar 2026 16:11:58 GMT
 < Transfer-Encoding: chunked
 < 
 { [68 bytes data]
 * Connection #0 to host 127.0.0.1 left intact
-data: {"type":"start","id":"92e8f739-a8ea-40bd-9ec4-33c1928e8535"}
+data: {"type":"start","id":"6db4b681-036b-49e4-acdf-5a781d575663"}
 
 data: {"type":"chunk","text":"```\nhello from diagnostics\n```\n"}
 
-data: {"type":"done","elapsed":"9.2","code":0}
+data: {"type":"done","elapsed":"13.4","code":0}
 
 --- 6. .env file check ---
 BEARER_TOKEN=cfc6b39d4152f7dc6a49b8445d1bb4fe45e742af56eb5581d2b8e23179d2acc6
@@ -119,7 +121,7 @@ PORT=3847
 │ namespace         │ default                               │
 │ version           │ 1.0.0                                 │
 │ restarts          │ 0                                     │
-│ uptime            │ 40s                                   │
+│ uptime            │ 43s                                   │
 │ script path       │ /opt/claude-chat/server.js            │
 │ script args       │ N/A                                   │
 │ error log path    │ /root/.pm2/logs/claude-chat-error.log │
@@ -134,7 +136,7 @@ PORT=3847
 │ node env          │ N/A                                   │
 
 --- 8. Node path and env ---
-node ok, pid 575957
+node ok, pid 577690
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
 
 === END DIAGNOSTICS ===
