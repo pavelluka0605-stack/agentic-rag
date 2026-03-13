@@ -7,43 +7,66 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Test endpoints
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Diagnose VPS
         continue-on-error: true
-        id: test
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           set +e
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+
           REPORT=""
 
-          # Test homepage
-          R1=$(curl -s -o /tmp/r1.txt -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/ 2>&1)
-          REPORT+="GET / → $R1\n"
-          echo "::notice::GET / → $R1"
-          echo "::notice::Body: $(head -c 200 /tmp/r1.txt)"
+          # 1. Check webapp.service
+          R1=$($SSH "systemctl is-active webapp.service 2>/dev/null; systemctl status webapp.service 2>/dev/null | head -15" 2>&1)
+          REPORT+="=== webapp.service ===\n$R1\n\n"
+          echo "::notice::webapp.service: $R1"
 
-          # Test POST /api/photo without file
-          R2=$(curl -s -o /tmp/r2.txt -w "%{http_code}" --max-time 10 -X POST https://chat.marbomebel.ru/api/photo 2>&1)
-          REPORT+="POST /api/photo (no file) → $R2\n"
-          echo "::notice::POST /api/photo (no file) → $R2"
-          echo "::notice::Body: $(head -c 300 /tmp/r2.txt)"
+          # 2. Check what's on port 8000
+          R2=$($SSH "ss -tlnp | grep 8000 || echo 'port 8000 not listening'" 2>&1)
+          REPORT+="=== Port 8000 ===\n$R2\n\n"
+          echo "::notice::Port 8000: $R2"
 
-          # Test GET /api/photo
-          R3=$(curl -s -o /tmp/r3.txt -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/api/photo 2>&1)
-          REPORT+="GET /api/photo → $R3\n"
-          echo "::notice::GET /api/photo → $R3"
-          echo "::notice::Body: $(head -c 300 /tmp/r3.txt)"
+          # 3. Check web.py content
+          R3=$($SSH "ls -la /opt/webapp/web.py 2>/dev/null; grep -n 'api/photo' /opt/webapp/web.py 2>/dev/null || echo 'no /api/photo in web.py'" 2>&1)
+          REPORT+="=== web.py ===\n$R3\n\n"
+          echo "::notice::web.py: $R3"
 
-          # Test GET /docs (FastAPI swagger)
-          R4=$(curl -s -o /tmp/r4.txt -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/docs 2>&1)
-          REPORT+="GET /docs → $R4\n"
-          echo "::notice::GET /docs → $R4"
+          # 4. Check /opt/p0-foundation/web.py
+          R4=$($SSH "ls -la /opt/p0-foundation/web.py 2>/dev/null; grep -n 'api/photo' /opt/p0-foundation/web.py 2>/dev/null || echo 'no /api/photo'" 2>&1)
+          REPORT+="=== p0-foundation/web.py ===\n$R4\n\n"
+          echo "::notice::p0 web.py: $R4"
+
+          # 5. Check nginx config
+          R5=$($SSH "grep -r 'chat.marbomebel' /etc/nginx/ 2>/dev/null | head -20 || echo 'no nginx config'" 2>&1)
+          REPORT+="=== nginx ===\n$R5\n\n"
+          echo "::notice::nginx: $R5"
+
+          # 6. Local curl test
+          R6=$($SSH "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/photo 2>/dev/null || echo 'failed'" 2>&1)
+          REPORT+="=== localhost:8000/api/photo ===\n$R6\n\n"
+          echo "::notice::localhost test: $R6"
+
+          # 7. Check all running python processes
+          R7=$($SSH "ps aux | grep -E 'uvicorn|gunicorn|python.*web' | grep -v grep || echo 'no python web'" 2>&1)
+          REPORT+="=== Python processes ===\n$R7\n\n"
+          echo "::notice::Python procs: $R7"
 
           # Send to Telegram
-          MSG="📸 Photo API Test\n\n$REPORT"
+          MSG="🔍 VPS Diagnostic\n\n$REPORT"
           curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
             -d chat_id="$TG_CHAT_ID" \
             --data-urlencode "text=$(echo -e "$MSG")" > /dev/null 2>&1 || true
 
-          echo "Tests done"
+          echo "Diagnostics complete"
