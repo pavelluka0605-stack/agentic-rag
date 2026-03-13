@@ -1,0 +1,16 @@
+{
+  "name": "claude-chat",
+  "version": "1.0.0",
+  "description": "Mobile PWA chat for VPS management via Claude Code CLI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "dotenv": "^16.4.5",
+    "express-rate-limit": "^7.4.0",
+    "uuid": "^10.0.0"
+  }
+}

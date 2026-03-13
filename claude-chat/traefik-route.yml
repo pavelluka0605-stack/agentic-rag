@@ -1,0 +1,15 @@
+http:
+  routers:
+    claude-chat:
+      rule: "Host(`chat.marbomebel.ru`)"
+      entryPoints:
+        - websecure
+      service: claude-chat
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    claude-chat:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:3847"
