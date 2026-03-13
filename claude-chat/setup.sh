@@ -11,18 +11,58 @@ echo "[1/6] Installing dependencies..."
 cd "$APP_DIR"
 npm install --production
 
-# 2. Install NGINX if not present
-echo "[2/6] Checking NGINX..."
-if ! command -v nginx &>/dev/null; then
-  echo "  Installing NGINX..."
-  apt-get update -qq
-  apt-get install -y -qq nginx
-  systemctl enable nginx
+# 2. Check what's on port 80 and handle it
+echo "[2/6] Checking port 80..."
+PORT80_PID=$(ss -tlnp | grep ':80 ' | grep -oP 'pid=\K[0-9]+' | head -1 || true)
+if [ -n "$PORT80_PID" ]; then
+  PORT80_NAME=$(ps -p "$PORT80_PID" -o comm= 2>/dev/null || echo "unknown")
+  echo "  Port 80 is used by: $PORT80_NAME (PID $PORT80_PID)"
+
+  if [ "$PORT80_NAME" = "caddy" ]; then
+    echo "  Caddy detected! Configuring Caddy instead of NGINX..."
+
+    # Configure Caddy for chat.marbomebel.ru
+    CADDY_CFG="/etc/caddy/Caddyfile"
+    if [ -f "$CADDY_CFG" ]; then
+      # Add chat.marbomebel.ru block if not already present
+      if ! grep -q "chat.marbomebel.ru" "$CADDY_CFG"; then
+        cat >> "$CADDY_CFG" << 'CADDY'
+
+chat.marbomebel.ru {
+    reverse_proxy 127.0.0.1:3847
+}
+CADDY
+        echo "  Added chat.marbomebel.ru to Caddyfile"
+      else
+        echo "  chat.marbomebel.ru already in Caddyfile"
+      fi
+      systemctl reload caddy || caddy reload --config "$CADDY_CFG" 2>/dev/null || true
+      echo "  Caddy reloaded"
+    else
+      echo "  WARNING: Caddyfile not found at $CADDY_CFG"
+    fi
+  else
+    echo "  Stopping $PORT80_NAME to free port 80..."
+    kill "$PORT80_PID" 2>/dev/null || true
+    sleep 2
+    # Proceed to install NGINX
+    INSTALL_NGINX=1
+  fi
+else
+  INSTALL_NGINX=1
 fi
 
-# 3. Configure NGINX for chat.marbomebel.ru
-echo "[3/6] Configuring NGINX..."
-cat > /etc/nginx/sites-enabled/chat-marbomebel << 'NGINX'
+# 3. Install and configure NGINX (only if Caddy not handling it)
+if [ "${INSTALL_NGINX:-}" = "1" ]; then
+  echo "[3/6] Setting up NGINX..."
+  if ! command -v nginx &>/dev/null; then
+    echo "  Installing NGINX..."
+    apt-get update -qq
+    apt-get install -y -qq nginx
+    systemctl enable nginx
+  fi
+
+  cat > /etc/nginx/sites-enabled/chat-marbomebel << 'NGINX'
 server {
     listen 80;
     server_name chat.marbomebel.ru;
@@ -42,12 +82,13 @@ server {
 }
 NGINX
 
-# Remove default site if exists
-rm -f /etc/nginx/sites-enabled/default
-
-nginx -t
-systemctl reload nginx || systemctl start nginx
-echo "  NGINX configured for chat.marbomebel.ru"
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t
+  systemctl start nginx || systemctl reload nginx
+  echo "  NGINX configured for chat.marbomebel.ru"
+else
+  echo "[3/6] Skipping NGINX (using Caddy)"
+fi
 
 # 4. Stop existing process if running
 echo "[4/6] Checking existing process..."
@@ -70,8 +111,5 @@ pm2 save
 echo ""
 echo "=== Setup Complete ==="
 echo "App running on port 3847"
-echo "NGINX proxying chat.marbomebel.ru -> :3847"
-echo ""
-echo "Access: http://chat.marbomebel.ru"
-echo "For HTTPS run: certbot --nginx -d chat.marbomebel.ru"
+echo "Access: https://chat.marbomebel.ru"
 echo ""
