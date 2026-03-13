@@ -70,42 +70,194 @@ jobs:
           bash setup.sh
           EOF
 
-      - name: Setup HTTPS with Certbot
+      - name: Diagnose and fix proxy
         run: |
-          $SSH_CMD << 'EOF'
-          # Install certbot if not present
-          if ! command -v certbot &>/dev/null; then
-            apt-get update -qq
-            apt-get install -y -qq certbot python3-certbot-nginx
+          $SSH_CMD << 'DIAG'
+          set -x
+          echo "=== DIAGNOSTICS ==="
+
+          # 1. What's on port 80?
+          echo "--- Port 80 ---"
+          ss -tlnp | grep ':80 ' || echo "Nothing on port 80!"
+
+          # 2. What's on port 443?
+          echo "--- Port 443 ---"
+          ss -tlnp | grep ':443 ' || echo "Nothing on port 443!"
+
+          # 3. App health
+          echo "--- App on 3847 ---"
+          curl -s http://127.0.0.1:3847/api/health || echo "App NOT responding on 3847!"
+
+          # 4. Caddy check
+          echo "--- Caddy ---"
+          which caddy 2>/dev/null && caddy version || echo "No caddy binary"
+          systemctl is-active caddy 2>/dev/null || echo "caddy service not active"
+          ls -la /etc/caddy/ 2>/dev/null || echo "No /etc/caddy/"
+          cat /etc/caddy/Caddyfile 2>/dev/null || echo "No Caddyfile"
+
+          # 5. NGINX check
+          echo "--- NGINX ---"
+          which nginx 2>/dev/null && nginx -v 2>&1 || echo "No nginx"
+          systemctl is-active nginx 2>/dev/null || echo "nginx not active"
+
+          # 6. PM2
+          echo "--- PM2 ---"
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+          pm2 list 2>/dev/null || echo "No pm2"
+
+          # 7. Test curl from VPS to itself via domain
+          echo "--- curl chat.marbomebel.ru from VPS ---"
+          curl -s -o /dev/null -w "HTTP %{http_code}" http://chat.marbomebel.ru/api/health 2>&1 || true
+          echo ""
+          curl -s http://chat.marbomebel.ru/api/health 2>&1 | head -5 || true
+
+          # 8. All listening ports
+          echo "--- All listening TCP ports ---"
+          ss -tlnp | head -20
+
+          echo "=== END DIAGNOSTICS ==="
+          DIAG
+
+      - name: Fix proxy config
+        run: |
+          $SSH_CMD << 'FIX'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+
+          echo "=== FIXING PROXY ==="
+
+          # Detect what's serving port 80
+          PORT80_PROC=$(ss -tlnp | grep ':80 ' | head -1 || true)
+
+          if echo "$PORT80_PROC" | grep -q caddy; then
+            echo "Caddy detected on port 80"
+
+            # Find Caddyfile
+            CADDYFILE=""
+            for f in /etc/caddy/Caddyfile /root/Caddyfile /opt/caddy/Caddyfile; do
+              [ -f "$f" ] && CADDYFILE="$f" && break
+            done
+
+            # Also check caddy config location
+            if [ -z "$CADDYFILE" ]; then
+              CADDYFILE=$(caddy environ 2>/dev/null | grep -oP 'CADDYFILE=\K.*' || true)
+            fi
+
+            if [ -z "$CADDYFILE" ]; then
+              echo "Can't find Caddyfile, creating /etc/caddy/Caddyfile"
+              mkdir -p /etc/caddy
+              CADDYFILE="/etc/caddy/Caddyfile"
+            fi
+
+            echo "Using Caddyfile: $CADDYFILE"
+            echo "Current content:"
+            cat "$CADDYFILE" 2>/dev/null || true
+
+            # Remove old chat entry if malformed, then add clean one
+            if grep -q "chat.marbomebel.ru" "$CADDYFILE"; then
+              echo "chat.marbomebel.ru already in Caddyfile, replacing..."
+              # Remove existing block (between chat.marbomebel.ru and next closing brace)
+              python3 -c "
+import re
+with open('$CADDYFILE') as f:
+    content = f.read()
+# Remove chat.marbomebel.ru block
+content = re.sub(r'\nchat\.marbomebel\.ru\s*\{[^}]*\}\n?', '\n', content)
+content = re.sub(r'chat\.marbomebel\.ru\s*\{[^}]*\}', '', content)
+with open('$CADDYFILE', 'w') as f:
+    f.write(content)
+"
+            fi
+
+            # Append clean config
+            cat >> "$CADDYFILE" << 'CADDY'
+
+chat.marbomebel.ru {
+    reverse_proxy 127.0.0.1:3847
+}
+CADDY
+
+            echo "Updated Caddyfile:"
+            cat "$CADDYFILE"
+
+            # Validate and reload
+            caddy validate --config "$CADDYFILE" 2>&1 || true
+            caddy reload --config "$CADDYFILE" 2>&1 || systemctl reload caddy 2>&1 || systemctl restart caddy 2>&1
+            echo "Caddy reloaded"
+
+          elif echo "$PORT80_PROC" | grep -q nginx; then
+            echo "NGINX on port 80, configuring..."
+            cat > /etc/nginx/sites-enabled/chat-marbomebel << 'NGINX'
+server {
+    listen 80;
+    server_name chat.marbomebel.ru;
+    location / {
+        proxy_pass http://127.0.0.1:3847;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 300s;
+    }
+}
+NGINX
+            nginx -t && systemctl reload nginx
+
+          else
+            echo "Unknown service on port 80: $PORT80_PROC"
+            echo "Installing NGINX..."
+            # Stop whatever is on port 80
+            PORT80_PID=$(echo "$PORT80_PROC" | grep -oP 'pid=\K[0-9]+' || true)
+            [ -n "$PORT80_PID" ] && kill "$PORT80_PID" && sleep 2
+
+            apt-get update -qq && apt-get install -y -qq nginx
+            cat > /etc/nginx/sites-enabled/chat-marbomebel << 'NGINX'
+server {
+    listen 80;
+    server_name chat.marbomebel.ru;
+    location / {
+        proxy_pass http://127.0.0.1:3847;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 300s;
+    }
+}
+NGINX
+            rm -f /etc/nginx/sites-enabled/default
+            nginx -t && systemctl start nginx
           fi
 
-          # Check if cert already exists
-          if [ ! -d /etc/letsencrypt/live/chat.marbomebel.ru ]; then
-            echo "Obtaining SSL certificate..."
-            certbot --nginx -d chat.marbomebel.ru --non-interactive --agree-tos --register-unsafely-without-email || echo "WARN: certbot failed, HTTP still works"
-          else
-            echo "SSL cert already exists, renewing if needed..."
-            certbot renew --quiet || true
-          fi
-          EOF
+          # Final verification
+          sleep 3
+          echo "=== VERIFICATION ==="
+          echo "Direct app:"
+          curl -s http://127.0.0.1:3847/api/health
+          echo ""
+          echo "Via proxy:"
+          curl -s -H "Host: chat.marbomebel.ru" http://127.0.0.1/api/health
+          echo ""
+          echo "Via domain:"
+          curl -s http://chat.marbomebel.ru/api/health 2>&1 | head -3
+          echo ""
+          echo "=== DONE ==="
+          FIX
 
       - name: Healthcheck
         run: |
           $SSH_CMD << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
           sleep 2
           HEALTH=$(curl -s http://127.0.0.1:3847/api/health)
           echo "Health: $HEALTH"
           echo "$HEALTH" | grep -q '"ok"' && echo "✓ Claude Chat is running!" || { echo "✗ Health check failed"; exit 1; }
-
-          # Check NGINX
-          nginx -t && echo "✓ NGINX config OK"
-          systemctl is-active nginx && echo "✓ NGINX is running"
-
           pm2 list | grep claude-chat
-          echo ""
           echo "=== Deploy Complete ==="
-          echo "URL: https://chat.marbomebel.ru"
-          echo "Port: 3847"
           EOF
 
       - name: Notify Telegram
