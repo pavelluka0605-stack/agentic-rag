@@ -1,4 +1,4 @@
-=== FIX v6 — SSL Certificate Fix Fri Mar 13 15:45:48 UTC 2026 ===
+=== FIX v6 — SSL Certificate Fix Fri Mar 13 15:52:22 UTC 2026 ===
 --- Current SSL cert for chat.marbomebel.ru ---
 issuer=C = US, O = Let's Encrypt, CN = R13
 subject=CN = chat.marbomebel.ru
@@ -71,18 +71,18 @@ notBefore=Mar 13 13:15:25 2026 GMT
 notAfter=Jun 11 13:15:24 2026 GMT
 
 App :3847:
-{"status":"ok","uptime":22.966253765,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:46:06.227Z"}
+{"status":"ok","uptime":22.823260164,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:52:39.841Z"}
 chat HTTPS (strict, no -k):
-{"status":"ok","uptime":23.070504093,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:46:06.331Z"}
+{"status":"ok","uptime":22.925568382,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:52:39.943Z"}
 chat HTTPS (skip verify):
-{"status":"ok","uptime":23.150435346,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:46:06.411Z"}
+{"status":"ok","uptime":23.005099212,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-13T15:52:40.023Z"}
 n8n HTTPS:
 HTTP 200
 Ports:
-LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=570554,fd=7))                                                                                                                          
-LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=570568,fd=7))                                                                                                                          
-LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=570559,fd=7))                                                                                                                          
-LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=570574,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=572019,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=572033,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=572024,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=572040,fd=7))                                                                                                                          
 
 Docker:
 NAMES                   STATUS                PORTS
