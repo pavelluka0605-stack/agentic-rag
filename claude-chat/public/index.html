@@ -638,6 +638,7 @@ async function sendMessage(text) {
   let fullText = '';
 
   try {
+    console.log('[chat] fetch:', cfg.url + '/api/chat');
     const res = await fetch(`${cfg.url}/api/chat`, {
       method: 'POST',
       headers: {
@@ -646,13 +647,19 @@ async function sendMessage(text) {
       },
       body: JSON.stringify({
         message: text,
-        history: messages.slice(-7, -1), // exclude the empty placeholder
+        history: messages.slice(-7, -1),
       }),
     });
 
+    console.log('[chat] response status:', res.status);
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || `HTTP ${res.status}`);
+      const errBody = await res.text().catch(() => res.statusText);
+      throw new Error(`HTTP ${res.status}: ${errBody}`);
+    }
+
+    if (!res.body) {
+      throw new Error('ReadableStream not supported');
     }
 
     const reader = res.body.getReader();
@@ -669,8 +676,10 @@ async function sendMessage(text) {
 
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6);
         try {
-          const data = JSON.parse(line.slice(6));
+          const data = JSON.parse(raw);
+          console.log('[chat] SSE:', data.type, data.text ? data.text.slice(0, 50) : '');
 
           if (data.type === 'start') {
             currentRequestId = data.id;
@@ -682,13 +691,27 @@ async function sendMessage(text) {
             fullText += `\n**Error:** ${data.text}`;
             updateLastAssistant(fullText);
           } else if (data.type === 'done') {
+            if (!fullText) fullText = '[No output from claude CLI]';
             updateLastAssistant(fullText, data.elapsed);
             saveChat();
           }
-        } catch (_) {}
+        } catch (parseErr) {
+          console.warn('[chat] SSE parse error:', parseErr, 'raw:', raw);
+        }
       }
     }
+
+    // Stream ended without 'done' event
+    if (fullText) {
+      updateLastAssistant(fullText);
+      saveChat();
+    } else {
+      updateLastAssistant('**No response received.** Check server logs.');
+      saveChat();
+    }
+
   } catch (err) {
+    console.error('[chat] fetch error:', err);
     if (fullText) {
       updateLastAssistant(fullText + `\n\n**Connection error:** ${err.message}`);
     } else {
