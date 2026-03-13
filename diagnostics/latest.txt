@@ -1,10 +1,35 @@
-=== URGENT FIX v5 Fri Mar 13 14:13:43 UTC 2026 ===
---- Stopping NGINX ---
-NGINX stopped
-Synchronizing state of nginx.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
-Executing: /usr/lib/systemd/systemd-sysv-install disable nginx
-Removed "/etc/systemd/system/multi-user.target.wants/nginx.service".
---- Dynamic config ---
+=== FIX v6 — SSL Certificate Fix Fri Mar 13 14:29:21 UTC 2026 ===
+--- Current SSL cert for chat.marbomebel.ru ---
+issuer=C = US, O = Let's Encrypt, CN = R13
+subject=CN = chat.marbomebel.ru
+notBefore=Mar 13 13:15:25 2026 GMT
+notAfter=Jun 11 13:15:24 2026 GMT
+
+--- Current SSL cert for n8n.marbomebel.ru ---
+issuer=C = US, O = Let's Encrypt, CN = R13
+subject=CN = n8n.marbomebel.ru
+notBefore=Mar  3 18:19:41 2026 GMT
+notAfter=Jun  1 18:19:40 2026 GMT
+
+--- ACME storage ---
+NO acme.json found! Creating directory...
+
+--- Traefik compose commands ---
+    command:
+    - --api.insecure=true
+    - --providers.docker=true
+    - --providers.docker.exposedbydefault=false
+    - --entrypoints.web.address=:80
+    - --entrypoints.web.http.redirections.entryPoint.to=websecure
+    - --entrypoints.web.http.redirections.entrypoint.scheme=https
+    - --entrypoints.websecure.address=:443
+    - --certificatesresolvers.mytlschallenge.acme.tlschallenge=true
+    - --certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}
+    - --certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json
+    - --providers.file.directory=/dynamic
+    - --providers.file.watch=true
+
+--- Dynamic chat.yml ---
 http:
   routers:
     chat-marbomebel:
@@ -20,38 +45,50 @@ http:
       loadBalancer:
         servers:
           - url: "http://172.17.0.1:3847"
---- Starting Traefik ---
- Container n8n-traefik-n8n-1  Recreate
- Container n8n-traefik-n8n-1  Recreated
- Container n8n-traefik-traefik-1  Starting
- Container n8n-traefik-n8n-1  Starting
- Container n8n-traefik-traefik-1  Started
-Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint n8n-traefik-n8n-1 (8b4612cb71c7afbc7c55beae9c1061cf01667fe4db363de546382f06076737cf): failed to bind host port for 127.0.0.1:5678:172.19.0.7:5678/tcp: address already in use
-Compose up failed
---- Traefik logs ---
 
-=== VERIFICATION ===
+--- DNS check ---
+Server IP: 72.56.127.126
+chat.marbomebel.ru -> 72.56.127.126
+n8n.marbomebel.ru -> 72.56.127.126
+
+--- Traefik static config check ---
+
+--- Restarting Traefik ---
+ Container n8n-traefik-traefik-1  Restarting
+ Container n8n-traefik-traefik-1  Started
+
+--- Traefik ACME logs ---
+
+--- Traefik all recent logs ---
+
+=== VERIFICATION (after restart) ===
+chat.marbomebel.ru SSL cert:
+issuer=C = US, O = Let's Encrypt, CN = R13
+subject=CN = chat.marbomebel.ru
+notBefore=Mar 13 13:15:25 2026 GMT
+notAfter=Jun 11 13:15:24 2026 GMT
+
 App :3847:
-{"status":"ok","uptime":16.759214419,"activeRequests":0,"timestamp":"2026-03-13T14:13:55.598Z"}
-n8n.marbomebel.ru HTTPS:
+{"status":"ok","uptime":24.390015657,"activeRequests":0,"timestamp":"2026-03-13T14:29:39.462Z"}
+chat HTTPS (strict, no -k):
+{"status":"ok","uptime":24.492369732,"activeRequests":0,"timestamp":"2026-03-13T14:29:39.564Z"}
+chat HTTPS (skip verify):
+{"status":"ok","uptime":24.567120322,"activeRequests":0,"timestamp":"2026-03-13T14:29:39.639Z"}
+n8n HTTPS:
 HTTP 200
-chat.marbomebel.ru HTTPS:
-{"status":"ok","uptime":16.932155422,"activeRequests":0,"timestamp":"2026-03-13T14:13:55.770Z"}
-chat.marbomebel.ru HTTP (should redirect):
-HTTP 301
 Ports:
-LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=564002,fd=7))                                                                                                                          
-LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=564014,fd=7))                                                                                                                          
-LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=564008,fd=7))                                                                                                                          
-LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=564021,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=565779,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=565794,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=565784,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=565800,fd=7))                                                                                                                          
 
 Docker:
 NAMES                   STATUS                PORTS
-n8n-traefik-traefik-1   Up 10 seconds         0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+n8n-traefik-traefik-1   Up 15 seconds         0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
 n8n-postgres-1          Up 4 days             5432/tcp
 n8n-voice-app-1         Up 4 days             80/tcp
 n8n-n8n-1               Up 3 days             5678/tcp
 openclaw                Up 9 days (healthy)   
 
-RESULT: SUCCESS — chat.marbomebel.ru WORKS!
+RESULT: SUCCESS — SSL is VALID, chat.marbomebel.ru works with trusted cert!
 === DONE ===
