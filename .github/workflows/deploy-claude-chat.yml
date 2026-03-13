@@ -15,6 +15,9 @@ env:
   SCP_CMD: scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}
   REMOTE_DIR: /opt/claude-chat
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     name: "Deploy Claude Chat to VPS"
