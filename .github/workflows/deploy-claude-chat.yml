@@ -1,0 +1,107 @@
+name: "Deploy Claude Chat"
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/*"
+    paths:
+      - "claude-chat/**"
+      - ".github/workflows/deploy-claude-chat.yml"
+  workflow_dispatch:
+
+env:
+  SSH_CMD: ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+  SCP_CMD: scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}
+  REMOTE_DIR: /opt/claude-chat
+
+jobs:
+  deploy:
+    name: "Deploy Claude Chat to VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Create directories on VPS
+        run: |
+          $SSH_CMD "mkdir -p $REMOTE_DIR/public"
+
+      - name: Copy files to VPS
+        run: |
+          $SCP_CMD claude-chat/server.js ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$REMOTE_DIR/
+          $SCP_CMD claude-chat/package.json ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$REMOTE_DIR/
+          $SCP_CMD claude-chat/package-lock.json ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$REMOTE_DIR/
+          $SCP_CMD claude-chat/setup.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$REMOTE_DIR/
+          $SCP_CMD claude-chat/traefik-route.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$REMOTE_DIR/
+          $SCP_CMD claude-chat/public/index.html ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$REMOTE_DIR/public/
+          $SCP_CMD claude-chat/public/manifest.json ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:$REMOTE_DIR/public/
+
+      - name: Create .env on VPS
+        run: |
+          $SSH_CMD << 'ENVEOF'
+          cat > /opt/claude-chat/.env << 'EOF'
+          BEARER_TOKEN=cfc6b39d4152f7dc6a49b8445d1bb4fe45e742af56eb5581d2b8e23179d2acc6
+          PORT=3847
+          EOF
+          ENVEOF
+
+      - name: Install deps and start
+        run: |
+          $SSH_CMD << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+          command -v node || { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs; }
+          echo "node=$(node --version) npm=$(npm --version)"
+
+          # Install PM2 globally if needed
+          command -v pm2 || npm install -g pm2
+
+          cd /opt/claude-chat
+          chmod +x setup.sh
+          bash setup.sh
+          EOF
+
+      - name: Healthcheck
+        run: |
+          $SSH_CMD << 'EOF'
+          sleep 2
+          HEALTH=$(curl -s http://127.0.0.1:3847/api/health)
+          echo "Health: $HEALTH"
+          echo "$HEALTH" | grep -q '"ok"' && echo "✓ Claude Chat is running!" || { echo "✗ Health check failed"; exit 1; }
+
+          pm2 list | grep claude-chat
+          echo ""
+          echo "=== Deploy Complete ==="
+          echo "URL: https://chat.marbomebel.ru"
+          echo "Port: 3847"
+          EOF
+
+      - name: Notify Telegram
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            MSG="✅ Claude Chat deployed successfully to VPS
+          🌐 https://chat.marbomebel.ru
+          📦 Port: 3847"
+          else
+            MSG="❌ Claude Chat deploy FAILED
+          🔗 ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TG_CHAT_ID }}" \
+            -d text="$MSG" \
+            -d parse_mode=HTML || true
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
