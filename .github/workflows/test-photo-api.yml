@@ -7,6 +7,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: Wait for deploy to finish
+        run: sleep 180
+
       - name: Test /api/photo endpoint availability
         run: |
           echo "=== Testing chat.marbomebel.ru /api/photo ==="
