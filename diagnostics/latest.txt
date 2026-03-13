@@ -1,4 +1,4 @@
-=== FIX v6 — SSL Certificate Fix Fri Mar 13 14:29:21 UTC 2026 ===
+=== FIX v6 — SSL Certificate Fix Fri Mar 13 15:37:43 UTC 2026 ===
 --- Current SSL cert for chat.marbomebel.ru ---
 issuer=C = US, O = Let's Encrypt, CN = R13
 subject=CN = chat.marbomebel.ru
@@ -12,7 +12,9 @@ notBefore=Mar  3 18:19:41 2026 GMT
 notAfter=Jun  1 18:19:40 2026 GMT
 
 --- ACME storage ---
-NO acme.json found! Creating directory...
+acme.json exists, size: 0 bytes
+chat.marbomebel.ru NOT in acme.json — cert not yet obtained!
+Parse error: Expecting value: line 1 column 1 (char 0)
 
 --- Traefik compose commands ---
     command:
@@ -69,18 +71,18 @@ notBefore=Mar 13 13:15:25 2026 GMT
 notAfter=Jun 11 13:15:24 2026 GMT
 
 App :3847:
-{"status":"ok","uptime":24.390015657,"activeRequests":0,"timestamp":"2026-03-13T14:29:39.462Z"}
+{"status":"ok","uptime":24.538102686,"activeRequests":0,"timestamp":"2026-03-13T15:38:01.570Z"}
 chat HTTPS (strict, no -k):
-{"status":"ok","uptime":24.492369732,"activeRequests":0,"timestamp":"2026-03-13T14:29:39.564Z"}
+{"status":"ok","uptime":24.633532213,"activeRequests":0,"timestamp":"2026-03-13T15:38:01.665Z"}
 chat HTTPS (skip verify):
-{"status":"ok","uptime":24.567120322,"activeRequests":0,"timestamp":"2026-03-13T14:29:39.639Z"}
+{"status":"ok","uptime":24.709910576,"activeRequests":0,"timestamp":"2026-03-13T15:38:01.742Z"}
 n8n HTTPS:
 HTTP 200
 Ports:
-LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=565779,fd=7))                                                                                                                          
-LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=565794,fd=7))                                                                                                                          
-LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=565784,fd=7))                                                                                                                          
-LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=565800,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=568881,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=568893,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=568886,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=568898,fd=7))                                                                                                                          
 
 Docker:
 NAMES                   STATUS                PORTS
