@@ -1,14 +1,83 @@
-=== FIX HTTPS PROXY Fri Mar 13 13:57:49 UTC 2026 ===
+=== FIX v3 Fri Mar 13 14:04:24 UTC 2026 ===
+--- Docker containers ---
+CONTAINER ID   NAMES                   IMAGE                    PORTS
+b77d63637705   n8n-postgres-1          pgvector/pgvector:pg16   5432/tcp
+43bc332d60fe   n8n-voice-app-1         nginx:alpine             80/tcp
+f22e23598ce9   n8n-n8n-1               n8nio/n8n:latest         5678/tcp
+dddcfbe32162   n8n-traefik-traefik-1   traefik                  0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+a2ffa3a5ed71   openclaw                alpine/openclaw:latest   
+
 --- Docker on 443 ---
-PID on 443: 60020
-Docker containers on 443: dddcfbe32162 n8n-traefik-traefik-1 0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
-NAMES                   PORTS
-n8n-postgres-1          5432/tcp
-n8n-voice-app-1         80/tcp
-n8n-n8n-1               5678/tcp
-n8n-traefik-traefik-1   0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
-openclaw                
---- Current NGINX config ---
+dddcfbe32162 n8n-traefik-traefik-1 traefik 0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+Container: n8n-traefik-traefik-1 (traefik)
+--- Docker compose ---
+Compose file: /opt/n8n-traefik/compose.yaml
+services:
+  traefik:
+    image: "traefik"
+    restart: always
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - traefik_data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: always
+    ports:
+      - "127.0.0.1:5678:5678"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.n8n.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`)
+      - traefik.http.routers.n8n.tls=true
+      - traefik.http.routers.n8n.entrypoints=web,websecure
+      - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
+      - traefik.http.middlewares.n8n.headers.SSLRedirect=true
+      - traefik.http.middlewares.n8n.headers.STSSeconds=315360000
+      - traefik.http.middlewares.n8n.headers.browserXSSFilter=true
+      - traefik.http.middlewares.n8n.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.n8n.headers.forceSTSHeader=true
+      - traefik.http.middlewares.n8n.headers.SSLHost=${DOMAIN_NAME}
+      - traefik.http.middlewares.n8n.headers.STSIncludeSubdomains=true
+      - traefik.http.middlewares.n8n.headers.STSPreload=true
+      - traefik.http.routers.n8n.middlewares=n8n@docker
+    environment:
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - N8N_RUNNERS_ENABLED=true
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
+Compose dir: /opt/n8n-traefik
+total 20
+drwxr-xr-x  3 root root 4096 Mar  3 19:18 .
+drwxr-xr-x 15 root root 4096 Mar 13 10:23 ..
+-rw-r--r--  1 root root  105 Mar  3 19:18 .env
+-rw-r--r--  1 root root 2231 Mar  2 13:52 compose.yaml
+drwxr-xr-x  2 root root 4096 Mar  2 13:52 local-files
+
+--- DNS ---
+72.56.127.126
+--- NGINX configs ---
+total 12
+drwxr-xr-x 2 root root 4096 Mar 13 13:16 .
+drwxr-xr-x 8 root root 4096 Mar 13 13:57 ..
+-rw-r--r-- 1 root root  528 Mar 13 14:04 chat-marbomebel
+=== /etc/nginx/sites-enabled/chat-marbomebel ===
 server {
     listen 80;
     server_name chat.marbomebel.ru;
@@ -26,79 +95,23 @@ server {
         proxy_send_timeout 300s;
     }
 }
---- nginx.conf includes ---
-include /etc/nginx/modules-enabled/*.conf;
-	include /etc/nginx/mime.types;
-	include /etc/nginx/conf.d/*.conf;
-	include /etc/nginx/sites-enabled/*;
---- Installing certbot ---
-Certbot already installed: certbot 2.9.0
---- Docker inspect ---
-Container on 443: /n8n-traefik-traefik-1 (traefik)
-Docker reverse proxy detected: traefik
-Traefik in Docker! Need to add labels or file provider config
 
---- Strategy: NGINX SSL ---
-Trying certbot...
-Saving debug log to /var/log/letsencrypt/letsencrypt.log
-Requesting a certificate for chat.marbomebel.ru
-
-Certbot failed to authenticate some domains (authenticator: nginx). The Certificate Authority reported these problems:
-  Domain: chat.marbomebel.ru
-  Type:   unauthorized
-  Detail: 72.56.127.126: Invalid response from https://chat.marbomebel.ru/.well-known/acme-challenge/F_0jZ6DJmTDXcT6Xw6LPtS4ZuriUbRVBRU9Yp7su0iM: 404
-
-Hint: The Certificate Authority failed to verify the temporary nginx configuration changes made by Certbot. Ensure the listed domains point to this nginx server and that it is accessible from the internet.
-
-Some challenges have failed.
-Ask for help or search for solutions at https://community.letsencrypt.org. See the logfile /var/log/letsencrypt/letsencrypt.log or re-run Certbot with -v for more details.
-Certbot failed. Trying alternative...
-Saving debug log to /var/log/letsencrypt/letsencrypt.log
-Requesting a certificate for chat.marbomebel.ru
-
-Certbot failed to authenticate some domains (authenticator: webroot). The Certificate Authority reported these problems:
-  Domain: chat.marbomebel.ru
-  Type:   unauthorized
-  Detail: 72.56.127.126: Invalid response from https://chat.marbomebel.ru/.well-known/acme-challenge/VNw8uwMFZav_FubSKxOs-BzAV0JbR0FpT8XSrAmT6gU: 404
-
-Hint: The Certificate Authority failed to download the temporary challenge files created by Certbot. Ensure that the listed domains serve their content from the provided --webroot-path/-w and that files created there can be downloaded from the internet.
-
-Some challenges have failed.
-Ask for help or search for solutions at https://community.letsencrypt.org. See the logfile /var/log/letsencrypt/letsencrypt.log or re-run Certbot with -v for more details.
-Webroot also failed. Trying standalone with port 80...
-Saving debug log to /var/log/letsencrypt/letsencrypt.log
-Requesting a certificate for chat.marbomebel.ru
-
-Certbot failed to authenticate some domains (authenticator: standalone). The Certificate Authority reported these problems:
-  Domain: chat.marbomebel.ru
-  Type:   unauthorized
-  Detail: 72.56.127.126: Invalid response from https://chat.marbomebel.ru/.well-known/acme-challenge/pTM6H8dR2HrnrYXQdL3Jg4T6OH0EsDUSONHQ9RNG0tA: 404
-
-Hint: The Certificate Authority failed to download the challenge files from the temporary standalone webserver started by Certbot on port 80. Ensure that the listed domains point to this machine and that it can accept inbound connections from the internet.
-
-Some challenges have failed.
-Ask for help or search for solutions at https://community.letsencrypt.org. See the logfile /var/log/letsencrypt/letsencrypt.log or re-run Certbot with -v for more details.
-All certbot methods failed
-No SSL cert obtained
+=== PLAN ===
+Docker container on 443: n8n-traefik-traefik-1 (traefik)
+FIX: Traefik in Docker - need labels or file provider
 
 === VERIFICATION ===
 Direct :3847:
-{"status":"ok","uptime":28.989180064,"activeRequests":0,"timestamp":"2026-03-13T13:58:13.897Z"}
-HTTP proxy:
-{"status":"ok","uptime":29.014235341,"activeRequests":0,"timestamp":"2026-03-13T13:58:13.922Z"}
-HTTPS proxy:
+{"status":"ok","uptime":11.609709585,"activeRequests":0,"timestamp":"2026-03-13T14:04:29.713Z"}
+HTTPS:
 404 page not found
 
-External HTTP:
-FAIL
-
-External HTTPS:
-404 page not found
-
---- Port status after fix ---
-LISTEN 0      511          0.0.0.0:80         0.0.0.0:*    users:(("nginx",pid=560125,fd=5),("nginx",pid=560124,fd=5),("nginx",pid=560123,fd=5))                                                                             
+HTTP:
+Moved Permanently
+Ports:
+LISTEN 0      511          0.0.0.0:80         0.0.0.0:*    users:(("nginx",pid=561049,fd=5),("nginx",pid=560124,fd=5),("nginx",pid=560123,fd=5))                                                                             
 LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=60020,fd=7))                                                                                                                           
 LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=60014,fd=7))                                                                                                                           
 LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=60028,fd=7))                                                                                                                           
-RESULT: HTTP_PROXY_OK_BUT_HTTPS_BROKEN
+RESULT: STILL_BROKEN
 === DONE ===
