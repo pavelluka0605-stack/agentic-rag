@@ -459,6 +459,14 @@ jobs:
           # Remove heredoc indentation
           sed -i 's/^          //' /etc/systemd/system/webapp.service
 
+          # Kill any stale uvicorn on port 8000 not managed by systemd
+          STALE_PID=$(lsof -ti :8000 2>/dev/null || true)
+          if [ -n "$STALE_PID" ]; then
+            echo "Killing stale process on port 8000: $STALE_PID"
+            kill -9 $STALE_PID 2>/dev/null || true
+            sleep 2
+          fi
+
           systemctl daemon-reload
           systemctl enable webapp
           systemctl restart webapp
