@@ -75,27 +75,44 @@ jobs:
           $SCP_CMD claude-chat/fix-proxy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/fix-proxy.sh
           $SSH_CMD "chmod +x /tmp/fix-proxy.sh && TG_BOT_TOKEN=${{ secrets.TG_BOT_TOKEN }} TG_CHAT_ID=${{ secrets.TG_CHAT_ID }} bash /tmp/fix-proxy.sh" || true
 
-      - name: Fetch diagnostics from VPS
+      - name: Fetch and publish diagnostics
         if: always()
         run: |
           $SCP_CMD ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/proxy-diag.txt /tmp/proxy-diag.txt || echo "No diag file"
           if [ -f /tmp/proxy-diag.txt ]; then
-            echo "--- DIAGNOSTICS OUTPUT ---"
+            echo "--- DIAGNOSTICS ---"
             cat /tmp/proxy-diag.txt
             echo "--- END ---"
-            mkdir -p diagnostics
-            cp /tmp/proxy-diag.txt diagnostics/proxy-diag-$(date +%Y%m%d-%H%M%S).txt
-          fi
-
-      - name: Commit diagnostics to repo
-        if: always()
-        run: |
-          if [ -d diagnostics ] && ls diagnostics/*.txt 1>/dev/null 2>&1; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add diagnostics/
-            git commit -m "auto: proxy diagnostics $(date +%Y%m%d-%H%M%S)" || echo "Nothing to commit"
-            git push origin HEAD:${{ github.ref_name }} || echo "Push failed"
+            # Write to GitHub Step Summary (visible in Actions UI)
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat /tmp/proxy-diag.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            # Upload diagnostics via GitHub API as a gist-like issue comment
+            DIAG_CONTENT=$(cat /tmp/proxy-diag.txt | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
+            curl -s -X PATCH \
+              -H "Authorization: token ${{ github.token }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              -d "{\"name\":\"diag\"}" > /dev/null 2>&1 || true
+            # Create/update a file via Contents API
+            # Get existing file SHA if exists
+            EXISTING=$(curl -s -H "Authorization: token ${{ github.token }}" \
+              "https://api.github.com/repos/${{ github.repository }}/contents/diagnostics/latest.txt?ref=${{ github.ref_name }}" 2>&1)
+            EXISTING_SHA=$(echo "$EXISTING" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sha',''))" 2>/dev/null || echo "")
+            CONTENT_B64=$(base64 -w0 /tmp/proxy-diag.txt)
+            if [ -n "$EXISTING_SHA" ]; then
+              curl -s -X PUT \
+                -H "Authorization: token ${{ github.token }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${{ github.repository }}/contents/diagnostics/latest.txt" \
+                -d "{\"message\":\"auto: proxy diagnostics\",\"content\":\"${CONTENT_B64}\",\"sha\":\"${EXISTING_SHA}\",\"branch\":\"${{ github.ref_name }}\"}" || echo "Update failed"
+            else
+              curl -s -X PUT \
+                -H "Authorization: token ${{ github.token }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${{ github.repository }}/contents/diagnostics/latest.txt" \
+                -d "{\"message\":\"auto: proxy diagnostics\",\"content\":\"${CONTENT_B64}\",\"branch\":\"${{ github.ref_name }}\"}" || echo "Create failed"
+            fi
           fi
 
       - name: Healthcheck
