@@ -7,69 +7,110 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for deploy to finish
-        run: sleep 180
-
-      - name: Test /api/photo endpoint availability
+      - name: Test /api/photo endpoint and report
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          echo "=== Testing chat.marbomebel.ru /api/photo ==="
+          REPORT=""
+          ALL_PASS=true
 
-          # Test 1: GET should return 405 (Method Not Allowed) — endpoint exists
-          echo "--- Test 1: GET /api/photo (expect 405) ---"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/api/photo)
-          echo "HTTP Status: $STATUS"
+          # Test 1: GET should return 405
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/api/photo || echo "000")
           if [ "$STATUS" = "405" ]; then
-            echo "PASS: Endpoint exists (405 Method Not Allowed for GET)"
-          elif [ "$STATUS" = "200" ]; then
-            echo "PASS: Endpoint exists (200 OK)"
+            REPORT+="✅ GET /api/photo → 405 (endpoint exists)\n"
           else
-            echo "WARN: Unexpected status $STATUS"
+            REPORT+="❌ GET /api/photo → $STATUS (expected 405)\n"
+            ALL_PASS=false
           fi
 
-          # Test 2: POST without file — should return 422 (validation error)
-          echo ""
-          echo "--- Test 2: POST /api/photo without file (expect 422) ---"
-          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 10 -X POST https://chat.marbomebel.ru/api/photo)
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          STATUS=$(echo "$RESPONSE" | tail -1)
-          echo "HTTP Status: $STATUS"
-          echo "Body: $BODY"
+          # Test 2: POST without file
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST https://chat.marbomebel.ru/api/photo || echo "000")
           if [ "$STATUS" = "422" ]; then
-            echo "PASS: Validation error as expected (no file provided)"
+            REPORT+="✅ POST /api/photo (no file) → 422\n"
           else
-            echo "INFO: Status $STATUS"
+            REPORT+="❌ POST /api/photo (no file) → $STATUS (expected 422)\n"
+            ALL_PASS=false
           fi
 
-          # Test 3: POST with a test image file
-          echo ""
-          echo "--- Test 3: POST /api/photo with test image ---"
-          # Create a minimal valid JPEG (1x1 pixel)
-          printf '\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.\x27 ",#\x1c\x1c(7),01444\x1f\x27444444444444\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xc4\x00\xb5\x10\x00\x02\x01\x03\x03\x02\x04\x03\x05\x05\x04\x04\x00\x00\x01}\x01\x02\x03\x00\x04\x11\x05\x12!1A\x06\x13Qa\x07"q\x142\x81\x91\xa1\x08#B\xb1\xc1\x15R\xd1\xf0$3br\x82\t\n\x16\x17\x18\x19\x1a%&\x27()*456789:CDEFGHIJSTUVWXYZcdefghijstuvwxyz\x83\x84\x85\x86\x87\x88\x89\x8a\x92\x93\x94\x95\x96\x97\x98\x99\x9a\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xfb\xd2\x8a(\x03\xff\xd9' > /tmp/test.jpg
+          # Test 3: POST with test image
+          python3 -c "
+          import struct
+          # Create minimal 1x1 PNG
+          data = b'\\x89PNG\\r\\n\\x1a\\n'
+          # IHDR
+          ihdr = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
+          import zlib
+          crc = struct.pack('>I', zlib.crc32(b'IHDR' + ihdr) & 0xffffffff)
+          data += struct.pack('>I', len(ihdr)) + b'IHDR' + ihdr + crc
+          # IDAT
+          raw = zlib.compress(b'\\x00\\xff\\x00\\x00')
+          crc2 = struct.pack('>I', zlib.crc32(b'IDAT' + raw) & 0xffffffff)
+          data += struct.pack('>I', len(raw)) + b'IDAT' + raw + crc2
+          # IEND
+          crc3 = struct.pack('>I', zlib.crc32(b'IEND') & 0xffffffff)
+          data += struct.pack('>I', 0) + b'IEND' + crc3
+          with open('/tmp/test.png', 'wb') as f:
+              f.write(data)
+          "
 
-          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 30 \
+          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 \
             -X POST https://chat.marbomebel.ru/api/photo \
-            -F "file=@/tmp/test.jpg;type=image/jpeg")
+            -F "file=@/tmp/test.png;type=image/png" || echo -e "\n000")
           BODY=$(echo "$RESPONSE" | head -n -1)
           STATUS=$(echo "$RESPONSE" | tail -1)
-          echo "HTTP Status: $STATUS"
-          echo "Body: $BODY"
+          if [ "$STATUS" = "200" ]; then
+            REPORT+="✅ POST /api/photo (with image) → 200\n"
+            REPORT+="   Response: ${BODY:0:200}\n"
+          else
+            REPORT+="❌ POST /api/photo (with image) → $STATUS\n"
+            REPORT+="   Response: ${BODY:0:200}\n"
+            ALL_PASS=false
+          fi
 
           # Test 4: POST /api/photo/analyze
-          echo ""
-          echo "--- Test 4: POST /api/photo/analyze with test image ---"
-          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 30 \
+          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 \
             -X POST https://chat.marbomebel.ru/api/photo/analyze \
-            -F "file=@/tmp/test.jpg;type=image/jpeg")
+            -F "file=@/tmp/test.png;type=image/png" || echo -e "\n000")
           BODY=$(echo "$RESPONSE" | head -n -1)
           STATUS=$(echo "$RESPONSE" | tail -1)
-          echo "HTTP Status: $STATUS"
-          echo "Body: $BODY"
+          if [ "$STATUS" = "200" ]; then
+            REPORT+="✅ POST /api/photo/analyze → 200\n"
+            REPORT+="   Response: ${BODY:0:200}\n"
+          else
+            REPORT+="❌ POST /api/photo/analyze → $STATUS\n"
+            REPORT+="   Response: ${BODY:0:200}\n"
+            ALL_PASS=false
+          fi
 
-          # Test 5: Basic health
-          echo ""
-          echo "--- Test 5: GET / (homepage) ---"
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/)
-          echo "HTTP Status: $STATUS"
+          # Test 5: Homepage
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/ || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            REPORT+="✅ GET / (homepage) → 200\n"
+          else
+            REPORT+="❌ GET / (homepage) → $STATUS\n"
+            ALL_PASS=false
+          fi
 
-          echo ""
-          echo "=== Tests complete ==="
+          echo -e "$REPORT"
+
+          # Send to Telegram
+          if [ -n "$TG_BOT_TOKEN" ] && [ -n "$TG_CHAT_ID" ]; then
+            HEADER="📸 Photo API Test Results"
+            if [ "$ALL_PASS" = true ]; then
+              HEADER+=" ✅ ALL PASS"
+            else
+              HEADER+=" ⚠️ SOME FAILED"
+            fi
+            MSG="$HEADER\n\n$REPORT"
+            curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+              -d chat_id="$TG_CHAT_ID" \
+              -d text="$(echo -e "$MSG")" \
+              -d parse_mode="HTML" > /dev/null 2>&1 || true
+          fi
+
+          # Fail workflow if any test failed
+          if [ "$ALL_PASS" = false ]; then
+            echo "::error::Some tests failed"
+            exit 1
+          fi
