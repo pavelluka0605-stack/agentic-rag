@@ -118,6 +118,78 @@ jobs:
             fi
           fi
 
+      - name: Deep diagnostics
+        run: |
+          $SSH_CMD << 'DIAG' | tee /tmp/chat-diag.txt
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" || true
+
+          echo "=== DEEP DIAGNOSTICS $(date) ==="
+
+          echo "--- 1. PM2 status ---"
+          pm2 list 2>&1 || echo "pm2 not found"
+
+          echo ""
+          echo "--- 2. PM2 logs (last 40 lines) ---"
+          pm2 logs claude-chat --nostream --lines 40 2>&1 || echo "no logs"
+
+          echo ""
+          echo "--- 3. Health check ---"
+          HEALTH=$(curl -s --max-time 5 http://127.0.0.1:3847/api/health 2>&1)
+          echo "Health: $HEALTH"
+
+          echo ""
+          echo "--- 4. Claude CLI check ---"
+          which claude 2>&1 || echo "which: not found"
+          claude --version 2>&1 || echo "claude --version: failed"
+
+          echo ""
+          echo "--- 5. Test /api/chat request ---"
+          CHAT_RESP=$(curl -sv --max-time 30 \
+            -X POST http://127.0.0.1:3847/api/chat \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer cfc6b39d4152f7dc6a49b8445d1bb4fe45e742af56eb5581d2b8e23179d2acc6" \
+            -d '{"message":"echo hello from diagnostics"}' 2>&1)
+          echo "Chat response: $CHAT_RESP"
+
+          echo ""
+          echo "--- 6. .env file check ---"
+          cat /opt/claude-chat/.env 2>&1 | head -5
+
+          echo ""
+          echo "--- 7. Process tree ---"
+          pm2 describe claude-chat 2>&1 | head -20
+
+          echo ""
+          echo "--- 8. Node path and env ---"
+          node -e "console.log('node ok, pid', process.pid)" 2>&1
+          echo "PATH=$PATH"
+
+          echo ""
+          echo "=== END DIAGNOSTICS ==="
+          DIAG
+
+      - name: Publish diagnostics
+        if: always()
+        run: |
+          if [ -f /tmp/chat-diag.txt ]; then
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat /tmp/chat-diag.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            # Update diagnostics file
+            EXISTING=$(curl -s -H "Authorization: token ${{ github.token }}" \
+              "https://api.github.com/repos/${{ github.repository }}/contents/diagnostics/chat-diag.txt?ref=${{ github.ref_name }}" 2>&1)
+            EXISTING_SHA=$(echo "$EXISTING" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sha',''))" 2>/dev/null || echo "")
+            CONTENT_B64=$(base64 -w0 /tmp/chat-diag.txt)
+            SHA_PARAM=""
+            [ -n "$EXISTING_SHA" ] && SHA_PARAM=",\"sha\":\"${EXISTING_SHA}\""
+            curl -s -X PUT \
+              -H "Authorization: token ${{ github.token }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/contents/diagnostics/chat-diag.txt" \
+              -d "{\"message\":\"auto: chat diagnostics\",\"content\":\"${CONTENT_B64}\"${SHA_PARAM},\"branch\":\"${{ github.ref_name }}\"}" || echo "Upload failed"
+          fi
+
       - name: Healthcheck
         run: |
           $SSH_CMD << 'EOF'
