@@ -70,6 +70,25 @@ jobs:
           bash setup.sh
           EOF
 
+      - name: Setup HTTPS with Certbot
+        run: |
+          $SSH_CMD << 'EOF'
+          # Install certbot if not present
+          if ! command -v certbot &>/dev/null; then
+            apt-get update -qq
+            apt-get install -y -qq certbot python3-certbot-nginx
+          fi
+
+          # Check if cert already exists
+          if [ ! -d /etc/letsencrypt/live/chat.marbomebel.ru ]; then
+            echo "Obtaining SSL certificate..."
+            certbot --nginx -d chat.marbomebel.ru --non-interactive --agree-tos --register-unsafely-without-email || echo "WARN: certbot failed, HTTP still works"
+          else
+            echo "SSL cert already exists, renewing if needed..."
+            certbot renew --quiet || true
+          fi
+          EOF
+
       - name: Healthcheck
         run: |
           $SSH_CMD << 'EOF'
@@ -77,6 +96,10 @@ jobs:
           HEALTH=$(curl -s http://127.0.0.1:3847/api/health)
           echo "Health: $HEALTH"
           echo "$HEALTH" | grep -q '"ok"' && echo "✓ Claude Chat is running!" || { echo "✗ Health check failed"; exit 1; }
+
+          # Check NGINX
+          nginx -t && echo "✓ NGINX config OK"
+          systemctl is-active nginx && echo "✓ NGINX is running"
 
           pm2 list | grep claude-chat
           echo ""
