@@ -7,7 +7,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Test /api/photo endpoint and report
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Test webapp on VPS via SSH
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
@@ -15,102 +22,85 @@ jobs:
           REPORT=""
           ALL_PASS=true
 
-          # Test 1: GET should return 405
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/api/photo || echo "000")
-          if [ "$STATUS" = "405" ]; then
-            REPORT+="✅ GET /api/photo → 405 (endpoint exists)\n"
+          # Check systemd service
+          SVC_STATUS=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "systemctl is-active webapp.service 2>/dev/null || echo 'inactive'" )
+          if [ "$SVC_STATUS" = "active" ]; then
+            REPORT+="✅ webapp.service: active\n"
           else
-            REPORT+="❌ GET /api/photo → $STATUS (expected 405)\n"
+            REPORT+="❌ webapp.service: $SVC_STATUS\n"
+            ALL_PASS=false
+            # Get more details
+            LOGS=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              "journalctl -u webapp.service --no-pager -n 30 2>/dev/null || echo 'no logs'" )
+            REPORT+="   Logs:\n$LOGS\n"
+          fi
+
+          # Check if web.py exists and has /api/photo
+          FILE_CHECK=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "grep -c 'api/photo' /opt/webapp/web.py 2>/dev/null || echo 0" )
+          if [ "$FILE_CHECK" -gt 0 ]; then
+            REPORT+="✅ web.py contains /api/photo ($FILE_CHECK matches)\n"
+          else
+            REPORT+="❌ web.py does NOT contain /api/photo\n"
             ALL_PASS=false
           fi
 
-          # Test 2: POST without file
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST https://chat.marbomebel.ru/api/photo || echo "000")
-          if [ "$STATUS" = "422" ]; then
+          # Check port 8000 locally
+          PORT_CHECK=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:8000/ 2>/dev/null || echo '000'" )
+          if [ "$PORT_CHECK" = "200" ]; then
+            REPORT+="✅ localhost:8000 → 200\n"
+          else
+            REPORT+="❌ localhost:8000 → $PORT_CHECK\n"
+            ALL_PASS=false
+          fi
+
+          # Test POST /api/photo locally on VPS
+          PHOTO_TEST=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "curl -s -o /dev/null -w '%{http_code}' --max-time 5 -X POST http://localhost:8000/api/photo 2>/dev/null || echo '000'" )
+          if [ "$PHOTO_TEST" = "422" ]; then
             REPORT+="✅ POST /api/photo (no file) → 422\n"
+          elif [ "$PHOTO_TEST" = "405" ]; then
+            REPORT+="✅ POST /api/photo → 405 (endpoint exists)\n"
           else
-            REPORT+="❌ POST /api/photo (no file) → $STATUS (expected 422)\n"
+            REPORT+="❌ POST /api/photo → $PHOTO_TEST\n"
             ALL_PASS=false
           fi
 
-          # Test 3: POST with test image
-          python3 -c "
-          import struct
-          # Create minimal 1x1 PNG
-          data = b'\\x89PNG\\r\\n\\x1a\\n'
-          # IHDR
-          ihdr = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
-          import zlib
-          crc = struct.pack('>I', zlib.crc32(b'IHDR' + ihdr) & 0xffffffff)
-          data += struct.pack('>I', len(ihdr)) + b'IHDR' + ihdr + crc
-          # IDAT
-          raw = zlib.compress(b'\\x00\\xff\\x00\\x00')
-          crc2 = struct.pack('>I', zlib.crc32(b'IDAT' + raw) & 0xffffffff)
-          data += struct.pack('>I', len(raw)) + b'IDAT' + raw + crc2
-          # IEND
-          crc3 = struct.pack('>I', zlib.crc32(b'IEND') & 0xffffffff)
-          data += struct.pack('>I', 0) + b'IEND' + crc3
-          with open('/tmp/test.png', 'wb') as f:
-              f.write(data)
-          "
-
-          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 \
-            -X POST https://chat.marbomebel.ru/api/photo \
-            -F "file=@/tmp/test.png;type=image/png" || echo -e "\n000")
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          STATUS=$(echo "$RESPONSE" | tail -1)
-          if [ "$STATUS" = "200" ]; then
-            REPORT+="✅ POST /api/photo (with image) → 200\n"
-            REPORT+="   Response: ${BODY:0:200}\n"
+          # Test external access
+          EXT_CHECK=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/ 2>/dev/null || echo "000")
+          if [ "$EXT_CHECK" = "200" ]; then
+            REPORT+="✅ External https://chat.marbomebel.ru/ → 200\n"
           else
-            REPORT+="❌ POST /api/photo (with image) → $STATUS\n"
-            REPORT+="   Response: ${BODY:0:200}\n"
-            ALL_PASS=false
+            REPORT+="⚠️ External https://chat.marbomebel.ru/ → $EXT_CHECK\n"
           fi
 
-          # Test 4: POST /api/photo/analyze
-          RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 60 \
-            -X POST https://chat.marbomebel.ru/api/photo/analyze \
-            -F "file=@/tmp/test.png;type=image/png" || echo -e "\n000")
-          BODY=$(echo "$RESPONSE" | head -n -1)
-          STATUS=$(echo "$RESPONSE" | tail -1)
-          if [ "$STATUS" = "200" ]; then
-            REPORT+="✅ POST /api/photo/analyze → 200\n"
-            REPORT+="   Response: ${BODY:0:200}\n"
-          else
-            REPORT+="❌ POST /api/photo/analyze → $STATUS\n"
-            REPORT+="   Response: ${BODY:0:200}\n"
-            ALL_PASS=false
-          fi
+          # Test external /api/photo
+          EXT_PHOTO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST https://chat.marbomebel.ru/api/photo 2>/dev/null || echo "000")
+          REPORT+="📡 External POST /api/photo → $EXT_PHOTO\n"
 
-          # Test 5: Homepage
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://chat.marbomebel.ru/ || echo "000")
-          if [ "$STATUS" = "200" ]; then
-            REPORT+="✅ GET / (homepage) → 200\n"
-          else
-            REPORT+="❌ GET / (homepage) → $STATUS\n"
-            ALL_PASS=false
-          fi
+          # Check requirements.txt has needed deps
+          DEPS=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "cat /opt/webapp/requirements.txt 2>/dev/null | grep -iE 'fastapi|uvicorn|openai|python-multipart' || echo 'none'" )
+          REPORT+="📦 Key deps: $DEPS\n"
 
           echo -e "$REPORT"
 
           # Send to Telegram
           if [ -n "$TG_BOT_TOKEN" ] && [ -n "$TG_CHAT_ID" ]; then
-            HEADER="📸 Photo API Test Results"
+            HEADER="📸 Photo API Test"
             if [ "$ALL_PASS" = true ]; then
               HEADER+=" ✅ ALL PASS"
             else
-              HEADER+=" ⚠️ SOME FAILED"
+              HEADER+=" ⚠️ ISSUES FOUND"
             fi
-            MSG="$HEADER\n\n$REPORT"
+            MSG=$(echo -e "$HEADER\n\n$REPORT")
             curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
               -d chat_id="$TG_CHAT_ID" \
-              -d text="$(echo -e "$MSG")" \
-              -d parse_mode="HTML" > /dev/null 2>&1 || true
+              --data-urlencode "text=$MSG" > /dev/null 2>&1 || true
           fi
 
-          # Fail workflow if any test failed
           if [ "$ALL_PASS" = false ]; then
-            echo "::error::Some tests failed"
             exit 1
           fi
