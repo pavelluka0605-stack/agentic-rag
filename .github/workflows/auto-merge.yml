@@ -30,3 +30,9 @@ jobs:
           git checkout main
           git merge --no-ff "$BRANCH" -m "Merge $BRANCH into main (auto-merge)"
           git push origin main
+
+      - name: Trigger deploy workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run deploy-p0.yml --ref main -f action=webapp
