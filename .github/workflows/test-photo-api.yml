@@ -18,8 +18,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup SSH
         run: |
@@ -28,37 +32,56 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Get diagnostics and files
+      - name: Get files and diagnostics
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-          mkdir -p output
 
           # Get index.html
-          $SSH "cat /opt/claude-chat/public/index.html" > output/index.html
-          echo "index.html: $(wc -l < output/index.html) lines"
+          mkdir -p claude-chat/public
+          $SSH "cat /opt/claude-chat/public/index.html" > claude-chat/public/index.html
+          echo "index.html: $(wc -l < claude-chat/public/index.html) lines"
 
-          # Get nginx config
-          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null" > output/nginx.conf || echo "no nginx"
+          # Get diagnostics
+          $SSH "curl -s http://localhost:3847/api/health" > /tmp/health.json
+          cat /tmp/health.json
 
-          # Get health check
-          $SSH "curl -s http://localhost:3847/api/health" > output/health.json
+          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS' /opt/claude-chat/server.js" > /tmp/server-check.txt
+          cat /tmp/server-check.txt
 
-          # Get deployed server.js key lines
-          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS\|5000\|15000\|clearInterval\|clearTimeout' /opt/claude-chat/server.js" > output/server-grep.txt
+          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null" > /tmp/nginx.conf
+          cat /tmp/nginx.conf
 
-          # Get service status
-          $SSH "systemctl status claude-chat --no-pager 2>/dev/null || pm2 list 2>/dev/null || echo 'no service'" > output/service.txt
+          $SSH "systemctl status claude-chat --no-pager 2>/dev/null || echo 'no systemd'" > /tmp/status.txt
+          cat /tmp/status.txt
 
-          # Get logs
-          $SSH "journalctl -u claude-chat -n 20 --no-pager 2>/dev/null || echo 'no logs'" > output/logs.txt
+      - name: Commit files to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Upload diagnostics
-        uses: actions/upload-artifact@v4
-        with:
-          name: vps-diagnostics
-          path: output/
-          retention-days: 1
+          # Add index.html
+          git add claude-chat/public/index.html
+
+          # Create diagnostics file
+          {
+            echo "=== HEALTH ==="
+            cat /tmp/health.json 2>/dev/null
+            echo ""
+            echo "=== SERVER CHECK ==="
+            cat /tmp/server-check.txt 2>/dev/null
+            echo ""
+            echo "=== NGINX ==="
+            cat /tmp/nginx.conf 2>/dev/null
+            echo ""
+            echo "=== STATUS ==="
+            cat /tmp/status.txt 2>/dev/null
+          } > claude-chat/diagnostics.txt
+          git add claude-chat/diagnostics.txt
+
+          git diff --cached --stat
+          git commit -m "chore: add index.html and diagnostics from VPS" || echo "No changes"
+          git push origin HEAD:main || echo "Push failed"
