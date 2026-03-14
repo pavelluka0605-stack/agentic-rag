@@ -28,30 +28,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy fixed server.js to VPS
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-
-          # Backup
-          $SSH "cp /opt/claude-chat/server.js /opt/claude-chat/server.js.bak.$(date +%s)"
-
-          # Upload fixed server.js
-          $SCP claude-chat/server.js "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js"
-          echo "Uploaded server.js"
-
-          # Restart
-          $SSH "systemctl restart claude-chat 2>/dev/null && echo 'systemd restarted' || (cd /opt/claude-chat && pm2 restart claude-chat 2>/dev/null && echo 'pm2 restarted') || (cd /opt/claude-chat && pkill -f 'node server.js' 2>/dev/null; sleep 1; cd /opt/claude-chat && nohup node server.js > /var/log/claude-chat.log 2>&1 & echo 'manual restart')"
-
-          sleep 3
-          echo "=== HEALTH ==="
-          $SSH "curl -s http://localhost:3847/api/health"
-
-      - name: Get index.html error handler and nginx config
+      - name: Diagnostics to summary
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -59,17 +36,46 @@ jobs:
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
 
-          echo "=== INDEX.HTML ERROR HANDLER (lines 1200-1260) ==="
-          $SSH "sed -n '1200,1260p' /opt/claude-chat/public/index.html"
+          {
+            echo "## Health Check"
+            echo '```json'
+            $SSH "curl -s http://localhost:3847/api/health"
+            echo ''
+            echo '```'
 
-          echo ""
-          echo "=== INDEX.HTML SSE/FETCH SECTION (lines 700-800) ==="
-          $SSH "sed -n '700,800p' /opt/claude-chat/public/index.html"
+            echo "## Server.js Heartbeat/Timeout Lines"
+            echo '```'
+            $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS\|5000\|15000\|clearInterval\|clearTimeout' /opt/claude-chat/server.js"
+            echo '```'
 
-          echo ""
-          echo "=== NGINX CONFIG ==="
-          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null | head -80"
+            echo "## Nginx Config"
+            echo '```'
+            $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null || echo 'no configs'"
+            echo '```'
 
-          echo ""
-          echo "=== HEARTBEAT IN DEPLOYED SERVER.JS ==="
-          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS\|5000\|15000' /opt/claude-chat/server.js"
+            echo "## Index.html Error Handler (lines 1200-1260)"
+            echo '```javascript'
+            $SSH "sed -n '1200,1260p' /opt/claude-chat/public/index.html"
+            echo '```'
+
+            echo "## Index.html SSE/Fetch (lines 700-780)"
+            echo '```javascript'
+            $SSH "sed -n '700,780p' /opt/claude-chat/public/index.html"
+            echo '```'
+
+            echo "## Index.html reconnect/recovery functions"
+            echo '```javascript'
+            $SSH "grep -n -A5 'Соединение прервано\|recoverBackground\|savePendingRequest\|reconnect\|EventSource\|reader\|getReader\|ReadableStream' /opt/claude-chat/public/index.html | head -80"
+            echo '```'
+
+            echo "## Claude-chat service"
+            echo '```'
+            $SSH "systemctl status claude-chat --no-pager 2>/dev/null | head -15 || echo 'no systemd service'"
+            $SSH "pm2 list 2>/dev/null || echo 'no pm2'"
+            echo '```'
+
+            echo "## Claude-chat logs (last 15)"
+            echo '```'
+            $SSH "journalctl -u claude-chat -n 15 --no-pager 2>/dev/null || echo 'no journalctl logs'"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
