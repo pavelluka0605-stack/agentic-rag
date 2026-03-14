@@ -12,7 +12,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -20,130 +23,69 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Nginx Config
+      - name: Run All Diagnostics
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-          $SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || cat /etc/nginx/sites-enabled/* 2>/dev/null | head -80"
+          set +e
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          OUT="diagnostic-report.txt"
+          > $OUT
 
-      - name: Search Chat UI
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+          echo "=== NGINX CONFIG ===" | tee -a $OUT
+          $SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'FILE NOT FOUND'" 2>&1 | tee -a $OUT
+
+          echo "" | tee -a $OUT
+          echo "=== CHAT UI SEARCH ===" | tee -a $OUT
+          $SSH "grep -rn 'Соединение прервано' /opt/ /var/ /home/ /root/ /srv/ /.cache/ /tmp/ 2>/dev/null | head -10 || echo 'NOT FOUND: Соединение прервано'" 2>&1 | tee -a $OUT
+          $SSH "grep -rn 'AI Ассистент' /opt/ /var/ /home/ /root/ /srv/ /.cache/ /tmp/ 2>/dev/null | head -10 || echo 'NOT FOUND: AI Ассистент'" 2>&1 | tee -a $OUT
+          $SSH "grep -rn 'VPS статус' /opt/ /var/ /home/ /root/ /srv/ /.cache/ /tmp/ 2>/dev/null | head -10 || echo 'NOT FOUND: VPS статус'" 2>&1 | tee -a $OUT
+
+          echo "" | tee -a $OUT
+          echo "=== DOCKER ===" | tee -a $OUT
+          $SSH "docker ps -a 2>/dev/null || echo 'NO DOCKER'" 2>&1 | tee -a $OUT
+
+          echo "" | tee -a $OUT
+          echo "=== CURL LOCALHOST:8000 ===" | tee -a $OUT
+          $SSH "curl -s -o /dev/null -w 'HTTP %{http_code} time=%{time_total}s\n' http://localhost:8000/ 2>&1" 2>&1 | tee -a $OUT
+          $SSH "curl -s http://localhost:8000/ 2>/dev/null | head -3" 2>&1 | tee -a $OUT
+
+          echo "" | tee -a $OUT
+          echo "=== WEBAPP SERVICE ===" | tee -a $OUT
+          $SSH "systemctl is-active webapp 2>&1; journalctl -u webapp -n 20 --no-pager 2>/dev/null | tail -15" 2>&1 | tee -a $OUT
+
+          echo "" | tee -a $OUT
+          echo "=== WEB.PY CHECK ===" | tee -a $OUT
+          $SSH "wc -l /opt/webapp/web.py 2>/dev/null; grep -c 'conn-error' /opt/webapp/web.py 2>/dev/null && echo 'HAS conn-error fix' || echo 'NO conn-error fix'; grep -c 'fetchJSON' /opt/webapp/web.py 2>/dev/null" 2>&1 | tee -a $OUT
+
+          echo "" | tee -a $OUT
+          echo "=== ALL SERVICES ===" | tee -a $OUT
+          $SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended'" 2>&1 | tee -a $OUT
+
+          echo "" | tee -a $OUT
+          echo "=== PORTS ===" | tee -a $OUT
+          $SSH "ss -tlnp" 2>&1 | tee -a $OUT
+
+          echo "" | tee -a $OUT
+          echo "=== RESOURCES ===" | tee -a $OUT
+          $SSH "df -h / && free -h && uptime" 2>&1 | tee -a $OUT
+
+          echo "DONE" | tee -a $OUT
+
+      - name: Upload Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vps-diagnostic-report
+          path: diagnostic-report.txt
+          retention-days: 3
+
+      - name: Show Report Summary
+        if: always()
         run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-          echo "=== Search /opt/ ==="
-          $SSH "grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус\|Проверьте интернет\|онлайн' /opt/ 2>/dev/null | head -20" || echo "not found"
-          echo "=== Search /var/www/ ==="
-          $SSH "grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус' /var/www/ 2>/dev/null | head -20" || echo "not found"
-          echo "=== Search /home/ /root/ /srv/ ==="
-          $SSH "grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус' /home/ /root/ /srv/ 2>/dev/null | head -20" || echo "not found"
-          echo "=== Search ALL (including /.cache/n8n) ==="
-          $SSH "grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус\|Проверьте интернет' /.cache/ /var/ /tmp/ 2>/dev/null | head -20" || echo "not found"
-
-      - name: Docker Containers
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-          $SSH "docker ps -a 2>/dev/null || echo 'no docker'"
-
-      - name: Curl Tests
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-          echo "=== localhost:8000 ==="
-          $SSH "curl -s -o /dev/null -w 'HTTP %{http_code} (%{time_total}s)\n' http://localhost:8000/"
-          echo "=== localhost:8000 HTML title ==="
-          $SSH "curl -s http://localhost:8000/ | grep -o '<title>[^<]*</title>'"
-          echo "=== localhost:8000/api/stats ==="
-          $SSH "curl -s http://localhost:8000/api/stats | head -3"
-
-      - name: Webapp Logs
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-          $SSH "journalctl -u webapp -n 30 --no-pager 2>/dev/null"
-
-      - name: All Listening Ports
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-          $SSH "ss -tlnp"
-
-      - name: All Services
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-          $SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended'"
-
-      - name: Web.py Head on VPS
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-          $SSH "wc -l /opt/webapp/web.py; md5sum /opt/webapp/web.py; head -5 /opt/webapp/web.py; echo '---'; grep -c 'conn-error' /opt/webapp/web.py && echo 'HAS conn-error banner' || echo 'NO conn-error banner (old version?)'"
-
-      - name: Send Full Report to Telegram
-        continue-on-error: true
-        env:
-          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
-
-          REPORT="VPS DIAGNOSTIC $(date '+%Y-%m-%d %H:%M')\n\n"
-
-          R=$($SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null | head -40" 2>&1)
-          REPORT+="=== NGINX ===\n${R}\n\n"
-
-          R=$($SSH "grep -rn 'Соединение прервано\|AI Ассистент\|VPS статус\|Проверьте интернет' /opt/ /.cache/ /var/ /home/ /root/ /srv/ /tmp/ 2>/dev/null | head -10" 2>&1)
-          REPORT+="=== CHAT UI SEARCH ===\n${R:-NOT FOUND}\n\n"
-
-          R=$($SSH "docker ps -a --format '{{.Names}} {{.Status}} {{.Ports}}' 2>/dev/null" 2>&1)
-          REPORT+="=== DOCKER ===\n${R:-NO DOCKER}\n\n"
-
-          R=$($SSH "curl -s -o /dev/null -w 'HTTP %{http_code}' http://localhost:8000/ 2>&1; echo ''; curl -s http://localhost:8000/ 2>/dev/null | grep -o '<title>[^<]*</title>'" 2>&1)
-          REPORT+="=== CURL ===\n${R}\n\n"
-
-          R=$($SSH "wc -l /opt/webapp/web.py; grep -c 'conn-error' /opt/webapp/web.py && echo 'HAS conn-error fix' || echo 'NO conn-error fix'" 2>&1)
-          REPORT+="=== WEB.PY ===\n${R}\n"
-
-          # Send to Telegram (split if too long)
-          MSG=$(echo -e "$REPORT")
-          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-            -d chat_id="$TG_CHAT_ID" \
-            --data-urlencode "text=$MSG" > /dev/null 2>&1
-
-          echo "Report sent to Telegram"
+          if [ -f diagnostic-report.txt ]; then
+            echo "::warning::$(cat diagnostic-report.txt | head -80 | tr '\n' '|')"
+          fi
