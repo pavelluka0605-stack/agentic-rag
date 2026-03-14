@@ -9,12 +9,19 @@ on:
       - ".github/workflows/test-photo-api.yml"
   workflow_dispatch:
 
+concurrency:
+  group: vps-diag
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup SSH
         run: |
@@ -23,8 +30,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Run All Diagnostics
-        continue-on-error: true
+      - name: Diagnose and Save
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -33,59 +39,57 @@ jobs:
           set +e
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
           OUT="diagnostic-report.txt"
-          > $OUT
+          echo "VPS Diagnostic Report - $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > $OUT
+          echo "================================================" >> $OUT
 
-          echo "=== NGINX CONFIG ===" | tee -a $OUT
-          $SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'FILE NOT FOUND'" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 1. NGINX CONFIG (chat-marbomebel) ===" >> $OUT
+          timeout 15 $SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'FILE NOT FOUND'" >> $OUT 2>&1
 
-          echo "" | tee -a $OUT
-          echo "=== CHAT UI SEARCH ===" | tee -a $OUT
-          $SSH "grep -rn 'Соединение прервано' /opt/ /var/ /home/ /root/ /srv/ /.cache/ /tmp/ 2>/dev/null | head -10 || echo 'NOT FOUND: Соединение прервано'" 2>&1 | tee -a $OUT
-          $SSH "grep -rn 'AI Ассистент' /opt/ /var/ /home/ /root/ /srv/ /.cache/ /tmp/ 2>/dev/null | head -10 || echo 'NOT FOUND: AI Ассистент'" 2>&1 | tee -a $OUT
-          $SSH "grep -rn 'VPS статус' /opt/ /var/ /home/ /root/ /srv/ /.cache/ /tmp/ 2>/dev/null | head -10 || echo 'NOT FOUND: VPS статус'" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 2. CHAT UI SEARCH ===" >> $OUT
+          timeout 20 $SSH "grep -rn 'Соединение прервано' /opt/ /var/www/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT FOUND: Соединение прервано'" >> $OUT 2>&1
+          timeout 20 $SSH "grep -rn 'AI Ассистент' /opt/ /var/www/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT FOUND: AI Ассистент'" >> $OUT 2>&1
+          timeout 20 $SSH "grep -rn 'VPS статус' /opt/ /var/www/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT FOUND: VPS статус'" >> $OUT 2>&1
 
-          echo "" | tee -a $OUT
-          echo "=== DOCKER ===" | tee -a $OUT
-          $SSH "docker ps -a 2>/dev/null || echo 'NO DOCKER'" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 3. DOCKER ===" >> $OUT
+          timeout 10 $SSH "docker ps -a 2>/dev/null || echo 'NO DOCKER'" >> $OUT 2>&1
 
-          echo "" | tee -a $OUT
-          echo "=== CURL LOCALHOST:8000 ===" | tee -a $OUT
-          $SSH "curl -s -o /dev/null -w 'HTTP %{http_code} time=%{time_total}s\n' http://localhost:8000/ 2>&1" 2>&1 | tee -a $OUT
-          $SSH "curl -s http://localhost:8000/ 2>/dev/null | head -3" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 4. CURL localhost:8000 ===" >> $OUT
+          timeout 10 $SSH "curl -s -w '\nHTTP %{http_code} time=%{time_total}s\n' http://localhost:8000/ 2>&1 | head -10" >> $OUT 2>&1
 
-          echo "" | tee -a $OUT
-          echo "=== WEBAPP SERVICE ===" | tee -a $OUT
-          $SSH "systemctl is-active webapp 2>&1; journalctl -u webapp -n 20 --no-pager 2>/dev/null | tail -15" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 5. WEBAPP STATUS + LOGS ===" >> $OUT
+          timeout 10 $SSH "systemctl is-active webapp" >> $OUT 2>&1
+          timeout 10 $SSH "journalctl -u webapp -n 15 --no-pager 2>/dev/null" >> $OUT 2>&1
 
-          echo "" | tee -a $OUT
-          echo "=== WEB.PY CHECK ===" | tee -a $OUT
-          $SSH "wc -l /opt/webapp/web.py 2>/dev/null; grep -c 'conn-error' /opt/webapp/web.py 2>/dev/null && echo 'HAS conn-error fix' || echo 'NO conn-error fix'; grep -c 'fetchJSON' /opt/webapp/web.py 2>/dev/null" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 6. WEB.PY VERSION CHECK ===" >> $OUT
+          timeout 10 $SSH "wc -lc /opt/webapp/web.py; md5sum /opt/webapp/web.py; grep -c 'conn-error' /opt/webapp/web.py && echo 'HAS conn-error banner' || echo 'NO conn-error banner'" >> $OUT 2>&1
 
-          echo "" | tee -a $OUT
-          echo "=== ALL SERVICES ===" | tee -a $OUT
-          $SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended'" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 7. ALL CUSTOM SERVICES ===" >> $OUT
+          timeout 10 $SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended'" >> $OUT 2>&1
 
-          echo "" | tee -a $OUT
-          echo "=== PORTS ===" | tee -a $OUT
-          $SSH "ss -tlnp" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 8. LISTENING PORTS ===" >> $OUT
+          timeout 10 $SSH "ss -tlnp" >> $OUT 2>&1
 
-          echo "" | tee -a $OUT
-          echo "=== RESOURCES ===" | tee -a $OUT
-          $SSH "df -h / && free -h && uptime" 2>&1 | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== 9. RESOURCES ===" >> $OUT
+          timeout 10 $SSH "df -h / && free -h" >> $OUT 2>&1
 
-          echo "DONE" | tee -a $OUT
+          echo "" >> $OUT
+          echo "=== DONE ===" >> $OUT
 
-      - name: Upload Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: vps-diagnostic-report
-          path: diagnostic-report.txt
-          retention-days: 3
+          cat $OUT
 
-      - name: Show Report Summary
-        if: always()
+      - name: Commit Report
         run: |
-          if [ -f diagnostic-report.txt ]; then
-            echo "::warning::$(cat diagnostic-report.txt | head -80 | tr '\n' '|')"
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add diagnostic-report.txt
+          git commit -m "chore: VPS diagnostic report $(date -u '+%Y-%m-%d %H:%M')" || echo "No changes"
+          git push origin main || echo "Push failed"
