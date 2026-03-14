@@ -22,7 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: claude/fix-connection-error-oXw4p
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup SSH
@@ -39,17 +38,11 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-
-          # Check what files exist
-          echo "=== Files in /opt/claude-chat/public/ ==="
-          $SSH "ls -la /opt/claude-chat/public/" || echo "directory not found"
-
-          # Download via SSH cat (more reliable than SCP for large files)
           mkdir -p claude-chat/public
           $SSH "cat /opt/claude-chat/public/index.html" > claude-chat/public/index.html
-          echo "Downloaded index.html: $(wc -l < claude-chat/public/index.html) lines, $(wc -c < claude-chat/public/index.html) bytes"
+          echo "Downloaded: $(wc -l < claude-chat/public/index.html) lines, $(wc -c < claude-chat/public/index.html) bytes"
 
-      - name: Verify deploy and get configs
+      - name: Verify server.js fix deployed
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -57,35 +50,33 @@ jobs:
         continue-on-error: true
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-
-          echo "=== HEALTH CHECK ==="
-          $SSH "curl -s http://localhost:3847/api/health" || echo "health check failed"
-
+          echo "=== HEALTH ==="
+          $SSH "curl -s http://localhost:3847/api/health"
           echo ""
-          echo "=== SERVER.JS HEARTBEAT LINE ==="
-          $SSH "grep -n 'heartbeat\|setInterval\|timeout\|TIMEOUT' /opt/claude-chat/server.js" || echo "no matches"
-
+          echo "=== HEARTBEAT CONFIG ==="
+          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS' /opt/claude-chat/server.js"
           echo ""
-          echo "=== NGINX CONFIG ==="
-          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null | head -80" || echo "no nginx configs"
-
+          echo "=== NGINX ==="
+          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null | head -60"
           echo ""
-          echo "=== CLAUDE-CHAT SERVICE STATUS ==="
-          $SSH "systemctl status claude-chat --no-pager 2>/dev/null || pm2 status 2>/dev/null || echo 'no service manager'"
+          echo "=== SERVICE ==="
+          $SSH "systemctl status claude-chat --no-pager 2>/dev/null | head -15"
 
-          echo ""
-          echo "=== CLAUDE-CHAT LOGS (last 10) ==="
-          $SSH "journalctl -u claude-chat -n 10 --no-pager 2>/dev/null || pm2 logs claude-chat --lines 10 --nostream 2>/dev/null || echo 'no logs'"
-
-      - name: Commit index.html
+      - name: Commit index.html to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if [ -f claude-chat/public/index.html ] && [ -s claude-chat/public/index.html ]; then
             git add claude-chat/public/index.html
-            git diff --cached --stat
-            git commit -m "chore: add index.html from VPS (via ssh cat)" || echo "No changes"
-            git push origin claude/fix-connection-error-oXw4p || echo "Push to claude branch failed"
+            CHANGES=$(git diff --cached --stat)
+            if [ -n "$CHANGES" ]; then
+              echo "$CHANGES"
+              git commit -m "chore: add index.html from VPS"
+              git push origin main
+            else
+              echo "No changes to commit"
+            fi
           else
             echo "ERROR: index.html not downloaded or empty"
+            exit 1
           fi
