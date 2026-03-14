@@ -248,6 +248,7 @@ let pendingPhotos = []; // { file, dataUrl }
 let history = [];
 let pollAbort = null; // AbortController for polling
 let clientTimeout = null; // total client-side timeout
+let requestStartTime = null; // когда начался текущий запрос
 
 const $messages = document.getElementById('messages');
 const $input = document.getElementById('msgInput');
@@ -391,6 +392,10 @@ async function sendMessage() {
   showTyping();
   $connBanner.classList.remove('show');
 
+  // Запоминаем время начала запроса в localStorage
+  requestStartTime = Date.now();
+  localStorage.setItem('chat_request_start', requestStartTime.toString());
+
   // Hard client-side timeout: 6 minutes — guarantees UI never hangs forever
   clientTimeout = setTimeout(() => {
     if (sending && currentRequestId) {
@@ -478,6 +483,7 @@ async function sendMessage() {
             saveLocalHistory();
           }
           currentRequestId = null;
+          localStorage.removeItem('chat_request_start');
         }
       }
     }
@@ -527,6 +533,8 @@ async function cancelCurrentRequest() {
   currentRequestId = null;
   sending = false;
   $sendBtn.disabled = false;
+  requestStartTime = null;
+  localStorage.removeItem('chat_request_start');
   addMessage('error', 'Запрос отменён');
 }
 
@@ -631,17 +639,35 @@ async function recoverSession() {
 
 // --- Auto-recover on page load ---
 async function checkPendingOnLoad() {
+  // Первая проверка: клиентский возраст запроса (не зависит от сервера)
+  const MAX_AGE_MS = 5 * 60 * 1000;
+  const savedStart = localStorage.getItem('chat_request_start');
+  if (savedStart) {
+    const age = Date.now() - parseInt(savedStart, 10);
+    if (age > MAX_AGE_MS) {
+      // Запрос старше 5 мин — точно мёртвый, убираем
+      localStorage.removeItem('chat_request_start');
+      removeTyping();
+      return;
+    }
+  } else {
+    // Нет активного запроса — нечего восстанавливать
+    return;
+  }
+
   try {
     const resp = await fetch(`${API}/api/recover/${sessionId}`, {
       headers: { 'Authorization': `Bearer ${TOKEN}` },
     });
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      localStorage.removeItem('chat_request_start');
+      return;
+    }
     const data = await resp.json();
 
-    // Игнорировать запросы старше 5 минут — они мёртвые
-    const MAX_AGE_MS = 5 * 60 * 1000;
+    // Двойная проверка: серверный возраст
     if (data.ageMs && data.ageMs > MAX_AGE_MS && data.status === 'running') {
-      // Старый зависший запрос — не показываем, пытаемся отменить
+      localStorage.removeItem('chat_request_start');
       if (data.requestId) {
         fetch(`${API}/api/cancel/${data.requestId}`, {
           method: 'POST',
@@ -652,20 +678,25 @@ async function checkPendingOnLoad() {
     }
 
     if (data.status === 'running') {
-      // Запрос ещё выполняется и не слишком старый — ждём
       showTyping('Запрос обрабатывается');
       if (data.requestId) {
         currentRequestId = data.requestId;
         pollForResult(data.requestId);
       }
     } else if (data.status === 'completed' && data.fullText) {
-      // Проверяем, не показан ли уже этот ответ
+      localStorage.removeItem('chat_request_start');
       const lastBot = history.filter(m => m.role === 'assistant').pop();
       if (!lastBot || lastBot.content !== data.fullText) {
         addMessage('bot', data.fullText, { elapsed: data.elapsed ? `${data.elapsed}s` : '' });
       }
+    } else {
+      // status: 'none' — запрос потерян
+      localStorage.removeItem('chat_request_start');
     }
-  } catch (_) {}
+  } catch (_) {
+    // Сервер недоступен — не показываем зависший индикатор
+    localStorage.removeItem('chat_request_start');
+  }
 }
 
 // --- Photos ---
