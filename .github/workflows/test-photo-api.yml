@@ -18,10 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: claude/fix-connection-error-oXw4p
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -29,21 +25,64 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Download and Commit
+      - name: Get server.js
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
-          mkdir -p claude-chat/public
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js" claude-chat/
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/package.json" claude-chat/
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html" claude-chat/public/
-          ls -la claude-chat/ claude-chat/public/
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          echo "===SERVER.JS=START==="
+          $SSH "cat /opt/claude-chat/server.js"
+          echo "===SERVER.JS=END==="
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add claude-chat/
-          git commit -m "chore: copy claude-chat source from VPS for analysis" || echo "No changes"
-          git push origin claude/fix-connection-error-oXw4p || echo "Push failed"
+      - name: Get index.html part1
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          echo "===INDEX.HTML.P1=START==="
+          $SSH "head -700 /opt/claude-chat/public/index.html"
+          echo "===INDEX.HTML.P1=END==="
+
+      - name: Get index.html part2
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          echo "===INDEX.HTML.P2=START==="
+          $SSH "tail -n +701 /opt/claude-chat/public/index.html"
+          echo "===INDEX.HTML.P2=END==="
+
+      - name: Get package.json
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          echo "===PACKAGE.JSON=START==="
+          $SSH "cat /opt/claude-chat/package.json"
+          echo "===PACKAGE.JSON=END==="
+
+      - name: Get nginx and traefik config
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          echo "=== NGINX CONFIG ==="
+          $SSH "cat /etc/nginx/sites-enabled/chat.marbomebel.ru 2>/dev/null || cat /etc/nginx/sites-enabled/default 2>/dev/null || echo 'no config found'"
+          echo "=== TRAEFIK DOCKER ==="
+          $SSH "docker ps --filter name=traefik --format '{{.Names}} {{.Ports}}' 2>/dev/null || echo 'no traefik'"
+          echo "=== SYSTEMD claude-chat ==="
+          $SSH "systemctl cat claude-chat.service 2>/dev/null || echo 'no service file'"
+          echo "=== CLAUDE-CHAT STATUS ==="
+          $SSH "systemctl status claude-chat.service 2>/dev/null || echo 'not found'"
+          echo "=== CLAUDE-CHAT LOGS ==="
+          $SSH "journalctl -u claude-chat -n 30 --no-pager 2>/dev/null || echo 'no logs'"
