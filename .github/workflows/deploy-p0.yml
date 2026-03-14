@@ -23,6 +23,7 @@ on:
           - longpoll      # Только VK Long Poll listener
           - workflows     # Только N8N workflows
           - webapp        # Только FastAPI webapp (web.py)
+          - chat          # Только Claude Chat (chat.marbomebel.ru)
           - healthcheck   # Проверка всех сервисов
 
 # ─── Secrets (настроить в GitHub → Settings → Secrets) ───
@@ -477,6 +478,72 @@ jobs:
           else
             echo "✗ FastAPI webapp failed to start"
             journalctl -u webapp -n 15 --no-pager
+          fi
+          REMOTE_SCRIPT
+
+      # ─── 7e. Claude Chat (chat.marbomebel.ru) ──
+      - name: Deploy Claude Chat
+        if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'chat' || github.event.inputs.action == '' }}
+        run: |
+          # Copy claude-chat files to VPS
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
+            claude-chat/ \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/
+
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
+
+          cd /opt/claude-chat
+
+          # Install dependencies
+          if ! command -v node &>/dev/null; then
+            echo "Node.js not found — skipping claude-chat deploy"
+            exit 0
+          fi
+          npm install --omit=dev 2>&1 | tail -5
+
+          # Create .env if it doesn't exist (use existing tokens)
+          if [ ! -f .env ]; then
+            source /opt/p0-foundation/.env 2>/dev/null || true
+            cat > .env << ENVEOF
+BEARER_TOKEN=$(openssl rand -hex 32)
+OPENAI_API_KEY=${OPENAI_API_KEY:-}
+PORT=3847
+ENVEOF
+            echo "✓ .env created with new BEARER_TOKEN"
+          fi
+
+          # Create/update systemd service
+          cat > /etc/systemd/system/claude-chat.service << 'UNIT'
+[Unit]
+Description=Claude Chat (chat.marbomebel.ru)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/claude-chat
+EnvironmentFile=/opt/claude-chat/.env
+ExecStart=/usr/bin/node /opt/claude-chat/server.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+          systemctl daemon-reload
+          systemctl enable claude-chat
+          systemctl restart claude-chat
+          sleep 3
+
+          if systemctl is-active --quiet claude-chat; then
+            echo "✓ Claude Chat running on :3847"
+            # Quick health check
+            curl -s --max-time 5 http://localhost:3847/api/health | head -c 200
+            echo ""
+          else
+            echo "✗ Claude Chat failed to start"
+            journalctl -u claude-chat -n 15 --no-pager
           fi
           REMOTE_SCRIPT
 
