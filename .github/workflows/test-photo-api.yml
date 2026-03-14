@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Nginx1
+      - name: VK-Callback
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -33,10 +33,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "head -20 /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'NOT_FOUND'" 2>&1)
-          echo "::warning::NGX1: $R"
+          R=$(timeout 10 $SSH "cat /etc/systemd/system/vk-callback.service 2>/dev/null || echo 'NOT_FOUND'" 2>&1)
+          echo "::warning::VK_CALLBACK: $R"
 
-      - name: Nginx2
+      - name: Traefik
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -44,10 +44,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "tail -20 /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'NOT_FOUND'" 2>&1)
-          echo "::warning::NGX2: $R"
+          R=$(timeout 10 $SSH "find / -maxdepth 4 -name 'docker-compose*' -o -name 'traefik*' 2>/dev/null | grep -v proc | head -10" 2>&1)
+          echo "::warning::TRAEFIK_FILES: $R"
 
-      - name: Search1
+      - name: TraefikConfig
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -55,10 +55,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "grep -rl 'Соединение прервано' /opt/webapp/ /opt/p0-foundation/ 2>/dev/null | head -3 || echo 'NOT_IN_OPT'" 2>&1)
-          echo "::warning::SEARCH_OPT: $R"
+          R=$(timeout 10 $SSH "docker inspect n8n-traefik-traefik-1 --format '{{json .Config.Labels}}' 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(f\"{k}={v}\") for k,v in d.items() if \"route\" in k.lower() or \"host\" in k.lower() or \"chat\" in k.lower()]' 2>/dev/null || echo 'NO_LABELS'" 2>&1)
+          echo "::warning::TRAEFIK_LABELS: $R"
 
-      - name: Search2
+      - name: N8NLabels
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -66,10 +66,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "grep -rl 'AI Ассистент\|VPS статус' /opt/webapp/ /opt/p0-foundation/ /var/www/ 2>/dev/null | head -3 || echo 'NOT_IN_OPT'" 2>&1)
-          echo "::warning::SEARCH_ASST: $R"
+          R=$(timeout 10 $SSH "docker ps --format '{{.Names}}' 2>/dev/null | while read c; do echo \"--- \$c ---\"; docker inspect \$c --format '{{json .Config.Labels}}' 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(f\"  {k}={v}\") for k,v in d.items() if \"host\" in k.lower() or \"rule\" in k.lower() or \"route\" in k.lower()]' 2>/dev/null; done || echo 'FAIL'" 2>&1)
+          echo "::warning::LABELS: $R"
 
-      - name: Docker
+      - name: Port3847
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -77,10 +77,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "docker ps --format '{{.Names}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo 'NO_DOCKER'" 2>&1)
-          echo "::warning::DOCKER: $R"
+          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | head -5 || echo 'NO_RESPONSE'" 2>&1)
+          echo "::warning::PORT3847: $R"
 
-      - name: Curl
+      - name: Port3102
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -88,10 +88,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:8000/ 2>/dev/null | grep -oP '<title>[^<]+</title>'" 2>&1)
-          echo "::warning::TITLE: $R"
+          R=$(timeout 10 $SSH "curl -s http://localhost:3102/ 2>/dev/null | head -5 || echo 'NO_RESPONSE'" 2>&1)
+          echo "::warning::PORT3102: $R"
 
-      - name: WebPy
+      - name: WebPyFix
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -99,10 +99,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "wc -l /opt/webapp/web.py; grep -c 'conn-error' /opt/webapp/web.py; grep -c 'Соединение' /opt/webapp/web.py" 2>&1)
-          echo "::warning::WEBPY: $R"
+          R=$(timeout 10 $SSH "grep 'conn-error\|retries\|Соединение\|fetchJSON' /opt/webapp/web.py 2>/dev/null | wc -l" 2>&1)
+          echo "::warning::WEBPY_FIX_LINES: $R"
 
-      - name: Services
+      - name: DockerCompose
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -110,16 +110,5 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended' | awk '{print \$1}' | tr '\n' ' '" 2>&1)
-          echo "::warning::SVC: $R"
-
-      - name: Ports
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "ss -tlnp | grep -v 'State' | awk '{print \$4, \$6}' | tr '\n' ' '" 2>&1)
-          echo "::warning::PORTS: $R"
+          R=$(timeout 10 $SSH "cat /opt/n8n-traefik/docker-compose.yml 2>/dev/null | head -40 || find / -maxdepth 3 -name 'docker-compose.yml' 2>/dev/null | head -5 || echo 'NOT_FOUND'" 2>&1)
+          echo "::warning::COMPOSE: $R"
