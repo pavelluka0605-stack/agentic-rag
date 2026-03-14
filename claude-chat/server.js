@@ -118,7 +118,7 @@ const conversations = new Map(); // sessionId -> { messages: [...], lastActivity
 const CONV_TTL = 60 * 60 * 1000; // 1 hour TTL
 const pendingRequests = new Map(); // sessionId -> requestId (active request mapping)
 
-// Cleanup old results and conversations periodically
+// Cleanup old results, conversations, and fix counter drift
 setInterval(() => {
   const now = Date.now();
   for (const [id, r] of backgroundResults) {
@@ -132,16 +132,46 @@ setInterval(() => {
       pendingRequests.delete(sid);
     }
   }
+  // Fix activeRequests counter drift: should equal runningProcesses.size
+  if (activeRequests !== runningProcesses.size) {
+    console.warn(`[cleanup] activeRequests drift: counter=${activeRequests}, actual=${runningProcesses.size}. Correcting.`);
+    activeRequests = runningProcesses.size;
+  }
 }, 60000);
 
 // --- Routes ---
 
-// Health check (no auth)
+// Health check (no auth) — also cleans up stale processes
 app.get('/api/health', (_req, res) => {
+  // Auto-cleanup: kill processes running longer than 6 minutes (should never happen)
+  const now = Date.now();
+  const MAX_AGE = 6 * 60 * 1000;
+  let cleaned = 0;
+  for (const [id, bg] of backgroundResults) {
+    if (!bg.done && bg.startTime && (now - bg.startTime) > MAX_AGE) {
+      const child = runningProcesses.get(id);
+      if (child) {
+        console.error(`[health] Force-killing stale process ${id} (age: ${((now - bg.startTime)/1000).toFixed(0)}s)`);
+        child.kill('SIGKILL');
+        runningProcesses.delete(id);
+        activeRequests = Math.max(0, activeRequests - 1);
+        bg.done = true;
+        bg.doneAt = now;
+        bg.code = -1;
+        bg.fullText += '\n\n[Запрос принудительно завершён — превышен лимит времени]';
+        cleaned++;
+      }
+    }
+  }
+
   res.json({
     status: 'ok',
     uptime: process.uptime(),
     activeRequests,
+    runningProcesses: runningProcesses.size,
+    backgroundResults: backgroundResults.size,
+    conversations: conversations.size,
+    cleaned,
     claudeCli: CLAUDE_PATH || 'not found (fallback: bash)',
     timestamp: new Date().toISOString(),
   });
@@ -300,22 +330,55 @@ app.post('/api/chat', auth, (req, res) => {
     return;
   }
 
-  // Spawn claude CLI (no spawn timeout — we manage it ourselves for clean error messages)
+  // Spawn claude CLI
   const child = spawn(CLAUDE_PATH, ['--print', prompt], {
     env: { ...process.env, NO_COLOR: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  // Manual timeout: 5 minutes — sends clean error before killing
+  // Total timeout: 5 minutes
   const TIMEOUT_MS = 5 * 60 * 1000;
+  // Stale timeout: kill if no output for 90 seconds (claude CLI likely hung)
+  const STALE_TIMEOUT_MS = 90 * 1000;
+  // First byte timeout: if no output at all within 30s, something is wrong
+  const FIRST_BYTE_TIMEOUT_MS = 30 * 1000;
+
+  let lastDataAt = Date.now();
+  let gotFirstByte = false;
+
   const processTimeout = setTimeout(() => {
     if (runningProcesses.has(requestId)) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       safeSend({ type: 'chunk', text: '\n\n[Превышено время ожидания (5 мин). Запрос отменён.]' });
       safeSend({ type: 'done', elapsed, code: 124 });
       child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), 5000); // force kill if SIGTERM doesn't work
     }
   }, TIMEOUT_MS);
+
+  // Stale detection: check every 15s if data stopped flowing
+  const staleChecker = setInterval(() => {
+    const silentMs = Date.now() - lastDataAt;
+    if (!gotFirstByte && silentMs > FIRST_BYTE_TIMEOUT_MS) {
+      // No output at all for 30s — claude CLI is likely broken
+      console.error(`[${requestId}] No first byte in ${FIRST_BYTE_TIMEOUT_MS/1000}s — killing`);
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      safeSend({ type: 'chunk', text: '\n\n[Claude CLI не отвечает. Попробуйте снова.]' });
+      safeSend({ type: 'done', elapsed, code: 1 });
+      child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), 3000);
+      clearInterval(staleChecker);
+    } else if (gotFirstByte && silentMs > STALE_TIMEOUT_MS) {
+      // Had output but stopped for 90s — likely hung
+      console.error(`[${requestId}] Stale for ${STALE_TIMEOUT_MS/1000}s — killing`);
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      safeSend({ type: 'chunk', text: '\n\n[Ответ прервался. Попробуйте снова.]' });
+      safeSend({ type: 'done', elapsed, code: 1 });
+      child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), 3000);
+      clearInterval(staleChecker);
+    }
+  }, 15000);
 
   runningProcesses.set(requestId, child);
 
@@ -333,6 +396,8 @@ app.post('/api/chat', auth, (req, res) => {
 
   child.stdout.on('data', (chunk) => {
     const text = chunk.toString();
+    lastDataAt = Date.now();
+    gotFirstByte = true;
     bgResult.fullText += text;
     bgResult.chunks.push({ type: 'chunk', text });
     safeSend({ type: 'chunk', text });
@@ -340,6 +405,8 @@ app.post('/api/chat', auth, (req, res) => {
 
   child.stderr.on('data', (chunk) => {
     const text = chunk.toString();
+    lastDataAt = Date.now();
+    gotFirstByte = true;
     bgResult.chunks.push({ type: 'error', text });
     safeSend({ type: 'error', text });
   });
@@ -347,6 +414,7 @@ app.post('/api/chat', auth, (req, res) => {
   child.on('close', (code) => {
     clearTimeout(processTimeout);
     clearInterval(heartbeat);
+    clearInterval(staleChecker);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     bgResult.done = true;
     bgResult.elapsed = elapsed;
@@ -379,6 +447,7 @@ app.post('/api/chat', auth, (req, res) => {
   child.on('error', (err) => {
     clearTimeout(processTimeout);
     clearInterval(heartbeat);
+    clearInterval(staleChecker);
     bgResult.chunks.push({ type: 'error', text: err.message });
     bgResult.done = true;
     bgResult.elapsed = '0';
@@ -469,6 +538,26 @@ app.get('/api/history/:sessionId', auth, (req, res) => {
     elapsed: m.elapsed,
   }));
   res.json({ messages, sessionId });
+});
+
+// Force reset — kill all running processes (emergency)
+app.post('/api/reset', auth, (_req, res) => {
+  let killed = 0;
+  for (const [id, child] of runningProcesses) {
+    child.kill('SIGKILL');
+    runningProcesses.delete(id);
+    const bg = backgroundResults.get(id);
+    if (bg) {
+      bg.done = true;
+      bg.doneAt = Date.now();
+      bg.code = -1;
+    }
+    killed++;
+  }
+  activeRequests = 0;
+  pendingRequests.clear();
+  console.log(`[reset] Force-killed ${killed} processes`);
+  res.json({ status: 'reset', killed });
 });
 
 // Cancel request
