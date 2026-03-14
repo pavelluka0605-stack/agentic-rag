@@ -161,7 +161,28 @@ jobs:
             add "VK: .env NOT LOADED"
           fi
 
-          # 6b. N8N env check
+          # 6b. Watchdog status
+          add ""
+          add "--- Watchdog ---"
+          if crontab -l 2>/dev/null | grep -q "watchdog.sh"; then
+            add "Watchdog cron: ACTIVE"
+          else
+            add "Watchdog cron: NOT FOUND"
+          fi
+          if [ -f /var/log/p0-watchdog.log ]; then
+            LAST_WD=$(tail -1 /var/log/p0-watchdog.log 2>/dev/null || echo "empty")
+            add "Last watchdog: $LAST_WD"
+          fi
+          if [ -f /tmp/p0-watchdog-state.json ]; then
+            WD_STATE=$(python3 -c "
+          import json
+          d = json.load(open('/tmp/p0-watchdog-state.json'))
+          print(f\"CPU:{d.get('cpu_pct','?')}% RAM:{d.get('ram_pct','?')}% Disk:{d.get('disk_pct','?')}% Issues:{d.get('issues',False)}\")
+          " 2>/dev/null || echo "parse error")
+            add "Watchdog state: $WD_STATE"
+          fi
+
+          # 6c. N8N env check
           add ""
           add "--- N8N Service Env ---"
           N8N_VER=$(n8n --version 2>/dev/null || echo "?")

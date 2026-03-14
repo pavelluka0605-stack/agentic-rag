@@ -480,6 +480,39 @@ jobs:
           fi
           REMOTE_SCRIPT
 
+      # ─── 7d. Установка Watchdog (мониторинг + авторестарт) ──
+      - name: Deploy Watchdog
+        if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == '' }}
+        run: |
+          # Копируем watchdog скрипт на VPS
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            p0-foundation/scripts/watchdog.sh \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/p0-foundation/scripts/
+
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
+
+          chmod +x /opt/p0-foundation/scripts/watchdog.sh
+
+          # Добавить N8N_API_KEY в .env если его нет
+          if ! grep -q "N8N_API_KEY" /opt/p0-foundation/.env 2>/dev/null; then
+            echo "N8N_API_KEY=${N8N_API_KEY:-}" >> /opt/p0-foundation/.env
+          fi
+
+          # Настроить cron: каждые 5 минут
+          CRON_LINE="*/5 * * * * /opt/p0-foundation/scripts/watchdog.sh >> /var/log/p0-watchdog.log 2>&1"
+          (crontab -l 2>/dev/null | grep -v "watchdog.sh" ; echo "$CRON_LINE") | crontab -
+          echo "✓ Watchdog установлен в cron (каждые 5 мин)"
+
+          # Создать лог-файл
+          touch /var/log/p0-watchdog.log
+
+          # Запустить первый раз для проверки
+          /opt/p0-foundation/scripts/watchdog.sh 2>&1 | tail -5 || true
+          echo "✓ Watchdog первый запуск завершён"
+
+          REMOTE_SCRIPT
+
       # ─── 8. Импорт N8N Workflows ──────────────
       - name: Import N8N workflows
         if: ${{ github.event.inputs.action == 'full' || github.event.inputs.action == 'workflows' || github.event.inputs.action == '' }}

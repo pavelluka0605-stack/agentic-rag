@@ -1,0 +1,158 @@
+{
+  "name": "P0-08_Error_Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+        }
+      },
+      "id": "cron-15min",
+      "name": "Every 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5678/api/v1/executions?status=error&limit=20",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "={{ $env.N8N_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "get-failed-executions",
+      "name": "Get Failed Executions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Анализ упавших N8N executions за последние 15 минут\nconst data = $input.first().json;\nconst executions = data?.data || [];\n\nconst now = new Date();\nconst cutoff = new Date(now.getTime() - 15 * 60 * 1000); // 15 минут\n\n// Фильтруем только свежие ошибки\nconst recentFails = executions.filter(e => {\n  const finished = e.stoppedAt || e.startedAt;\n  if (!finished) return false;\n  return new Date(finished) > cutoff;\n});\n\nif (recentFails.length === 0) {\n  return [{ json: { hasErrors: false, count: 0, summary: 'Нет ошибок' } }];\n}\n\n// Группируем по workflow\nconst byWorkflow = {};\nfor (const e of recentFails) {\n  const name = e.workflowData?.name || `WF#${e.workflowId}`;\n  if (!byWorkflow[name]) {\n    byWorkflow[name] = { count: 0, lastError: '', lastTime: '' };\n  }\n  byWorkflow[name].count++;\n  \n  // Попробовать извлечь сообщение ошибки\n  const errMsg = e.data?.resultData?.error?.message \n    || e.data?.resultData?.lastNodeExecuted \n    || 'unknown error';\n  byWorkflow[name].lastError = errMsg;\n  byWorkflow[name].lastTime = e.stoppedAt || e.startedAt;\n}\n\n// Формируем отчёт\nconst lines = Object.entries(byWorkflow).map(([name, info]) => {\n  const count = info.count > 1 ? ` (${info.count}x)` : '';\n  const time = new Date(info.lastTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });\n  return `• ${name}${count} — ${info.lastError} [${time}]`;\n});\n\nreturn [{\n  json: {\n    hasErrors: true,\n    count: recentFails.length,\n    summary: lines.join('\\n'),\n    workflows: byWorkflow,\n    timestamp: now.toISOString()\n  }\n}];"
+      },
+      "id": "analyze-errors",
+      "name": "Analyze Errors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-has-errors",
+              "leftValue": "={{ $json.hasErrors }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-errors",
+      "name": "Has Errors?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": \"⚠️ <b>N8N Error Monitor</b>\\n\\n🔴 Ошибки за 15 мин: {{ $json.count }}\\n\\n{{ $json.summary }}\\n\\n⏰ {{ $now.format('DD.MM.YYYY HH:mm') }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-alert",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Логируем в Google Sheets\nconst input = $input.first().json;\nreturn [{\n  json: {\n    Timestamp: new Date().toISOString(),\n    Workflow: 'P0-08_Error_Monitor',\n    'Тип': 'error_alert',\n    'Событие': `${input.count} ошибок обнаружено`,\n    'Детали': input.summary?.substring(0, 500) || '',\n    'Статус': 'alert_sent'\n  }\n}];"
+      },
+      "id": "prepare-log",
+      "name": "Prepare Log Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Логи_N8N",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "log-to-sheets",
+      "name": "Log to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1340, 400]
+    },
+    {
+      "parameters": {},
+      "id": "no-errors-noop",
+      "name": "No Errors",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 600]
+    }
+  ],
+  "connections": {
+    "Every 15 min": {
+      "main": [[{ "node": "Get Failed Executions", "type": "main", "index": 0 }]]
+    },
+    "Get Failed Executions": {
+      "main": [[{ "node": "Analyze Errors", "type": "main", "index": 0 }]]
+    },
+    "Analyze Errors": {
+      "main": [[{ "node": "Has Errors?", "type": "main", "index": 0 }]]
+    },
+    "Has Errors?": {
+      "main": [
+        [
+          { "node": "Telegram Alert", "type": "main", "index": 0 },
+          { "node": "Prepare Log Entry", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "No Errors", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prepare Log Entry": {
+      "main": [[{ "node": "Log to Sheets", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
