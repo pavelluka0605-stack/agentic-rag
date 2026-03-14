@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Port3847HTML
+      - name: FindDir
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -33,10 +33,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | head -30" 2>&1)
-          echo "::warning::HTML3847: $R"
+          R=$(timeout 10 $SSH "ls -la /opt/claud* 2>/dev/null; echo '---'; find /opt -maxdepth 2 -name '*.js' -path '*claud*' 2>/dev/null | head -5; echo '---'; cat /proc/630484/cmdline 2>/dev/null | tr '\0' ' ' || ps aux | grep 3847 | grep -v grep" 2>&1)
+          echo "::warning::DIR: $R"
 
-      - name: Port3847Title
+      - name: MainJS
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -44,10 +44,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | grep -oE '<title>[^<]+</title>|Ассистент|Соединение|VPS статус|fetchJSON'" 2>&1)
-          echo "::warning::TITLE3847: $R"
+          R=$(timeout 10 $SSH "find /opt -maxdepth 3 -name 'server.js' -o -name 'app.js' -o -name 'index.js' 2>/dev/null | while read f; do echo \"--- \$f ---\"; head -5 \$f; done" 2>&1)
+          echo "::warning::MAINJS: $R"
 
-      - name: Port3847Process
+      - name: ErrSource
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -55,10 +55,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "ss -tlnp | grep 3847; echo '---'; ps aux | grep -E '3847|vk-callback' | grep -v grep" 2>&1)
-          echo "::warning::PROC3847: $R"
+          R=$(timeout 10 $SSH "grep -rn 'Соединение прервано\|Проверьте интернет' /opt/claud* /opt/vk-callback/ 2>/dev/null | head -5 || echo 'NOT_FOUND'" 2>&1)
+          echo "::warning::ERRSRC: $R"
 
-      - name: VKCallbackUnit
+      - name: VKCBFiles
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -66,10 +66,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "cat /etc/systemd/system/vk-callback.service 2>/dev/null" 2>&1)
-          echo "::warning::VKCB_UNIT: $R"
+          R=$(timeout 10 $SSH "ls -la /opt/vk-callback/ 2>/dev/null | head -15; echo '---'; cat /opt/vk-callback/package.json 2>/dev/null | head -10 || echo 'no package.json'" 2>&1)
+          echo "::warning::VKCB: $R"
 
-      - name: VKCallbackDir
+      - name: Logs3847
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -77,10 +77,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "ls -la /opt/vk-callback/ 2>/dev/null || ls -la /opt/p0-foundation/vk-callback/ 2>/dev/null || echo 'DIR_NOT_FOUND'" 2>&1)
-          echo "::warning::VKCB_DIR: $R"
+          R=$(timeout 10 $SSH "journalctl -u vk-callback -n 10 --no-pager 2>/dev/null | tail -8" 2>&1)
+          echo "::warning::LOGS: $R"
 
-      - name: Port3847SearchErr
+      - name: ServiceUnit
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -88,10 +88,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | grep -oE 'Соединение|прервано|Проверьте|интернет|error|Error|timeout'" 2>&1)
-          echo "::warning::ERR3847: $R"
+          R=$(timeout 10 $SSH "systemctl cat vk-callback 2>/dev/null | head -15" 2>&1)
+          echo "::warning::UNIT: $R"
 
-      - name: TraefikRoutes
+      - name: ConnErrCode
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -99,16 +99,5 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:8080/api/http/routers 2>/dev/null | python3 -c 'import sys,json;[print(f\"{r.get(\"name\",\"\")}: {r.get(\"rule\",\"\")}\") for r in json.load(sys.stdin)]' 2>/dev/null || echo 'NO_TRAEFIK_API'" 2>&1)
-          echo "::warning::ROUTES: $R"
-
-      - name: Port3847GrepAll
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | grep -c 'Ассистент'; echo 'lines:'; curl -s http://localhost:3847/ 2>/dev/null | wc -l" 2>&1)
-          echo "::warning::SIZE3847: $R"
+          R=$(timeout 10 $SSH "grep -n 'Соединение\|прервано\|Проверьте\|интернет\|connection\|abort\|timeout' /opt/claud*/server.js /opt/claud*/app.js /opt/claud*/index.js /opt/claud*/src/*.js 2>/dev/null | head -10 || echo 'NOT_FOUND'" 2>&1)
+          echo "::warning::CONN: $R"
