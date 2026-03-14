@@ -7,11 +7,17 @@ on:
     paths:
       - '.github/workflows/fetch-site.yml'
 
+permissions:
+  contents: write
+  issues: write
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
 
       - name: Fetch all pages
         run: |
@@ -75,23 +81,49 @@ jobs:
                   print(f"Skipped {f}: too small ({size} bytes)")
           SCRIPT
 
-      - name: Commit results
-        if: always()
+      - name: Commit and push results
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add site-analysis/ -f
-          git diff --cached --stat
+          git status
           git commit -m "chore: mebelit.site content dump for analysis" || echo "Nothing to commit"
-          git push || echo "Push failed"
+          git push origin HEAD:claude/continue-work-lzjg4 -f
 
-      - name: Print content
+      - name: Create issue with content
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          BODY=""
           for f in site-analysis/*.md; do
             [ -f "$f" ] || continue
-            echo ""
-            echo "======== $(basename $f) ========"
-            cat "$f"
-            echo ""
+            NAME=$(basename "$f")
+            CONTENT=$(head -500 "$f")
+            BODY="${BODY}
+
+          ## ${NAME}
+
+          \`\`\`
+          ${CONTENT}
+          \`\`\`
+
+          ---
+          "
           done
+
+          # Truncate if too long (GitHub issue limit ~65536 chars)
+          BODY=$(echo "$BODY" | head -2000)
+
+          gh issue create \
+            --title "Site dump: mebelit.site content analysis" \
+            --body "$BODY" \
+            --label "documentation" 2>/dev/null || echo "Issue creation failed, content too long"
+
+          # Also upload artifacts
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mebelit-site-dump
+          path: site-analysis/
