@@ -936,6 +936,17 @@ HTML = """<!DOCTYPE html>
   .stat-card .label { font-size: 11px; color: #8b949e; }
   .loading { color: #8b949e; font-style: italic; }
   .hidden { display: none; }
+  .conn-error-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    background: #2d1315; color: #f85149; padding: 12px 20px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    font-size: 14px; border-bottom: 2px solid #da3633;
+  }
+  .conn-error-banner button {
+    background: #da3633; color: #fff; border: none; padding: 6px 16px;
+    border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  .conn-error-banner button:hover { background: #f85149; }
   .context-text { color: #6e7681; font-size: 12px; margin-top: 4px; }
 
   /* Voice UI */
@@ -967,6 +978,10 @@ HTML = """<!DOCTYPE html>
 </style>
 </head>
 <body>
+<div id="conn-error" class="conn-error-banner hidden">
+  <span>Соединение прервано. Проверьте интернет и попробуйте ещё раз.</span>
+  <button onclick="retryConnection()">Повторить</button>
+</div>
 <div class="container">
   <h1>Agentic RAG v3</h1>
   <p class="subtitle">Steps + DevOps + Knowledge Base + Wiki + AI Agents + BlueSales CRM</p>
@@ -1088,7 +1103,28 @@ HTML = """<!DOCTYPE html>
 const API = '';
 let currentCat = null;
 
-async function fetchJSON(url) { return (await fetch(url)).json(); }
+async function fetchJSON(url, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      document.getElementById('conn-error').classList.add('hidden');
+      return await res.json();
+    } catch (err) {
+      if (i === retries) {
+        document.getElementById('conn-error').classList.remove('hidden');
+        throw err;
+      }
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+}
+
+function retryConnection() {
+  document.getElementById('conn-error').classList.add('hidden');
+  loadStats();
+  loadTimeline(currentCat);
+}
 
 function renderStep(s) {
   const cat = s.category || 'step';
@@ -1110,27 +1146,31 @@ function renderStep(s) {
 }
 
 async function loadStats() {
-  const s = await fetchJSON(`${API}/api/stats`);
-  const bs = s.by_status || {};
-  const bc = s.by_category || {};
-  document.getElementById('stats').innerHTML = `
-    <div class="stat-card"><div class="num">${s.total}</div><div class="label">Total</div></div>
-    <div class="stat-card"><div class="num" style="color:#67e8f9">${bc.step||0}</div><div class="label">Steps</div></div>
-    <div class="stat-card"><div class="num" style="color:#a78bfa">${bc.devops||0}</div><div class="label">DevOps</div></div>
-    <div class="stat-card"><div class="num" style="color:#34d399">${bc.knowledge||0}</div><div class="label">Knowledge</div></div>
-    <div class="stat-card"><div class="num" style="color:#fbbf24">${bc.wiki||0}</div><div class="label">Wiki</div></div>
-    <div class="stat-card"><div class="num" style="color:#60a5fa">${bc.crm||0}</div><div class="label">CRM</div></div>
-    <div class="stat-card"><div class="num" style="color:#3fb950">${bs.success||0}</div><div class="label">OK</div></div>
-    <div class="stat-card"><div class="num" style="color:#f85149">${bs.error||0}</div><div class="label">Err</div></div>
-  `;
+  try {
+    const s = await fetchJSON(`${API}/api/stats`);
+    const bs = s.by_status || {};
+    const bc = s.by_category || {};
+    document.getElementById('stats').innerHTML = `
+      <div class="stat-card"><div class="num">${s.total}</div><div class="label">Total</div></div>
+      <div class="stat-card"><div class="num" style="color:#67e8f9">${bc.step||0}</div><div class="label">Steps</div></div>
+      <div class="stat-card"><div class="num" style="color:#a78bfa">${bc.devops||0}</div><div class="label">DevOps</div></div>
+      <div class="stat-card"><div class="num" style="color:#34d399">${bc.knowledge||0}</div><div class="label">Knowledge</div></div>
+      <div class="stat-card"><div class="num" style="color:#fbbf24">${bc.wiki||0}</div><div class="label">Wiki</div></div>
+      <div class="stat-card"><div class="num" style="color:#60a5fa">${bc.crm||0}</div><div class="label">CRM</div></div>
+      <div class="stat-card"><div class="num" style="color:#3fb950">${bs.success||0}</div><div class="label">OK</div></div>
+      <div class="stat-card"><div class="num" style="color:#f85149">${bs.error||0}</div><div class="label">Err</div></div>
+    `;
+  } catch (e) { /* banner shown by fetchJSON */ }
 }
 
 async function loadTimeline(category) {
-  const url = category ? `${API}/api/category/${category}` : `${API}/api/steps`;
-  const steps = await fetchJSON(url);
-  const el = document.getElementById('timeline');
-  if (!steps.length) { el.innerHTML = '<p class="loading">Empty. Click "Demo" to load sample data.</p>'; return; }
-  el.innerHTML = steps.map(renderStep).join('');
+  try {
+    const url = category ? `${API}/api/category/${category}` : `${API}/api/steps`;
+    const steps = await fetchJSON(url);
+    const el = document.getElementById('timeline');
+    if (!steps.length) { el.innerHTML = '<p class="loading">Empty. Click "Demo" to load sample data.</p>'; return; }
+    el.innerHTML = steps.map(renderStep).join('');
+  } catch (e) { /* banner shown by fetchJSON */ }
 }
 
 function showPanel(name) {
@@ -1154,22 +1194,28 @@ function showCat(cat) {
 }
 
 async function loadDemo() {
-  await fetch(`${API}/api/demo`, {method:'POST'});
-  loadStats(); loadTimeline(currentCat);
+  try {
+    await fetch(`${API}/api/demo`, {method:'POST'});
+    loadStats(); loadTimeline(currentCat);
+  } catch (e) { /* banner shown by fetchJSON */ }
 }
 
 async function runGolden() {
   const q = document.getElementById('golden-input').value;
   document.getElementById('golden-result').innerHTML = '<p class="loading">Analyzing...</p>';
-  const r = await fetchJSON(`${API}/api/golden?query=${encodeURIComponent(q)}`);
-  document.getElementById('golden-result').textContent = r.result;
+  try {
+    const r = await fetchJSON(`${API}/api/golden?query=${encodeURIComponent(q)}`);
+    document.getElementById('golden-result').textContent = r.result;
+  } catch (e) { document.getElementById('golden-result').textContent = 'Ошибка соединения'; }
 }
 
 async function runSearch() {
   const q = document.getElementById('search-input').value;
   document.getElementById('search-result').innerHTML = '<p class="loading">Searching...</p>';
-  const r = await fetchJSON(`${API}/api/search?q=${encodeURIComponent(q)}`);
-  document.getElementById('search-result').textContent = r.result;
+  try {
+    const r = await fetchJSON(`${API}/api/search?q=${encodeURIComponent(q)}`);
+    document.getElementById('search-result').textContent = r.result;
+  } catch (e) { document.getElementById('search-result').textContent = 'Ошибка соединения'; }
 }
 
 async function runAgents() {
@@ -1177,45 +1223,55 @@ async function runAgents() {
   document.getElementById('agents-plan').innerHTML = '<p class="loading">Planner...</p>';
   document.getElementById('agents-critique').innerHTML = '';
   document.getElementById('agents-execution').innerHTML = '';
-  const r = await fetchJSON(`${API}/api/agents/chain?task=${encodeURIComponent(q)}`);
-  document.getElementById('agents-plan').textContent = '=== PLAN ===\\n' + r.plan;
-  document.getElementById('agents-critique').textContent = '=== CRITIC ===\\n' + r.critique;
-  document.getElementById('agents-execution').textContent = '=== EXECUTOR ===\\n' + r.execution;
+  try {
+    const r = await fetchJSON(`${API}/api/agents/chain?task=${encodeURIComponent(q)}`);
+    document.getElementById('agents-plan').textContent = '=== PLAN ===\\n' + r.plan;
+    document.getElementById('agents-critique').textContent = '=== CRITIC ===\\n' + r.critique;
+    document.getElementById('agents-execution').textContent = '=== EXECUTOR ===\\n' + r.execution;
+  } catch (e) { document.getElementById('agents-plan').textContent = 'Ошибка соединения'; }
 }
 
 async function runCritic() {
   document.getElementById('agents-plan').innerHTML = '<p class="loading">Critic...</p>';
-  const r = await fetchJSON(`${API}/api/agents/critic`);
-  document.getElementById('agents-plan').textContent = r.result;
+  try {
+    const r = await fetchJSON(`${API}/api/agents/critic`);
+    document.getElementById('agents-plan').textContent = r.result;
+  } catch (e) { document.getElementById('agents-plan').textContent = 'Ошибка соединения'; }
 }
 
 async function doExport(fmt) {
-  const text = await (await fetch(`${API}/api/export/${fmt}`)).text();
-  document.getElementById('export-result').textContent = text;
+  try {
+    const text = await (await fetch(`${API}/api/export/${fmt}`)).text();
+    document.getElementById('export-result').textContent = text;
+  } catch (e) { document.getElementById('export-result').textContent = 'Ошибка соединения'; }
 }
 
 // ─── BlueSales CRM ──────────────────────────────
 async function bsTest() {
   document.getElementById('bs-result').innerHTML = '<p class="loading">Testing connection...</p>';
-  const r = await fetchJSON(`${API}/api/bluesales/test`);
-  if (r.ok) {
-    document.getElementById('bs-result').textContent =
-      'Connection OK! Managers: ' + (r.users || []).join(', ');
-  } else {
-    document.getElementById('bs-result').textContent = 'Error: ' + (r.error || 'Unknown');
-  }
+  try {
+    const r = await fetchJSON(`${API}/api/bluesales/test`);
+    if (r.ok) {
+      document.getElementById('bs-result').textContent =
+        'Connection OK! Managers: ' + (r.users || []).join(', ');
+    } else {
+      document.getElementById('bs-result').textContent = 'Error: ' + (r.error || 'Unknown');
+    }
+  } catch (e) { document.getElementById('bs-result').textContent = 'Ошибка соединения с сервером'; }
 }
 
 async function bsSync() {
   document.getElementById('bs-result').innerHTML = '<p class="loading">Syncing data (this may take a while)...</p>';
-  const r = await (await fetch(`${API}/api/bluesales/sync?days=30&project=default`, {method:'POST'})).json();
-  if (r.ok) {
-    document.getElementById('bs-result').textContent =
-      `Synced! Customers: ${r.customers_synced}, Orders: ${r.orders_synced}, Total: ${r.total}`;
-    loadStats(); loadTimeline(currentCat);
-  } else {
-    document.getElementById('bs-result').textContent = 'Error: ' + (r.error || 'Unknown');
-  }
+  try {
+    const r = await (await fetch(`${API}/api/bluesales/sync?days=30&project=default`, {method:'POST'})).json();
+    if (r.ok) {
+      document.getElementById('bs-result').textContent =
+        `Synced! Customers: ${r.customers_synced}, Orders: ${r.orders_synced}, Total: ${r.total}`;
+      loadStats(); loadTimeline(currentCat);
+    } else {
+      document.getElementById('bs-result').textContent = 'Error: ' + (r.error || 'Unknown');
+    }
+  } catch (e) { document.getElementById('bs-result').textContent = 'Ошибка соединения с сервером'; }
 }
 
 async function bsCustomers() {
