@@ -19,102 +19,79 @@ jobs:
           URL="https://mebelit.site"
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-          # Fetch main page
           echo "=== Fetching main page ==="
           curl -sL -A "$UA" "${URL}/" -o site-analysis/index.html
           echo "Main page: $(wc -c < site-analysis/index.html) bytes"
 
-          # Extract all internal links
           echo "=== All links on main page ==="
           grep -oP 'href="([^"]*)"' site-analysis/index.html | sed 's/href="//;s/"//' | sort -u | tee /tmp/all-links.txt
 
-          # Fetch each internal link
           echo "=== Fetching internal pages ==="
           while read link; do
             if [[ "$link" == "/"* && "$link" != "/#"* && ${#link} -gt 1 ]]; then
               FILENAME=$(echo "$link" | sed 's|^/||;s|/|_|g;s|\.html$||')
               echo "Fetching: ${URL}${link} -> ${FILENAME}.html"
               curl -sL -A "$UA" "${URL}${link}" -o "site-analysis/${FILENAME}.html" 2>/dev/null
-              SIZE=$(wc -c < "site-analysis/${FILENAME}.html" 2>/dev/null || echo 0)
-              echo "  Size: ${SIZE} bytes"
+              echo "  Size: $(wc -c < "site-analysis/${FILENAME}.html") bytes"
             fi
           done < /tmp/all-links.txt
 
-          # Also try common paths
-          for page in pryamye-kuhni uglovye-kuhni p-obraznye-kuhni privacy-policy politika-konfidencialnosti contacts about catalog quiz; do
+          for page in pryamye-kuhni uglovye-kuhni p-obraznye-kuhni privacy-policy politika-konfidencialnosti; do
             if [ ! -f "site-analysis/${page}.html" ]; then
               echo "Trying: ${URL}/${page}"
-              HTTP_CODE=$(curl -sL -o "site-analysis/${page}.html" -w "%{http_code}" -A "$UA" "${URL}/${page}" 2>/dev/null)
-              SIZE=$(wc -c < "site-analysis/${page}.html" 2>/dev/null || echo 0)
-              echo "  Status: ${HTTP_CODE}, Size: ${SIZE} bytes"
-              if [ "$SIZE" -lt 500 ]; then
-                rm -f "site-analysis/${page}.html"
-              fi
+              curl -sL -o "site-analysis/${page}.html" -A "$UA" "${URL}/${page}" 2>/dev/null
+              SIZE=$(wc -c < "site-analysis/${page}.html")
+              echo "  Size: ${SIZE} bytes"
+              [ "$SIZE" -lt 500 ] && rm -f "site-analysis/${page}.html"
             fi
           done
 
           echo "=== Files collected ==="
-          ls -la site-analysis/
+          ls -lah site-analysis/
 
-      - name: Convert HTML to readable text
+      - name: Convert to text
         run: |
           pip install html2text -q
+          python3 << 'SCRIPT'
+          import html2text, os, glob
 
-          cd site-analysis
-          for f in *.html; do
-            BASENAME="${f%.html}"
-            SIZE=$(wc -c < "$f")
-            if [ "$SIZE" -gt 500 ]; then
-              echo "Converting $f ($SIZE bytes)..."
-              python3 -c "
-import html2text, sys
-h = html2text.HTML2Text()
-h.ignore_links = False
-h.ignore_images = False
-h.body_width = 0
-with open('$f', 'r', errors='ignore') as fh:
-    content = fh.read()
-text = h.handle(content)
-with open('${BASENAME}.md', 'w') as out:
-    out.write(text)
-print(f'  -> {len(text)} chars')
-" || echo "  Failed to convert $f"
-            fi
-          done
-          cd ..
+          h = html2text.HTML2Text()
+          h.ignore_links = False
+          h.ignore_images = False
+          h.body_width = 0
 
-      - name: Commit results to repo
+          for f in sorted(glob.glob("site-analysis/*.html")):
+              size = os.path.getsize(f)
+              if size > 500:
+                  basename = os.path.splitext(os.path.basename(f))[0]
+                  with open(f, "r", errors="ignore") as fh:
+                      content = fh.read()
+                  text = h.handle(content)
+                  outpath = f"site-analysis/{basename}.md"
+                  with open(outpath, "w") as out:
+                      out.write(text)
+                  print(f"Converted {basename}: {len(text)} chars")
+              else:
+                  print(f"Skipped {f}: too small ({size} bytes)")
+          SCRIPT
+
+      - name: Commit results
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
           git add site-analysis/ -f
-
-          FILE_COUNT=$(ls site-analysis/ | wc -l)
-          TOTAL_SIZE=$(du -sh site-analysis/ | cut -f1)
-
           git diff --cached --stat
-          git commit -m "chore: mebelit.site dump — ${FILE_COUNT} files, ${TOTAL_SIZE}" || echo "Nothing to commit"
+          git commit -m "chore: mebelit.site content dump for analysis" || echo "Nothing to commit"
           git push || echo "Push failed"
 
-      - name: Print page summaries
+      - name: Print content
         if: always()
         run: |
-          echo "============================================"
-          echo "=== PAGE SUMMARIES ==="
-          echo "============================================"
           for f in site-analysis/*.md; do
-            if [ -f "$f" ]; then
-              echo ""
-              echo "######## $(basename $f) ########"
-              head -300 "$f"
-              echo ""
-              echo "--- end of $(basename $f) ---"
-            fi
+            [ -f "$f" ] || continue
+            echo ""
+            echo "======== $(basename $f) ========"
+            cat "$f"
+            echo ""
           done
-
-          # Also show raw HTML structure for main page
-          echo ""
-          echo "######## HTML STRUCTURE (index.html) ########"
-          grep -oP '<(h[1-6]|title|meta[^>]*description)[^>]*>[^<]*' site-analysis/index.html 2>/dev/null | head -50 || true
