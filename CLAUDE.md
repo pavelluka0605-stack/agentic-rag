@@ -155,10 +155,16 @@ agentic-rag/
 - [x] P0-03 обновлён: после комментария вызывает P0-07 для AI обработки
 - [x] P0-07 исправлен: OpenAI API через $env.OPENAI_API_KEY вместо ручного credential
 - [x] OPENAI_API_KEY добавлен как GitHub секрет
+- [x] Watchdog скрипт — авторестарт сервисов + мониторинг ресурсов VPS + Telegram алерты
+- [x] P0-08 Error Monitor — отслеживание ошибок N8N executions каждые 15 мин
+- [x] Watchdog интегрирован в deploy-p0.yml (установка через cron каждые 5 мин)
+- [x] healthcheck.yml обновлён — проверяет статус watchdog
 
 ## Текущее состояние системы
 
-- **N8N** — работает на VPS, 7 workflows (P0-01..P0-07) активированы
+- **N8N** — работает на VPS, 8 workflows (P0-01..P0-08) активированы
+- **Watchdog** — cron каждые 5 мин: проверка сервисов, авторестарт, мониторинг CPU/RAM/диска
+- **P0-08 Error Monitor** — N8N workflow, проверяет failed executions каждые 15 мин → алерт в Telegram
 - **VK Long Poll** (community) — слушает входящие сообщения в группу
 - **VK User Long Poll** — слушает личные сообщения
 - **BlueSales Sync** (P0-05) — автосинхронизация клиентов/заказов каждый час
