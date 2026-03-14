@@ -83,7 +83,7 @@ def _get_openai_client():
             return None
         try:
             from openai import OpenAI
-            _openai_client = OpenAI(api_key=api_key)
+            _openai_client = OpenAI(api_key=api_key, timeout=30)
         except ImportError:
             return None
     return _openai_client

@@ -124,6 +124,40 @@ if systemctl is-enabled --quiet webapp 2>/dev/null; then
   check_service "Webapp" "webapp" "http://localhost:8000/" 5
 fi
 
+# ─── 1b. Проверка что API реально отвечает на запросы ────────
+
+# Проверка webapp /health (функциональная, не только "порт открыт")
+if systemctl is-active --quiet webapp 2>/dev/null; then
+  HEALTH_RESP=$(curl -s --max-time 10 http://localhost:8000/health 2>/dev/null || echo "TIMEOUT")
+  if echo "$HEALTH_RESP" | grep -q "TIMEOUT\|Connection refused"; then
+    log "WARN: Webapp /health не отвечает — перезапуск"
+    systemctl restart webapp 2>/dev/null || true
+    RESTARTS="${RESTARTS}\n🔄 <b>Webapp</b> — /health не отвечал, перезапущен"
+  elif echo "$HEALTH_RESP" | grep -q '"status":"degraded"'; then
+    ISSUES="${ISSUES}\n🟡 <b>Webapp</b> — работает, но degraded: $(echo "$HEALTH_RESP" | head -c 200)"
+  fi
+
+  # Проверка что API отдаёт данные (простой GET)
+  API_RESP=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" http://localhost:8000/api/projects 2>/dev/null || echo "000")
+  if [ "$API_RESP" = "000" ] || [ "$API_RESP" = "502" ] || [ "$API_RESP" = "503" ]; then
+    log "WARN: Webapp /api/projects вернул HTTP $API_RESP"
+    ISSUES="${ISSUES}\n🟡 <b>Webapp API</b> — HTTP $API_RESP на /api/projects"
+  fi
+fi
+
+# Проверка N8N API
+if systemctl is-active --quiet n8n 2>/dev/null && [ -n "$N8N_API_KEY" ]; then
+  N8N_RESP=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" \
+    -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
+    "http://localhost:5678/api/v1/workflows?limit=1" 2>/dev/null || echo "000")
+  if [ "$N8N_RESP" = "000" ] || [ "$N8N_RESP" = "502" ] || [ "$N8N_RESP" = "503" ]; then
+    log "WARN: N8N API вернул HTTP $N8N_RESP — перезапуск"
+    systemctl restart n8n 2>/dev/null || true
+    sleep 10
+    RESTARTS="${RESTARTS}\n🔄 <b>N8N</b> — API не отвечал (HTTP $N8N_RESP), перезапущен"
+  fi
+fi
+
 # ─── 2. Проверка ресурсов VPS ────────────────────────────────
 
 # Диск
