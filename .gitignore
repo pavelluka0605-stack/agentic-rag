@@ -2,5 +2,4 @@ __pycache__/
 *.db
 *.pyc
 memory.json
-index.html
 .google-sa.json
