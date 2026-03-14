@@ -1,12 +1,11 @@
 name: Fetch Site Content
 
 on:
-  workflow_dispatch:
-    inputs:
-      url:
-        description: 'URL to fetch'
-        required: true
-        default: 'https://mebelit.site/'
+  push:
+    branches:
+      - claude/continue-work-lzjg4
+    paths:
+      - '.github/workflows/fetch-site.yml'
 
 jobs:
   fetch:
@@ -17,21 +16,26 @@ jobs:
       - name: Fetch main page
         run: |
           mkdir -p site-dump
+          URL="https://mebelit.site"
 
           # Fetch main page
           curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-            "${{ github.event.inputs.url }}" -o site-dump/index.html
+            "${URL}/" -o site-dump/index.html
 
           echo "=== Main page size ==="
           wc -c site-dump/index.html
 
+          # Show first 200 chars to verify
+          head -c 500 site-dump/index.html
+          echo ""
+
           # Try to find links to subpages
-          grep -oP 'href="[^"]*"' site-dump/index.html | head -50 || true
+          echo "=== Links found ==="
+          grep -oP 'href="[^"]*"' site-dump/index.html | sort -u | head -80 || true
 
       - name: Fetch subpages
         run: |
-          BASE="${{ github.event.inputs.url }}"
-          BASE="${BASE%/}"
+          URL="https://mebelit.site"
 
           # Common Tilda/kitchen site paths
           PAGES=(
@@ -40,32 +44,47 @@ jobs:
             "/p-obraznye-kuhni"
             "/privacy-policy"
             "/politika-konfidencialnosti"
-            "/straight-kitchens"
-            "/corner-kitchens"
-            "/u-shaped-kitchens"
-            "/catalog"
-            "/about"
-            "/contacts"
-            "/quiz"
+            "/page38498498.html"
+            "/page38498499.html"
+            "/page38498500.html"
+            "/page38498501.html"
           )
 
           for page in "${PAGES[@]}"; do
-            echo "=== Fetching ${BASE}${page} ==="
+            echo "=== Fetching ${URL}${page} ==="
             HTTP_CODE=$(curl -sL -o "site-dump/$(echo $page | tr '/' '_').html" -w "%{http_code}" \
-              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-              "${BASE}${page}" 2>/dev/null)
-            echo "Status: $HTTP_CODE"
+              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+              "${URL}${page}" 2>/dev/null)
+            SIZE=$(wc -c < "site-dump/$(echo $page | tr '/' '_').html" 2>/dev/null || echo 0)
+            echo "Status: $HTTP_CODE, Size: $SIZE bytes"
           done
 
-          # Also try to extract links from main page and fetch them
-          grep -oP 'href="/[^"]*"' site-dump/index.html 2>/dev/null | \
-            sed 's/href="//;s/"//' | sort -u | head -20 | while read link; do
-            if [[ "$link" != "#"* && "$link" != "http"* && "$link" != "javascript"* ]]; then
+          # Extract and fetch all internal links from main page
+          echo "=== Fetching discovered links ==="
+          grep -oP 'href="(/[^"]*)"' site-dump/index.html 2>/dev/null | \
+            sed 's/href="//;s/"//' | sort -u | head -30 | while read link; do
+            if [[ "$link" != "#"* && "$link" != "javascript"* && ${#link} -gt 1 ]]; then
               FILENAME=$(echo "$link" | tr '/' '_')
-              echo "=== Fetching discovered: ${BASE}${link} ==="
-              curl -sL -o "site-dump/discovered${FILENAME}.html" \
+              echo "=== Fetching: ${URL}${link} ==="
+              HTTP_CODE=$(curl -sL -o "site-dump/discovered${FILENAME}.html" -w "%{http_code}" \
+                -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+                "${URL}${link}" 2>/dev/null)
+              SIZE=$(wc -c < "site-dump/discovered${FILENAME}.html" 2>/dev/null || echo 0)
+              echo "Status: $HTTP_CODE, Size: $SIZE bytes"
+            fi
+          done
+
+          # Also try Tilda-specific page patterns
+          echo "=== Trying Tilda page patterns ==="
+          for num in $(seq 1 15); do
+            TILDA_URL="${URL}/page${num}.html"
+            HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" \
+              -A "Mozilla/5.0" "${TILDA_URL}" 2>/dev/null)
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Found: ${TILDA_URL} (200)"
+              curl -sL -o "site-dump/tilda_page${num}.html" \
                 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-                "${BASE}${link}" 2>/dev/null
+                "${TILDA_URL}" 2>/dev/null
             fi
           done
 
@@ -74,29 +93,27 @@ jobs:
 
       - name: Extract text content
         run: |
-          # Install html2text
           pip install html2text >/dev/null 2>&1
-
           mkdir -p site-text
 
           for f in site-dump/*.html; do
             BASENAME=$(basename "$f" .html)
             SIZE=$(wc -c < "$f")
-            if [ "$SIZE" -gt 100 ]; then
+            if [ "$SIZE" -gt 500 ]; then
               echo "=== Converting $BASENAME (${SIZE} bytes) ==="
-              python3 -c "
-          import html2text
+              python3 << 'PYEOF'
+          import html2text, sys
           h = html2text.HTML2Text()
           h.ignore_links = False
           h.ignore_images = False
           h.body_width = 0
-          with open('$f', 'r', errors='ignore') as fh:
+          with open("$f", "r", errors="ignore") as fh:
               content = fh.read()
           text = h.handle(content)
-          with open('site-text/${BASENAME}.md', 'w') as out:
+          with open(f"site-text/${BASENAME}.md", "w") as out:
               out.write(text)
-          print(f'Converted: {len(text)} chars')
-          " 2>/dev/null || echo "Failed to convert $BASENAME"
+          print(f"Converted: {len(text)} chars")
+          PYEOF
             else
               echo "Skipping $BASENAME (too small: ${SIZE} bytes)"
             fi
@@ -105,28 +122,33 @@ jobs:
           echo "=== Text files ==="
           ls -la site-text/
 
-      - name: Upload HTML dump
-        uses: actions/upload-artifact@v4
-        with:
-          name: site-html-dump
-          path: site-dump/
+      - name: Commit site dump to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Upload text content
-        uses: actions/upload-artifact@v4
-        with:
-          name: site-text-content
-          path: site-text/
+          mkdir -p site-analysis
+          cp -r site-dump/* site-analysis/ 2>/dev/null || true
+          cp -r site-text/* site-analysis/ 2>/dev/null || true
 
-      - name: Print text content
+          git add site-analysis/
+          git diff --cached --stat
+          git commit -m "chore: site dump of mebelit.site for analysis" || echo "Nothing to commit"
+          git push || echo "Push failed"
+
+      - name: Print text content summary
         run: |
           echo "============================================"
           echo "=== FULL TEXT CONTENT OF ALL PAGES ==="
           echo "============================================"
           for f in site-text/*.md; do
-            echo ""
-            echo "########################################"
-            echo "### FILE: $(basename $f)"
-            echo "########################################"
-            cat "$f"
-            echo ""
+            if [ -f "$f" ]; then
+              echo ""
+              echo "########################################"
+              echo "### FILE: $(basename $f)"
+              echo "########################################"
+              head -200 "$f"
+              echo ""
+              echo "... (truncated if longer)"
+            fi
           done
