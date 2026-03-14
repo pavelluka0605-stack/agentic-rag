@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -25,7 +27,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: FindDir
+      - name: Download Source
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -33,71 +35,66 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "ls -la /opt/claud* 2>/dev/null; echo '---'; find /opt -maxdepth 2 -name '*.js' -path '*claud*' 2>/dev/null | head -5; echo '---'; cat /proc/630484/cmdline 2>/dev/null | tr '\0' ' ' || ps aux | grep 3847 | grep -v grep" 2>&1)
-          echo "::warning::DIR: $R"
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
 
-      - name: MainJS
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "find /opt -maxdepth 3 -name 'server.js' -o -name 'app.js' -o -name 'index.js' 2>/dev/null | while read f; do echo \"--- \$f ---\"; head -5 \$f; done" 2>&1)
-          echo "::warning::MAINJS: $R"
+          mkdir -p /tmp/chat-src
 
-      - name: ErrSource
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "grep -rn 'Соединение прервано\|Проверьте интернет' /opt/claud* /opt/vk-callback/ 2>/dev/null | head -5 || echo 'NOT_FOUND'" 2>&1)
-          echo "::warning::ERRSRC: $R"
+          # Download key files
+          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js" /tmp/chat-src/ 2>/dev/null || echo "no server.js"
+          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html" /tmp/chat-src/ 2>/dev/null || echo "no index.html"
+          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/package.json" /tmp/chat-src/ 2>/dev/null || echo "no package.json"
+          $SCP -r "$VPS_USER@$VPS_HOST:/opt/claude-chat/.env" /tmp/chat-src/ 2>/dev/null || echo "no .env"
 
-      - name: VKCBFiles
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "ls -la /opt/vk-callback/ 2>/dev/null | head -15; echo '---'; cat /opt/vk-callback/package.json 2>/dev/null | head -10 || echo 'no package.json'" 2>&1)
-          echo "::warning::VKCB: $R"
+          echo "Downloaded files:"
+          ls -la /tmp/chat-src/
 
-      - name: Logs3847
+      - name: Copy to repo
         continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "journalctl -u vk-callback -n 10 --no-pager 2>/dev/null | tail -8" 2>&1)
-          echo "::warning::LOGS: $R"
+          mkdir -p claude-chat
+          cp /tmp/chat-src/server.js claude-chat/ 2>/dev/null || true
+          cp /tmp/chat-src/index.html claude-chat/ 2>/dev/null || true
+          cp /tmp/chat-src/package.json claude-chat/ 2>/dev/null || true
+          # Don't copy .env (secrets)
 
-      - name: ServiceUnit
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "systemctl cat vk-callback 2>/dev/null | head -15" 2>&1)
-          echo "::warning::UNIT: $R"
+          echo "=== server.js (lines around error) ==="
+          grep -n 'Соединение\|прервано\|Проверьте\|timeout\|connection\|abort\|error\|ECONNRESET\|ETIMEDOUT' claude-chat/server.js 2>/dev/null | head -20 || echo "no matches in server.js"
 
-      - name: ConnErrCode
-        continue-on-error: true
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+          echo ""
+          echo "=== index.html (lines around error) ==="
+          grep -n 'Соединение\|прервано\|Проверьте\|timeout\|connection\|error\|fetch\|abort' claude-chat/index.html 2>/dev/null | head -20 || echo "no matches in index.html"
+
+      - name: Commit Source
         run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "grep -n 'Соединение\|прервано\|Проверьте\|интернет\|connection\|abort\|timeout' /opt/claud*/server.js /opt/claud*/app.js /opt/claud*/index.js /opt/claud*/src/*.js 2>/dev/null | head -10 || echo 'NOT_FOUND'" 2>&1)
-          echo "::warning::CONN: $R"
+          if [ -f claude-chat/server.js ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add claude-chat/
+            git commit -m "chore: add claude-chat source from VPS for analysis" || echo "No changes"
+            git push origin main || echo "Push to main failed"
+          fi
+
+      - name: ErrorLines
+        continue-on-error: true
+        run: |
+          if [ -f claude-chat/index.html ]; then
+            # Show 10 lines around the error message
+            R=$(grep -n -B5 -A5 'Соединение прервано' claude-chat/index.html 2>/dev/null | head -20)
+            echo "::warning::ERRCTX: $R"
+          fi
+
+      - name: ServerTimeout
+        continue-on-error: true
+        run: |
+          if [ -f claude-chat/server.js ]; then
+            R=$(grep -n 'timeout\|TIMEOUT\|120\|setTimeout\|maxTime\|abort' claude-chat/server.js 2>/dev/null | head -15)
+            echo "::warning::TIMEOUT: $R"
+          fi
+
+      - name: ServerAPI
+        continue-on-error: true
+        run: |
+          if [ -f claude-chat/server.js ]; then
+            R=$(grep -n 'app.post\|app.get\|router\.\|ssh\|exec\|spawn\|child_process' claude-chat/server.js 2>/dev/null | head -15)
+            echo "::warning::API: $R"
+          fi
