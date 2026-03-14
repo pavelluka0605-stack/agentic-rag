@@ -205,10 +205,10 @@ app.post('/api/chat', auth, (req, res) => {
     'X-Request-Id': requestId,
   });
 
-  // Heartbeat to keep connection alive through proxies
+  // Heartbeat to keep connection alive through proxies (every 5s)
   const heartbeat = setInterval(() => {
-    try { res.write(': heartbeat\n\n'); } catch (_) {}
-  }, 15000);
+    try { res.write(': heartbeat\n\n'); } catch (_) { clearInterval(heartbeat); }
+  }, 5000);
 
   // Send request ID
   res.write(`data: ${JSON.stringify({ type: 'start', id: requestId })}\n\n`);
@@ -245,6 +245,7 @@ app.post('/api/chat', auth, (req, res) => {
       res.write(`data: ${JSON.stringify({ type: 'chunk', text })}\n\n`);
     });
     child.on('close', (code) => {
+      clearInterval(heartbeat);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       if (!output) {
         res.write(`data: ${JSON.stringify({ type: 'chunk', text: `[exit code: ${code}]` })}\n\n`);
@@ -255,6 +256,7 @@ app.post('/api/chat', auth, (req, res) => {
       runningProcesses.delete(requestId);
     });
     child.on('error', (err) => {
+      clearInterval(heartbeat);
       res.write(`data: ${JSON.stringify({ type: 'error', text: err.message })}\n\n`);
       res.write(`data: ${JSON.stringify({ type: 'done', elapsed: '0', code: 1 })}\n\n`);
       res.end();
@@ -262,6 +264,7 @@ app.post('/api/chat', auth, (req, res) => {
       runningProcesses.delete(requestId);
     });
     req.on('close', () => {
+      clearInterval(heartbeat);
       if (runningProcesses.has(requestId)) {
         child.kill('SIGTERM');
         runningProcesses.delete(requestId);
@@ -271,12 +274,22 @@ app.post('/api/chat', auth, (req, res) => {
     return;
   }
 
-  // Spawn claude CLI
+  // Spawn claude CLI (no spawn timeout — we manage it ourselves for clean error messages)
   const child = spawn(CLAUDE_PATH, ['--print', prompt], {
     env: { ...process.env, NO_COLOR: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 120000, // 2 min timeout
   });
+
+  // Manual timeout: 5 minutes — sends clean error before killing
+  const TIMEOUT_MS = 5 * 60 * 1000;
+  const processTimeout = setTimeout(() => {
+    if (runningProcesses.has(requestId)) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      safeSend({ type: 'chunk', text: '\n\n[Превышено время ожидания (5 мин). Запрос отменён.]' });
+      safeSend({ type: 'done', elapsed, code: 124 });
+      child.kill('SIGTERM');
+    }
+  }, TIMEOUT_MS);
 
   runningProcesses.set(requestId, child);
 
@@ -306,6 +319,8 @@ app.post('/api/chat', auth, (req, res) => {
   });
 
   child.on('close', (code) => {
+    clearTimeout(processTimeout);
+    clearInterval(heartbeat);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     bgResult.done = true;
     bgResult.elapsed = elapsed;
@@ -318,6 +333,8 @@ app.post('/api/chat', auth, (req, res) => {
   });
 
   child.on('error', (err) => {
+    clearTimeout(processTimeout);
+    clearInterval(heartbeat);
     bgResult.chunks.push({ type: 'error', text: err.message });
     bgResult.done = true;
     bgResult.elapsed = '0';
