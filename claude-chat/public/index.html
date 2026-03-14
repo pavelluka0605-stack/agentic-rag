@@ -72,9 +72,10 @@ body {
   background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
   color: var(--text2); font-size: 11px; cursor: pointer;
 }
-.typing { align-self: flex-start; color: var(--text2); font-size: 14px; padding: 8px 16px; }
-.typing::after { content: ''; animation: dots 1.5s infinite; }
+.typing { align-self: flex-start; color: var(--text2); font-size: 14px; padding: 8px 16px; display: flex; align-items: center; gap: 8px; }
+.typing .dots::after { content: ''; animation: dots 1.5s infinite; }
 @keyframes dots { 0%{content:'.'} 33%{content:'..'} 66%{content:'...'} }
+.typing .cancel-link { color: var(--error); font-size: 12px; cursor: pointer; text-decoration: underline; margin-left: 8px; }
 
 /* Quick buttons */
 .quick-btns {
@@ -245,6 +246,8 @@ let currentRequestId = null;
 let sending = false;
 let pendingPhotos = []; // { file, dataUrl }
 let history = [];
+let pollAbort = null; // AbortController for polling
+let clientTimeout = null; // total client-side timeout
 
 const $messages = document.getElementById('messages');
 const $input = document.getElementById('msgInput');
@@ -323,12 +326,12 @@ function addMessage(role, content, opts = {}) {
   return div;
 }
 
-function showTyping() {
+function showTyping(text = 'Ожидание ответа') {
   removeTyping();
   const div = document.createElement('div');
   div.className = 'typing';
   div.id = 'typing';
-  div.textContent = 'Ожидание ответа';
+  div.innerHTML = `<span>${escapeHtml(text)}</span><span class="dots"></span><span class="cancel-link" onclick="cancelCurrentRequest()">отменить</span>`;
   $messages.appendChild(div);
   $messages.scrollTop = $messages.scrollHeight;
 }
@@ -388,6 +391,16 @@ async function sendMessage() {
   showTyping();
   $connBanner.classList.remove('show');
 
+  // Hard client-side timeout: 6 minutes — guarantees UI never hangs forever
+  clientTimeout = setTimeout(() => {
+    if (sending && currentRequestId) {
+      console.warn('Client timeout — forcing cleanup');
+      cancelCurrentRequest();
+    }
+  }, 6 * 60 * 1000);
+
+  let sseCompleted = false;
+
   try {
     const resp = await fetch(`${API}/api/chat`, {
       method: 'POST',
@@ -402,6 +415,7 @@ async function sendMessage() {
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
       removeTyping();
+      if (clientTimeout) { clearTimeout(clientTimeout); clientTimeout = null; }
       addMessage('error', err.error || `HTTP ${resp.status}`);
       sending = false;
       $sendBtn.disabled = false;
@@ -444,7 +458,9 @@ async function sendMessage() {
         } else if (event.type === 'error') {
           botText += event.text;
         } else if (event.type === 'done') {
+          sseCompleted = true;
           removeTyping();
+          if (clientTimeout) { clearTimeout(clientTimeout); clientTimeout = null; }
           if (botDiv) {
             const el = document.createElement('div');
             el.className = 'elapsed';
@@ -465,50 +481,108 @@ async function sendMessage() {
         }
       }
     }
+
+    // SSE stream ended without 'done' event — server closed unexpectedly
+    if (!sseCompleted && currentRequestId) {
+      showTyping('Восстанавливаю соединение');
+      pollForResult(currentRequestId);
+      return; // pollForResult handles cleanup
+    }
   } catch (err) {
     removeTyping();
-    // Connection lost — show banner, try to recover
+    // Connection lost — try to recover
     $connBanner.classList.add('show');
     if (currentRequestId) {
-      // Don't show error yet — request may still be running on server
-      showTyping();
+      showTyping('Соединение потеряно, ожидаю ответ');
       pollForResult(currentRequestId);
+      return; // pollForResult handles cleanup
     } else {
       addMessage('error', 'Соединение прервано. Проверьте интернет.');
     }
   } finally {
-    sending = false;
-    $sendBtn.disabled = false;
+    if (sseCompleted || !currentRequestId) {
+      if (clientTimeout) { clearTimeout(clientTimeout); clientTimeout = null; }
+      sending = false;
+      $sendBtn.disabled = false;
+    }
   }
+}
+
+// --- Cancel current request ---
+async function cancelCurrentRequest() {
+  if (pollAbort) pollAbort.abort();
+  if (clientTimeout) { clearTimeout(clientTimeout); clientTimeout = null; }
+
+  if (currentRequestId) {
+    try {
+      await fetch(`${API}/api/cancel/${currentRequestId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${TOKEN}` },
+      });
+    } catch (_) {}
+  }
+
+  removeTyping();
+  $connBanner.classList.remove('show');
+  currentRequestId = null;
+  sending = false;
+  $sendBtn.disabled = false;
+  addMessage('error', 'Запрос отменён');
 }
 
 // --- Poll for result after disconnect ---
 async function pollForResult(requestId) {
+  pollAbort = new AbortController();
   const maxAttempts = 60; // 5 minutes max (every 5s)
+  let lastPartialText = '';
+
   for (let i = 0; i < maxAttempts; i++) {
+    if (pollAbort.signal.aborted) return;
     await new Promise(r => setTimeout(r, 5000));
+    if (pollAbort.signal.aborted) return;
+
     try {
       const resp = await fetch(`${API}/api/result/${requestId}`, {
         headers: { 'Authorization': `Bearer ${TOKEN}` },
+        signal: pollAbort.signal,
       });
       if (!resp.ok) continue;
       const data = await resp.json();
+
+      // Show partial text as it arrives
+      if (data.fullText && data.fullText !== lastPartialText) {
+        lastPartialText = data.fullText;
+        const typingEl = document.getElementById('typing');
+        if (typingEl) {
+          typingEl.querySelector('span').textContent = `Получаю ответ (${data.fullText.length} символов)`;
+        }
+      }
+
       if (data.done) {
         removeTyping();
         $connBanner.classList.remove('show');
         if (data.fullText) {
           addMessage('bot', data.fullText, { elapsed: `${data.elapsed}s` });
+        } else {
+          addMessage('error', 'Сервер обработал запрос, но ответ пустой. Попробуйте снова.');
         }
         currentRequestId = null;
+        sending = false;
+        $sendBtn.disabled = false;
+        pollAbort = null;
         return;
       }
-    } catch (_) {
+    } catch (e) {
+      if (e.name === 'AbortError') return;
       // Still offline, keep trying
     }
   }
   removeTyping();
-  addMessage('error', 'Не удалось получить ответ. Попробуйте снова.');
+  addMessage('error', 'Не удалось получить ответ за 5 минут. Попробуйте снова.');
   currentRequestId = null;
+  sending = false;
+  $sendBtn.disabled = false;
+  pollAbort = null;
 }
 
 // --- Recover session on app reopen ---
