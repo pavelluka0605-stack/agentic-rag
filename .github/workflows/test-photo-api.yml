@@ -25,67 +25,85 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Nginx
+      - name: Nginx1
+        continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 15 $SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'NOT FOUND'" 2>&1)
-          echo "::warning::NGINX: $R"
+          R=$(timeout 10 $SSH "head -20 /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'NOT_FOUND'" 2>&1)
+          echo "::warning::NGX1: $R"
 
-      - name: Chat Search
+      - name: Nginx2
+        continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 20 $SSH "grep -rl 'Соединение прервано' /opt/ /var/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT_FOUND'" 2>&1)
-          echo "::warning::SEARCH_CONNECTION: $R"
+          R=$(timeout 10 $SSH "tail -20 /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'NOT_FOUND'" 2>&1)
+          echo "::warning::NGX2: $R"
 
-      - name: Chat Search 2
+      - name: Search1
+        continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 20 $SSH "grep -rl 'VPS статус\|AI Ассистент' /opt/ /var/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT_FOUND'" 2>&1)
-          echo "::warning::SEARCH_ASSISTANT: $R"
+          R=$(timeout 10 $SSH "grep -rl 'Соединение прервано' /opt/webapp/ /opt/p0-foundation/ 2>/dev/null | head -3 || echo 'NOT_IN_OPT'" 2>&1)
+          echo "::warning::SEARCH_OPT: $R"
+
+      - name: Search2
+        continue-on-error: true
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "grep -rl 'AI Ассистент\|VPS статус' /opt/webapp/ /opt/p0-foundation/ /var/www/ 2>/dev/null | head -3 || echo 'NOT_IN_OPT'" 2>&1)
+          echo "::warning::SEARCH_ASST: $R"
 
       - name: Docker
+        continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "docker ps --format '{{.Names}} | {{.Status}} | {{.Ports}}' 2>/dev/null || echo 'NO_DOCKER'" 2>&1)
+          R=$(timeout 10 $SSH "docker ps --format '{{.Names}}|{{.Status}}|{{.Ports}}' 2>/dev/null || echo 'NO_DOCKER'" 2>&1)
           echo "::warning::DOCKER: $R"
 
       - name: Curl
+        continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:8000/ 2>/dev/null | grep -oE '<title>[^<]+</title>' || echo 'NO_TITLE'" 2>&1)
-          echo "::warning::CURL_TITLE: $R"
+          R=$(timeout 10 $SSH "curl -s http://localhost:8000/ 2>/dev/null | grep -oP '<title>[^<]+</title>'" 2>&1)
+          echo "::warning::TITLE: $R"
 
       - name: WebPy
+        continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "wc -lc /opt/webapp/web.py; grep -c 'conn-error' /opt/webapp/web.py && echo 'HAS_FIX' || echo 'NO_FIX'" 2>&1)
+          R=$(timeout 10 $SSH "wc -l /opt/webapp/web.py; grep -c 'conn-error' /opt/webapp/web.py; grep -c 'Соединение' /opt/webapp/web.py" 2>&1)
           echo "::warning::WEBPY: $R"
 
       - name: Services
+        continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -93,14 +111,15 @@ jobs:
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
           R=$(timeout 10 $SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended' | awk '{print \$1}' | tr '\n' ' '" 2>&1)
-          echo "::warning::SERVICES: $R"
+          echo "::warning::SVC: $R"
 
-      - name: Logs
+      - name: Ports
+        continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "journalctl -u webapp -n 5 --no-pager 2>/dev/null | tail -5" 2>&1)
-          echo "::warning::LOGS: $R"
+          R=$(timeout 10 $SSH "ss -tlnp | grep -v 'State' | awk '{print \$4, \$6}' | tr '\n' ' '" 2>&1)
+          echo "::warning::PORTS: $R"
