@@ -18,7 +18,16 @@ import wiki as wiki_mod
 import bluesales
 import bluesales_config
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Agentic RAG", version="3.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ─── API ──────────────────────────────────────────────
@@ -1001,9 +1010,13 @@ HTML = """<!DOCTYPE html>
   <!-- Voice -->
   <div id="panel-voice" class="hidden">
     <div class="voice-area">
+      <div class="input-bar" style="margin-bottom:16px">
+        <input id="textInput" placeholder="Введите текст..." style="flex:1" />
+        <button onclick="sendText()" style="background:#238636;color:#fff">Send</button>
+      </div>
       <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()">&#127908;</button>
       <div class="voice-timer hidden" id="voiceTimer">0:00</div>
-      <div class="voice-status" id="voiceStatus">Tap to record</div>
+      <div class="voice-status" id="voiceStatus">Tap to record or type text above</div>
     </div>
     <div class="voice-result hidden" id="voiceResult">
       <div class="transcript" id="voiceTranscript"></div>
@@ -1348,6 +1361,50 @@ async function bsSchema() {
   });
   document.getElementById('bs-result').innerHTML = html;
 }
+
+// ─── Text Send ───────────────────────────────────
+async function sendText() {
+  const input = document.getElementById('textInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  document.getElementById('voiceStatus').textContent = 'Sending...';
+
+  try {
+    const formData = new FormData();
+    formData.append('text', text);
+    formData.append('project', 'default');
+    formData.append('source', 'web');
+
+    const res = await fetch(`${API}/api/voice/text`, {method: 'POST', body: formData});
+    const data = await res.json();
+
+    if (data.error) {
+      document.getElementById('voiceStatus').textContent = 'Error: ' + data.error;
+      return;
+    }
+
+    document.getElementById('voiceStatus').textContent = 'Saved! #' + data.id;
+    document.getElementById('voiceResult').classList.remove('hidden');
+    document.getElementById('voiceTranscript').textContent = data.text;
+    document.getElementById('voiceCatInfo').innerHTML =
+      `<span class="cat-badge ${data.category}">${data.category}(${data.kind})</span> ` +
+      (data.tags||[]).map(t => `<span class="tag">${t}</span>`).join(' ') +
+      (data.priority > 0 ? ` <span class="prio">P${data.priority}</span>` : '');
+
+    input.value = '';
+    loadStats();
+    loadTimeline(currentCat);
+  } catch (err) {
+    document.getElementById('voiceStatus').textContent = 'Error: ' + (err.message || 'Load failed');
+  }
+}
+
+// Enter key to send text
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('textInput');
+  if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') sendText(); });
+});
 
 // ─── Voice Recording ─────────────────────────────
 let mediaRecorder = null;
