@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: VK-Callback
+      - name: Port3847HTML
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -33,10 +33,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "cat /etc/systemd/system/vk-callback.service 2>/dev/null || echo 'NOT_FOUND'" 2>&1)
-          echo "::warning::VK_CALLBACK: $R"
+          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | head -30" 2>&1)
+          echo "::warning::HTML3847: $R"
 
-      - name: Traefik
+      - name: Port3847Title
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -44,10 +44,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "find / -maxdepth 4 -name 'docker-compose*' -o -name 'traefik*' 2>/dev/null | grep -v proc | head -10" 2>&1)
-          echo "::warning::TRAEFIK_FILES: $R"
+          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | grep -oE '<title>[^<]+</title>|Ассистент|Соединение|VPS статус|fetchJSON'" 2>&1)
+          echo "::warning::TITLE3847: $R"
 
-      - name: TraefikConfig
+      - name: Port3847Process
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -55,10 +55,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "docker inspect n8n-traefik-traefik-1 --format '{{json .Config.Labels}}' 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(f\"{k}={v}\") for k,v in d.items() if \"route\" in k.lower() or \"host\" in k.lower() or \"chat\" in k.lower()]' 2>/dev/null || echo 'NO_LABELS'" 2>&1)
-          echo "::warning::TRAEFIK_LABELS: $R"
+          R=$(timeout 10 $SSH "ss -tlnp | grep 3847; echo '---'; ps aux | grep -E '3847|vk-callback' | grep -v grep" 2>&1)
+          echo "::warning::PROC3847: $R"
 
-      - name: N8NLabels
+      - name: VKCallbackUnit
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -66,10 +66,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "docker ps --format '{{.Names}}' 2>/dev/null | while read c; do echo \"--- \$c ---\"; docker inspect \$c --format '{{json .Config.Labels}}' 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(f\"  {k}={v}\") for k,v in d.items() if \"host\" in k.lower() or \"rule\" in k.lower() or \"route\" in k.lower()]' 2>/dev/null; done || echo 'FAIL'" 2>&1)
-          echo "::warning::LABELS: $R"
+          R=$(timeout 10 $SSH "cat /etc/systemd/system/vk-callback.service 2>/dev/null" 2>&1)
+          echo "::warning::VKCB_UNIT: $R"
 
-      - name: Port3847
+      - name: VKCallbackDir
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -77,10 +77,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | head -5 || echo 'NO_RESPONSE'" 2>&1)
-          echo "::warning::PORT3847: $R"
+          R=$(timeout 10 $SSH "ls -la /opt/vk-callback/ 2>/dev/null || ls -la /opt/p0-foundation/vk-callback/ 2>/dev/null || echo 'DIR_NOT_FOUND'" 2>&1)
+          echo "::warning::VKCB_DIR: $R"
 
-      - name: Port3102
+      - name: Port3847SearchErr
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -88,10 +88,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "curl -s http://localhost:3102/ 2>/dev/null | head -5 || echo 'NO_RESPONSE'" 2>&1)
-          echo "::warning::PORT3102: $R"
+          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | grep -oE 'Соединение|прервано|Проверьте|интернет|error|Error|timeout'" 2>&1)
+          echo "::warning::ERR3847: $R"
 
-      - name: WebPyFix
+      - name: TraefikRoutes
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -99,10 +99,10 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "grep 'conn-error\|retries\|Соединение\|fetchJSON' /opt/webapp/web.py 2>/dev/null | wc -l" 2>&1)
-          echo "::warning::WEBPY_FIX_LINES: $R"
+          R=$(timeout 10 $SSH "curl -s http://localhost:8080/api/http/routers 2>/dev/null | python3 -c 'import sys,json;[print(f\"{r.get(\"name\",\"\")}: {r.get(\"rule\",\"\")}\") for r in json.load(sys.stdin)]' 2>/dev/null || echo 'NO_TRAEFIK_API'" 2>&1)
+          echo "::warning::ROUTES: $R"
 
-      - name: DockerCompose
+      - name: Port3847GrepAll
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -110,5 +110,5 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          R=$(timeout 10 $SSH "cat /opt/n8n-traefik/docker-compose.yml 2>/dev/null | head -40 || find / -maxdepth 3 -name 'docker-compose.yml' 2>/dev/null | head -5 || echo 'NOT_FOUND'" 2>&1)
-          echo "::warning::COMPOSE: $R"
+          R=$(timeout 10 $SSH "curl -s http://localhost:3847/ 2>/dev/null | grep -c 'Ассистент'; echo 'lines:'; curl -s http://localhost:3847/ 2>/dev/null | wc -l" 2>&1)
+          echo "::warning::SIZE3847: $R"
