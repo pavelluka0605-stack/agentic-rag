@@ -125,7 +125,8 @@ body {
   margin-bottom: 4px;
 }
 .input-area .send-btn.visible { display: flex; }
-.input-area .send-btn:disabled { opacity: 0.4; cursor: default; }
+.input-area .send-btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+.input-area .send-btn { touch-action: manipulation; }
 
 /* Attachments preview */
 .attachments {
@@ -342,8 +343,13 @@ function removeTyping() {
 }
 
 // --- Send message ---
+let lastSendTime = 0;
 async function sendMessage() {
   if (sending) return; // debounce
+
+  // Защита от двойного тапа на мобильном (минимум 1.5с между отправками)
+  const now = Date.now();
+  if (now - lastSendTime < 1500) return;
 
   const text = $input.value.trim();
   const photos = [...pendingPhotos];
@@ -351,6 +357,7 @@ async function sendMessage() {
   if (!text && photos.length === 0) return;
 
   // Prevent double send
+  lastSendTime = now;
   sending = true;
   $sendBtn.disabled = true;
   $input.value = '';
