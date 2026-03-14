@@ -9,12 +9,15 @@ from openai import OpenAI
 
 _client = None
 
+# Таймаут для всех OpenAI вызовов (секунды)
+OPENAI_TIMEOUT = 60
+
 
 def _get_client() -> OpenAI:
     global _client
     if _client is None:
         api_key = os.environ.get("OPENAI_API_KEY", "")
-        _client = OpenAI(api_key=api_key)
+        _client = OpenAI(api_key=api_key, timeout=OPENAI_TIMEOUT)
     return _client
 
 
@@ -70,16 +73,19 @@ def _format_steps(steps: list[dict]) -> str:
 
 def _call_llm(system_prompt: str, user_message: str, model: str = "gpt-4o") -> str:
     client = _get_client()
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-        temperature=0.3,
-        max_tokens=4096,
-    )
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.3,
+            max_tokens=4096,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"[Ошибка AI: {type(e).__name__}: {e}]"
 
 
 def extract_golden_path(steps: list[dict], task_description: str = "") -> str:

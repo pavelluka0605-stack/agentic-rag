@@ -4,9 +4,11 @@ Web UI — FastAPI + встроенный HTML.
 """
 
 import os
+import time
+import logging
 import tempfile
-from fastapi import FastAPI, Query, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi import FastAPI, Query, UploadFile, File, Form, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse
 import memory_store
 import retriever
 import reasoning_agent
@@ -20,6 +22,9 @@ import bluesales_config
 
 from fastapi.middleware.cors import CORSMiddleware
 
+logger = logging.getLogger("web")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
 app = FastAPI(title="Agentic RAG", version="3.0")
 
 app.add_middleware(
@@ -28,6 +33,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ─── Middleware: логирование запросов + перехват ошибок ────
+@app.middleware("http")
+async def request_monitor(request: Request, call_next):
+    start = time.time()
+    path = request.url.path
+    method = request.method
+    try:
+        response = await call_next(request)
+        elapsed = time.time() - start
+        if elapsed > 5:
+            logger.warning(f"SLOW {method} {path} — {elapsed:.1f}s")
+        else:
+            logger.info(f"{method} {path} — {elapsed:.1f}s — {response.status_code}")
+        return response
+    except Exception as e:
+        elapsed = time.time() - start
+        logger.error(f"ERROR {method} {path} — {elapsed:.1f}s — {type(e).__name__}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"{type(e).__name__}: {str(e)}"},
+        )
+
+
+# ─── Health endpoint для мониторинга ────
+@app.get("/health")
+def health_check():
+    """Health check для watchdog и мониторинга."""
+    checks = {"status": "ok", "timestamp": time.time()}
+    # Проверяем что memory_store доступен
+    try:
+        memory_store.stats()
+        checks["db"] = "ok"
+    except Exception as e:
+        checks["db"] = f"error: {e}"
+        checks["status"] = "degraded"
+    # Проверяем что OpenAI ключ есть
+    checks["openai_key"] = "set" if os.environ.get("OPENAI_API_KEY") else "missing"
+    return checks
 
 
 # ─── API ──────────────────────────────────────────────
@@ -483,17 +528,18 @@ def api_voice_text(
     Auto-categorizes with GPT and saves to memory."""
     import json as _json
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""), timeout=30)
 
     text = text.strip()
     if not text:
         return {"error": "Empty text"}
 
     # Auto-categorize
-    cat_response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": """Categorize the voice note. Reply ONLY with JSON:
+    try:
+        cat_response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": """Categorize the voice note. Reply ONLY with JSON:
 {"category":"wiki|devops|knowledge|step","kind":"note|command|config|incident|decision|pattern|lesson|howto|snippet|action","title":"short title in Russian","tags":["tag1","tag2"],"priority":0}
 
 Rules:
@@ -502,13 +548,15 @@ Rules:
 - Notes, links, how-tos, tips, ideas → wiki
 - Action steps, tasks, todos → step
 - priority: 0=info, 1-2=normal, 3=important, 4-5=critical"""},
-            {"role": "user", "content": text},
-        ],
-        temperature=0,
-    )
-    try:
+                {"role": "user", "content": text},
+            ],
+            temperature=0,
+        )
         cat = _json.loads(cat_response.choices[0].message.content)
     except (_json.JSONDecodeError, IndexError):
+        cat = {"category": "wiki", "kind": "note", "title": text[:50], "tags": [], "priority": 0}
+    except Exception as e:
+        logger.error(f"OpenAI categorize error: {e}")
         cat = {"category": "wiki", "kind": "note", "title": text[:50], "tags": [], "priority": 0}
 
     tags = cat.get("tags", [])
@@ -570,7 +618,7 @@ async def api_voice(
 ):
     """Voice input: record → Whisper transcribe → GPT categorize → save."""
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""), timeout=60)
 
     # Save uploaded audio to temp file
     suffix = ".webm"
@@ -655,7 +703,7 @@ Rules:
 async def api_voice_transcribe(audio: UploadFile = File(...)):
     """Transcribe audio with Whisper, then polish with GPT-4o."""
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""), timeout=60)
 
     suffix = ".webm"
     if audio.filename:
@@ -706,7 +754,7 @@ async def api_photo(
     """Photo input: upload → GPT-4o Vision analyze → save to memory."""
     import base64
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""), timeout=60)
 
     content = await photo.read()
     if not content:
@@ -736,13 +784,17 @@ async def api_photo(
         ]},
     ]
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=messages,
-        max_tokens=1000,
-        temperature=0,
-    )
-    raw = response.choices[0].message.content.strip()
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            max_tokens=1000,
+            temperature=0,
+        )
+        raw = response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"OpenAI photo error: {e}")
+        return {"error": f"AI анализ не удался: {type(e).__name__}"}
 
     import json
     try:
@@ -787,7 +839,7 @@ async def api_photo_analyze(
     """Only analyze photo, don't save — for preview."""
     import base64
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""), timeout=60)
 
     content = await photo.read()
     if not content:
@@ -802,16 +854,19 @@ async def api_photo_analyze(
 
     user_prompt = prompt or "Опиши что на фото."
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": [
-            {"type": "text", "text": user_prompt},
-            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-        ]}],
-        max_tokens=1000,
-    )
-
-    return {"description": response.choices[0].message.content.strip()}
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text": user_prompt},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+            ]}],
+            max_tokens=1000,
+        )
+        return {"description": response.choices[0].message.content.strip()}
+    except Exception as e:
+        logger.error(f"OpenAI photo/analyze error: {e}")
+        return {"error": f"AI анализ не удался: {type(e).__name__}"}
 
 
 @app.delete("/api/clear")
