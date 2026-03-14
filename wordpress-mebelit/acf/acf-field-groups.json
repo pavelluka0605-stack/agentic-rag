@@ -1,0 +1,202 @@
+[
+  {
+    "key": "group_kitchen_fields",
+    "title": "Поля кухни",
+    "fields": [
+      {
+        "key": "field_kitchen_price",
+        "label": "Цена",
+        "name": "kitchen_price",
+        "type": "number",
+        "required": 1,
+        "prepend": "₽",
+        "instructions": "Цена за всю кухню в рублях"
+      },
+      {
+        "key": "field_kitchen_features",
+        "label": "Характеристики",
+        "name": "kitchen_features",
+        "type": "repeater",
+        "sub_fields": [
+          {
+            "key": "field_feature_text",
+            "label": "Характеристика",
+            "name": "feature_text",
+            "type": "text"
+          }
+        ],
+        "instructions": "Например: Сроки: от 21 дня, Гарантия: 24 месяца"
+      }
+    ],
+    "location": [
+      [
+        {
+          "param": "post_type",
+          "operator": "==",
+          "value": "kitchen"
+        }
+      ]
+    ]
+  },
+  {
+    "key": "group_review_fields",
+    "title": "Поля отзыва",
+    "fields": [
+      {
+        "key": "field_review_author",
+        "label": "Автор",
+        "name": "review_author",
+        "type": "text",
+        "required": 1
+      },
+      {
+        "key": "field_review_text",
+        "label": "Текст отзыва",
+        "name": "review_text",
+        "type": "textarea",
+        "required": 1,
+        "rows": 4
+      },
+      {
+        "key": "field_review_rating",
+        "label": "Рейтинг",
+        "name": "review_rating",
+        "type": "number",
+        "required": 1,
+        "default_value": 5,
+        "min": 1,
+        "max": 5
+      }
+    ],
+    "location": [
+      [
+        {
+          "param": "post_type",
+          "operator": "==",
+          "value": "review"
+        }
+      ]
+    ]
+  },
+  {
+    "key": "group_site_settings",
+    "title": "Настройки сайта",
+    "fields": [
+      {
+        "key": "field_phone",
+        "label": "Телефон (отображение)",
+        "name": "site_phone",
+        "type": "text",
+        "default_value": "+7 (391) 216-97-59"
+      },
+      {
+        "key": "field_phone_raw",
+        "label": "Телефон (для ссылки)",
+        "name": "site_phone_raw",
+        "type": "text",
+        "default_value": "+73912169759"
+      },
+      {
+        "key": "field_work_hours",
+        "label": "Часы работы",
+        "name": "site_work_hours",
+        "type": "text",
+        "default_value": "10:00-18:00 пн-пт"
+      },
+      {
+        "key": "field_address",
+        "label": "Адрес",
+        "name": "site_address",
+        "type": "text",
+        "default_value": "Красноярск, ул. 2 Огородная 26"
+      },
+      {
+        "key": "field_webhook_url",
+        "label": "Webhook URL (n8n / Telegram)",
+        "name": "webhook_url",
+        "type": "url",
+        "instructions": "URL для отправки заявок (JSON POST)"
+      },
+      {
+        "key": "field_min_price_straight",
+        "label": "Мин. цена прямых кухонь",
+        "name": "min_price_straight",
+        "type": "number",
+        "default_value": 63700
+      },
+      {
+        "key": "field_min_price_corner",
+        "label": "Мин. цена угловых кухонь",
+        "name": "min_price_corner",
+        "type": "number",
+        "default_value": 96300
+      },
+      {
+        "key": "field_min_price_pshape",
+        "label": "Мин. цена П-образных кухонь",
+        "name": "min_price_pshape",
+        "type": "number",
+        "default_value": 98600
+      }
+    ],
+    "location": [
+      [
+        {
+          "param": "options_page",
+          "operator": "==",
+          "value": "mebelit-settings"
+        }
+      ]
+    ]
+  },
+  {
+    "key": "group_team_members",
+    "title": "Команда",
+    "fields": [
+      {
+        "key": "field_team_members",
+        "label": "Члены команды",
+        "name": "team_members",
+        "type": "repeater",
+        "layout": "block",
+        "sub_fields": [
+          {
+            "key": "field_member_name",
+            "label": "Имя",
+            "name": "member_name",
+            "type": "text"
+          },
+          {
+            "key": "field_member_role",
+            "label": "Должность",
+            "name": "member_role",
+            "type": "text"
+          },
+          {
+            "key": "field_member_quote",
+            "label": "Цитата",
+            "name": "member_quote",
+            "type": "textarea",
+            "rows": 3
+          },
+          {
+            "key": "field_member_photo",
+            "label": "Фото",
+            "name": "member_photo",
+            "type": "image",
+            "return_format": "url"
+          }
+        ]
+      }
+    ],
+    "location": [
+      [
+        {
+          "param": "options_page",
+          "operator": "==",
+          "value": "acf-options-команда"
+        }
+      ]
+    ]
+  }
+]

@@ -1,0 +1,598 @@
+/*
+ Theme Name:   Mebelit Child
+ Theme URI:    https://mebelit.site
+ Description:  Дочерняя тема Hello Elementor для mebelit.site — кухни на заказ в Красноярске
+ Author:       Mebelit
+ Author URI:   https://mebelit.site
+ Template:     hello-elementor
+ Version:      1.0.0
+ Text Domain:  mebelit-child
+*/
+
+/* ============================================
+   GLOBAL DESIGN TOKENS
+   ============================================ */
+
+:root {
+  /* Цвета бренда */
+  --color-primary: #1a1a2e;
+  --color-primary-light: #2d2d44;
+  --color-accent: #e8c547;
+  --color-accent-hover: #d4b13e;
+  --color-accent-light: rgba(232, 197, 71, 0.1);
+  --color-white: #ffffff;
+  --color-light-bg: #f7f7f7;
+  --color-dark-bg: #111111;
+  --color-text: #333333;
+  --color-text-light: #666666;
+  --color-text-muted: #999999;
+  --color-border: #e0e0e0;
+  --color-success: #4caf50;
+  --color-star: #ffc107;
+
+  /* Типографика */
+  --font-heading: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-size-base: 16px;
+  --line-height-base: 1.6;
+
+  /* Размеры */
+  --container-max: 1200px;
+  --section-gap: 80px;
+  --section-gap-mobile: 48px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Тени */
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-popup: 0 16px 48px rgba(0, 0, 0, 0.2);
+
+  /* Переходы */
+  --transition-fast: 0.2s ease;
+  --transition-base: 0.3s ease;
+}
+
+/* ============================================
+   GLOBAL RESET & BASE STYLES
+   ============================================ */
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-primary);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ============================================
+   BUTTON STYLES (единый стиль)
+   ============================================ */
+
+.btn-primary,
+.elementor-button.btn-primary {
+  background-color: var(--color-accent) !important;
+  color: var(--color-primary) !important;
+  border: none !important;
+  border-radius: var(--radius-md) !important;
+  font-family: var(--font-heading) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 16px 32px !important;
+  font-size: 15px !important;
+  transition: var(--transition-base) !important;
+  cursor: pointer !important;
+}
+
+.btn-primary:hover,
+.elementor-button.btn-primary:hover {
+  background-color: var(--color-accent-hover) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.btn-secondary,
+.elementor-button.btn-secondary {
+  background-color: transparent !important;
+  color: var(--color-accent) !important;
+  border: 2px solid var(--color-accent) !important;
+  border-radius: var(--radius-md) !important;
+  font-family: var(--font-heading) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  padding: 14px 30px !important;
+  font-size: 15px !important;
+  transition: var(--transition-base) !important;
+}
+
+.btn-secondary:hover,
+.elementor-button.btn-secondary:hover {
+  background-color: var(--color-accent) !important;
+  color: var(--color-primary) !important;
+}
+
+/* ============================================
+   KITCHEN CARDS
+   ============================================ */
+
+.kitchen-card {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: var(--transition-base);
+}
+
+.kitchen-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-4px);
+}
+
+.kitchen-card__image {
+  width: 100%;
+  height: 280px;
+  object-fit: cover;
+}
+
+.kitchen-card__content {
+  padding: 24px;
+}
+
+.kitchen-card__name {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--color-primary);
+}
+
+.kitchen-card__price {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-accent);
+  margin-bottom: 16px;
+}
+
+.kitchen-card__features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+.kitchen-card__features li {
+  position: relative;
+  padding-left: 20px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: var(--color-text-light);
+}
+
+.kitchen-card__features li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+/* ============================================
+   REVIEW CARDS
+   ============================================ */
+
+.review-card {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--shadow-card);
+}
+
+.review-card__stars {
+  color: var(--color-star);
+  font-size: 18px;
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+}
+
+.review-card__text {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--color-text);
+  margin-bottom: 20px;
+}
+
+.review-card__author {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--color-primary);
+}
+
+/* ============================================
+   TEAM SECTION
+   ============================================ */
+
+.team-member {
+  text-align: center;
+}
+
+.team-member__photo {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 20px;
+  border: 4px solid var(--color-accent);
+}
+
+.team-member__name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--color-primary);
+  margin-bottom: 4px;
+}
+
+.team-member__role {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.team-member__quote {
+  font-style: italic;
+  font-size: 14px;
+  color: var(--color-text-light);
+  line-height: 1.6;
+}
+
+/* ============================================
+   FORMS
+   ============================================ */
+
+.mebelit-form input[type="text"],
+.mebelit-form input[type="tel"],
+.mebelit-form input[type="email"],
+.mebelit-form textarea,
+.elementor-field-textual {
+  border: 2px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 14px 18px !important;
+  font-family: var(--font-body) !important;
+  font-size: 15px !important;
+  transition: var(--transition-fast) !important;
+  background: var(--color-white) !important;
+}
+
+.mebelit-form input:focus,
+.elementor-field-textual:focus {
+  border-color: var(--color-accent) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px var(--color-accent-light) !important;
+}
+
+.form-consent {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.form-consent a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+/* ============================================
+   GUARANTEE BADGES
+   ============================================ */
+
+.guarantee-badge {
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.guarantee-badge__icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+}
+
+.guarantee-badge__title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 12px;
+  color: var(--color-primary);
+}
+
+.guarantee-badge__text {
+  font-size: 14px;
+  color: var(--color-text-light);
+  line-height: 1.6;
+}
+
+/* ============================================
+   QUIZ STYLES
+   ============================================ */
+
+.quiz-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  padding: 48px;
+  box-shadow: var(--shadow-popup);
+}
+
+.quiz-step {
+  display: none;
+}
+
+.quiz-step.active {
+  display: block;
+}
+
+.quiz-progress {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.quiz-progress__bar {
+  flex: 1;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  transition: var(--transition-base);
+}
+
+.quiz-progress__bar.active {
+  background: var(--color-accent);
+}
+
+.quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  margin-bottom: 12px;
+}
+
+.quiz-option:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.quiz-option.selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.quiz-option__image {
+  width: 80px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.quiz-option__label {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.quiz-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 32px;
+}
+
+.quiz-input {
+  width: 100%;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  font-size: 16px;
+  font-family: var(--font-body);
+  margin-bottom: 16px;
+}
+
+.quiz-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+/* ============================================
+   HEADER / NAVIGATION
+   ============================================ */
+
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--color-primary);
+  padding: 0 24px;
+  transition: var(--transition-base);
+}
+
+.site-header.scrolled {
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+}
+
+.header-inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+}
+
+.header-logo img {
+  height: 40px;
+  width: auto;
+}
+
+.header-nav a {
+  color: var(--color-white);
+  text-decoration: none;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 8px 16px;
+  transition: var(--transition-fast);
+}
+
+.header-nav a:hover,
+.header-nav a.active {
+  color: var(--color-accent);
+}
+
+.header-phone {
+  color: var(--color-white);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 16px;
+  text-decoration: none;
+}
+
+.header-phone:hover {
+  color: var(--color-accent);
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+
+.site-footer {
+  background: var(--color-primary);
+  color: var(--color-white);
+  padding: 48px 24px 24px;
+}
+
+.footer-inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+}
+
+.footer-copyright {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 24px;
+  margin-top: 32px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* ============================================
+   HERO SECTION
+   ============================================ */
+
+.hero-section {
+  position: relative;
+  min-height: 600px;
+  display: flex;
+  align-items: center;
+  background: var(--color-primary);
+  color: var(--color-white);
+  overflow: hidden;
+}
+
+.hero-section__content {
+  max-width: 600px;
+}
+
+.hero-section h1 {
+  font-size: clamp(28px, 5vw, 48px);
+  color: var(--color-white);
+  margin-bottom: 20px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-accent);
+  color: var(--color-primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  :root {
+    --section-gap: 48px;
+  }
+
+  .quiz-container {
+    padding: 24px 16px;
+    border-radius: var(--radius-lg);
+  }
+
+  .header-inner {
+    height: 60px;
+  }
+
+  .kitchen-card__image {
+    height: 200px;
+  }
+
+  .team-member__photo {
+    width: 150px;
+    height: 150px;
+  }
+
+  .review-card {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn-primary,
+  .elementor-button.btn-primary {
+    padding: 14px 24px !important;
+    font-size: 14px !important;
+    width: 100% !important;
+    text-align: center !important;
+  }
+
+  .quiz-option {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .quiz-option__image {
+    width: 100%;
+    height: 80px;
+  }
+}
