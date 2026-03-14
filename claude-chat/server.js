@@ -112,12 +112,24 @@ const runningProcesses = new Map(); // id -> child_process
 const backgroundResults = new Map(); // id -> { chunks: [], done: boolean, elapsed, code, startTime }
 const BG_RESULT_TTL = 10 * 60 * 1000; // 10 min TTL
 
-// Cleanup old results periodically
+// --- Conversation history store ---
+// Persists messages so client can recover after disconnect/app restart
+const conversations = new Map(); // sessionId -> { messages: [...], lastActivity: Date }
+const CONV_TTL = 60 * 60 * 1000; // 1 hour TTL
+const pendingRequests = new Map(); // sessionId -> requestId (active request mapping)
+
+// Cleanup old results and conversations periodically
 setInterval(() => {
   const now = Date.now();
   for (const [id, r] of backgroundResults) {
     if (r.done && now - r.doneAt > BG_RESULT_TTL) {
       backgroundResults.delete(id);
+    }
+  }
+  for (const [sid, conv] of conversations) {
+    if (now - conv.lastActivity > CONV_TTL) {
+      conversations.delete(sid);
+      pendingRequests.delete(sid);
     }
   }
 }, 60000);
@@ -183,7 +195,7 @@ app.get('/api/vps-status', auth, (_req, res) => {
 
 // Chat — SSE streaming
 app.post('/api/chat', auth, (req, res) => {
-  const { message, history } = req.body;
+  const { message, history, sessionId: clientSessionId } = req.body;
 
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'message is required' });
@@ -195,6 +207,20 @@ app.post('/api/chat', auth, (req, res) => {
 
   activeRequests++;
   const requestId = uuidv4();
+  const sessionId = clientSessionId || uuidv4();
+
+  // Initialize conversation if needed
+  if (!conversations.has(sessionId)) {
+    conversations.set(sessionId, { messages: [], lastActivity: Date.now() });
+  }
+  const conv = conversations.get(sessionId);
+  conv.lastActivity = Date.now();
+
+  // Save user message
+  conv.messages.push({ role: 'user', content: message, timestamp: Date.now() });
+
+  // Track pending request for this session
+  pendingRequests.set(sessionId, requestId);
 
   // SSE headers
   res.writeHead(200, {
@@ -210,8 +236,8 @@ app.post('/api/chat', auth, (req, res) => {
     try { res.write(': heartbeat\n\n'); } catch (_) { clearInterval(heartbeat); }
   }, 5000);
 
-  // Send request ID
-  res.write(`data: ${JSON.stringify({ type: 'start', id: requestId })}\n\n`);
+  // Send request ID and session ID
+  res.write(`data: ${JSON.stringify({ type: 'start', id: requestId, sessionId })}\n\n`);
 
   // Build prompt with history context
   let prompt = message;
@@ -326,6 +352,24 @@ app.post('/api/chat', auth, (req, res) => {
     bgResult.elapsed = elapsed;
     bgResult.code = code;
     bgResult.doneAt = Date.now();
+
+    // Save assistant response to conversation history
+    if (bgResult.fullText && conv) {
+      conv.messages.push({
+        role: 'assistant',
+        content: bgResult.fullText,
+        timestamp: Date.now(),
+        elapsed: parseFloat(elapsed),
+        requestId,
+      });
+      conv.lastActivity = Date.now();
+    }
+
+    // Clear pending request for this session
+    if (pendingRequests.get(sessionId) === requestId) {
+      pendingRequests.delete(sessionId);
+    }
+
     safeSend({ type: 'done', elapsed, code });
     if (clientConnected) { try { res.end(); } catch (_) {} }
     activeRequests--;
@@ -368,6 +412,63 @@ app.get('/api/result/:id', auth, (req, res) => {
     elapsed: bg.elapsed,
     code: bg.code,
   });
+});
+
+// Recover after disconnect — get pending/completed result for session
+app.get('/api/recover/:sessionId', auth, (req, res) => {
+  const { sessionId } = req.params;
+
+  // Check if there's a pending request for this session
+  const pendingRequestId = pendingRequests.get(sessionId);
+  const conv = conversations.get(sessionId);
+
+  if (pendingRequestId) {
+    // There's still a running request — return its current state
+    const bg = backgroundResults.get(pendingRequestId);
+    if (bg) {
+      return res.json({
+        status: bg.done ? 'completed' : 'running',
+        requestId: pendingRequestId,
+        fullText: bg.fullText,
+        elapsed: bg.elapsed,
+        code: bg.code,
+        done: bg.done,
+      });
+    }
+  }
+
+  // No pending request — return last assistant message if available
+  if (conv && conv.messages.length > 0) {
+    const lastMsg = [...conv.messages].reverse().find(m => m.role === 'assistant');
+    if (lastMsg) {
+      return res.json({
+        status: 'completed',
+        requestId: lastMsg.requestId || null,
+        fullText: lastMsg.content,
+        elapsed: lastMsg.elapsed || null,
+        done: true,
+      });
+    }
+  }
+
+  res.json({ status: 'none' });
+});
+
+// Get conversation history for session
+app.get('/api/history/:sessionId', auth, (req, res) => {
+  const { sessionId } = req.params;
+  const conv = conversations.get(sessionId);
+  if (!conv) {
+    return res.json({ messages: [] });
+  }
+  // Return last 50 messages
+  const messages = conv.messages.slice(-50).map(m => ({
+    role: m.role,
+    content: m.content,
+    timestamp: m.timestamp,
+    elapsed: m.elapsed,
+  }));
+  res.json({ messages, sessionId });
 });
 
 // Cancel request
