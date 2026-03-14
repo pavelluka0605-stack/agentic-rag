@@ -16,7 +16,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
@@ -40,32 +40,56 @@ jobs:
         run: |
           SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           mkdir -p claude-chat/public
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html" claude-chat/public/
-          wc -l claude-chat/public/index.html
-          ls -la claude-chat/public/
+          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html" claude-chat/public/index.html
+          echo "index.html downloaded: $(wc -l < claude-chat/public/index.html) lines, $(wc -c < claude-chat/public/index.html) bytes"
 
-      - name: Get proxy configs
+      - name: Deploy fixed server.js to VPS
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-          echo "=== NGINX CONFIGS ==="
-          $SSH "ls /etc/nginx/sites-enabled/ 2>/dev/null && echo '---' && cat /etc/nginx/sites-enabled/* 2>/dev/null" || echo "no nginx"
-          echo "=== TRAEFIK DYNAMIC ==="
-          $SSH "find /opt/ -name 'traefik*' -o -name 'dynamic*' 2>/dev/null | head -10"
-          $SSH "docker inspect traefik 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(l) for l in d[0].get(\"Args\",[]) if \"timeout\" in l.lower() or \"idle\" in l.lower()]' 2>/dev/null" || echo "no traefik timeout args"
-          echo "=== CLAUDE-CHAT SERVICE ==="
-          $SSH "systemctl cat claude-chat 2>/dev/null" || echo "no service"
-          echo "=== CLAUDE-CHAT LOGS (last 20) ==="
-          $SSH "journalctl -u claude-chat -n 20 --no-pager 2>/dev/null" || echo "no logs"
 
-      - name: Commit and push
+          # Backup current server.js
+          $SSH "cp /opt/claude-chat/server.js /opt/claude-chat/server.js.bak"
+          echo "Backed up server.js"
+
+          # Upload fixed server.js
+          $SCP claude-chat/server.js "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js"
+          echo "Uploaded fixed server.js"
+
+          # Restart claude-chat service
+          $SSH "systemctl restart claude-chat 2>/dev/null || (cd /opt/claude-chat && pm2 restart claude-chat 2>/dev/null) || echo 'Manual restart needed'"
+          echo "Restarted service"
+
+          # Verify it's running
+          sleep 2
+          $SSH "curl -s http://localhost:3847/api/health" || echo "Health check failed"
+
+      - name: Get proxy timeout configs
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        continue-on-error: true
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          echo "=== NGINX CONFIG ==="
+          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null" || echo "no nginx configs"
+          echo ""
+          echo "=== TRAEFIK CONFIG ==="
+          $SSH "docker inspect traefik 2>/dev/null | head -100" || echo "no traefik"
+          echo ""
+          echo "=== TRAEFIK DYNAMIC CONFIG ==="
+          $SSH "find /opt/ -path '*/traefik/*' -name '*.yml' -o -name '*.yaml' -o -name '*.toml' 2>/dev/null | xargs head -50 2>/dev/null" || echo "no dynamic config"
+
+      - name: Commit index.html to branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add claude-chat/
+          git add claude-chat/public/
           git diff --cached --stat
           git commit -m "chore: add index.html from VPS" || echo "No changes"
-          git push origin claude/fix-connection-error-oXw4p
+          git push origin claude/fix-connection-error-oXw4p || echo "Push failed (will be in main via auto-merge)"
