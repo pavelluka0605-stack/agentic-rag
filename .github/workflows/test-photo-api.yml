@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: vps-diag
+  group: vps-diag-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,82 +28,66 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Fix nginx proxy timeouts
+      - name: Deploy and fix
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
 
-          # Show current nginx config for chat
-          echo "=== CURRENT NGINX CONFIG ==="
-          $SSH "cat /etc/nginx/sites-enabled/chat* 2>/dev/null || ls /etc/nginx/sites-enabled/"
-
-          # Check if nginx has proxy timeout settings for the chat location
-          echo ""
-          echo "=== CHECKING PROXY TIMEOUTS ==="
-          $SSH "grep -r 'proxy_read_timeout\|proxy_send_timeout\|proxy_connect_timeout\|proxy_buffering' /etc/nginx/ 2>/dev/null || echo 'no proxy timeout settings found'"
-
-          # Add/update proxy timeouts for SSE support
-          # Find the nginx config file for chat.marbomebel.ru
-          CONF=$($SSH "ls /etc/nginx/sites-enabled/chat* 2>/dev/null | head -1")
-          if [ -z "$CONF" ]; then
-            CONF=$($SSH "grep -rl 'chat.marbomebel' /etc/nginx/sites-enabled/ 2>/dev/null | head -1")
+          # 1. Deploy server.js if it exists in repo
+          if [ -f claude-chat/server.js ]; then
+            $SSH "cp /opt/claude-chat/server.js /opt/claude-chat/server.js.bak"
+            $SCP claude-chat/server.js "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js"
+            echo "✓ server.js deployed"
           fi
-          if [ -z "$CONF" ]; then
-            CONF=$($SSH "grep -rl '3847' /etc/nginx/sites-enabled/ 2>/dev/null | head -1")
-          fi
-          echo "Config file: $CONF"
+
+          # 2. Fix nginx proxy timeouts for SSE
+          echo "=== Fixing nginx timeouts ==="
+          # Find the nginx config for chat
+          CONF=$($SSH "grep -rl '3847\|chat.marbomebel' /etc/nginx/sites-enabled/ 2>/dev/null | head -1")
+          echo "Nginx config: $CONF"
 
           if [ -n "$CONF" ]; then
-            # Check if proxy_read_timeout already exists
-            HAS_TIMEOUT=$($SSH "grep -c 'proxy_read_timeout' $CONF 2>/dev/null || echo 0")
-            if [ "$HAS_TIMEOUT" = "0" ]; then
-              echo "Adding proxy timeout settings..."
-              # Add timeout settings after proxy_pass line
-              $SSH "sed -i '/proxy_pass.*3847/a\\
-        proxy_read_timeout 600s;\\
-        proxy_send_timeout 600s;\\
-        proxy_connect_timeout 60s;\\
-        proxy_buffering off;\\
-        proxy_cache off;\\
-        proxy_http_version 1.1;\\
-        proxy_set_header Connection \"\";' $CONF"
-              echo "Added proxy timeout settings"
+            # Check if already has long timeout
+            HAS=$($SSH "grep -c 'proxy_read_timeout 600' $CONF 2>/dev/null" || echo "0")
+            if [ "$HAS" = "0" ]; then
+              # Check if has any proxy_read_timeout
+              HAS_ANY=$($SSH "grep -c 'proxy_read_timeout' $CONF 2>/dev/null" || echo "0")
+              if [ "$HAS_ANY" != "0" ]; then
+                # Update existing
+                $SSH "sed -i 's/proxy_read_timeout.*/proxy_read_timeout 600s;/' $CONF"
+                $SSH "sed -i 's/proxy_send_timeout.*/proxy_send_timeout 600s;/' $CONF"
+                echo "Updated existing timeout values"
+              else
+                # Add after proxy_pass
+                $SSH "sed -i '/proxy_pass.*3847/a\\        proxy_read_timeout 600s;\\n        proxy_send_timeout 600s;\\n        proxy_connect_timeout 60s;\\n        proxy_buffering off;\\n        proxy_cache off;' $CONF"
+                echo "Added timeout settings after proxy_pass"
+              fi
+              $SSH "nginx -t && systemctl reload nginx && echo '✓ nginx reloaded' || echo '✗ nginx reload failed'"
             else
-              echo "Proxy timeout already configured, updating..."
-              $SSH "sed -i 's/proxy_read_timeout.*/proxy_read_timeout 600s;/' $CONF"
-              $SSH "sed -i 's/proxy_send_timeout.*/proxy_send_timeout 600s;/' $CONF"
+              echo "Nginx timeout already set to 600s"
             fi
-
-            echo ""
-            echo "=== UPDATED NGINX CONFIG ==="
             $SSH "cat $CONF"
-
-            # Test and reload nginx
-            $SSH "nginx -t && systemctl reload nginx && echo 'nginx reloaded OK' || echo 'nginx reload FAILED'"
           else
-            echo "No nginx config found for chat - checking if Traefik handles it directly"
-            $SSH "docker ps --filter name=traefik 2>/dev/null"
+            echo "No nginx config for chat found - checking if Traefik handles it"
+            $SSH "docker ps 2>/dev/null | grep -i traefik || echo 'no traefik'"
           fi
 
-      - name: Verify everything works
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          # 3. Restart claude-chat
+          $SSH "systemctl restart claude-chat 2>/dev/null && echo '✓ systemd restart' || echo 'trying pm2...'"
+          $SSH "pm2 restart claude-chat 2>/dev/null && echo '✓ pm2 restart' || echo 'trying manual...'"
 
+          sleep 3
+
+          # 4. Verify
+          echo ""
           echo "=== HEALTH CHECK ==="
-          $SSH "curl -s http://localhost:3847/api/health"
-          echo ""
-
-          echo "=== SERVICE STATUS ==="
-          $SSH "systemctl is-active claude-chat 2>/dev/null || echo 'checking pm2...' && pm2 list 2>/dev/null || echo 'manual process'"
-          $SSH "ps aux | grep 'node.*server.js' | grep -v grep"
+          HEALTH=$($SSH "curl -s http://localhost:3847/api/health")
+          echo "$HEALTH"
 
           echo ""
-          echo "=== EXTERNAL TEST ==="
-          curl -s -o /dev/null -w "HTTP %{http_code} (%{time_total}s)" https://chat.marbomebel.ru/api/health 2>/dev/null && echo "" || echo "External access failed (may need auth)"
+          echo "=== KEY SERVER.JS LINES ==="
+          $SSH "grep -n 'heartbeat\|TIMEOUT_MS\|5000\|clearInterval\|clearTimeout' /opt/claude-chat/server.js"
