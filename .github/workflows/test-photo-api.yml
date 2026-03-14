@@ -1,6 +1,12 @@
-name: Test Photo API
+name: VPS Diagnostics
 
 on:
+  push:
+    branches:
+      - main
+      - "claude/*"
+    paths:
+      - ".github/workflows/test-photo-api.yml"
   workflow_dispatch:
 
 jobs:
@@ -14,7 +20,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Diagnose VPS
+      - name: Full VPS Diagnostics
         continue-on-error: true
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
@@ -24,49 +30,90 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           set +e
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=15 $VPS_USER@$VPS_HOST"
 
-          REPORT=""
+          # === 1. ALL RUNNING SERVICES ===
+          echo "::group::1. All Custom Services"
+          R1=$($SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended' || echo 'none'" 2>&1)
+          echo "$R1"
+          echo "::endgroup::"
+          echo "::notice::Services: $(echo "$R1" | grep -c 'running' || echo 0) running"
 
-          # 1. Check webapp.service
-          R1=$($SSH "systemctl is-active webapp.service 2>/dev/null; systemctl status webapp.service 2>/dev/null | head -15" 2>&1)
-          REPORT+="=== webapp.service ===\n$R1\n\n"
-          echo "::notice::webapp.service: $R1"
+          # === 2. WEBAPP STATUS & LOGS ===
+          echo "::group::2. Webapp Service"
+          R2=$($SSH "systemctl status webapp.service 2>/dev/null | head -20; echo '--- LOGS ---'; journalctl -u webapp -n 30 --no-pager 2>/dev/null" 2>&1)
+          echo "$R2"
+          echo "::endgroup::"
+          echo "::notice::webapp: $(echo "$R2" | head -1)"
 
-          # 2. Check what's on port 8000
-          R2=$($SSH "ss -tlnp | grep 8000 || echo 'port 8000 not listening'" 2>&1)
-          REPORT+="=== Port 8000 ===\n$R2\n\n"
-          echo "::notice::Port 8000: $R2"
+          # === 3. FULL NGINX CONFIG ===
+          echo "::group::3. Nginx Config"
+          R3=$($SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || cat /etc/nginx/sites-enabled/* 2>/dev/null | head -150 || echo 'no nginx config'" 2>&1)
+          echo "$R3"
+          echo "::endgroup::"
+          echo "::notice::nginx config: $(echo "$R3" | head -3)"
 
-          # 3. Check web.py content
-          R3=$($SSH "ls -la /opt/webapp/web.py 2>/dev/null; grep -n 'api/photo' /opt/webapp/web.py 2>/dev/null || echo 'no /api/photo in web.py'" 2>&1)
-          REPORT+="=== web.py ===\n$R3\n\n"
-          echo "::notice::web.py: $R3"
+          # === 4. ALL PORTS ===
+          echo "::group::4. Listening Ports"
+          R4=$($SSH "ss -tlnp 2>/dev/null" 2>&1)
+          echo "$R4"
+          echo "::endgroup::"
+          echo "::notice::ports: $(echo "$R4" | grep -c LISTEN) listening"
 
-          # 4. Check /opt/p0-foundation/web.py
-          R4=$($SSH "ls -la /opt/p0-foundation/web.py 2>/dev/null; grep -n 'api/photo' /opt/p0-foundation/web.py 2>/dev/null || echo 'no /api/photo'" 2>&1)
-          REPORT+="=== p0-foundation/web.py ===\n$R4\n\n"
-          echo "::notice::p0 web.py: $R4"
+          # === 5. DOCKER ===
+          echo "::group::5. Docker Containers"
+          R5=$($SSH "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null || echo 'NO DOCKER'" 2>&1)
+          echo "$R5"
+          echo "::endgroup::"
+          echo "::notice::docker: $R5"
 
-          # 5. Check nginx config
-          R5=$($SSH "grep -r 'chat.marbomebel' /etc/nginx/ 2>/dev/null | head -20 || echo 'no nginx config'" 2>&1)
-          REPORT+="=== nginx ===\n$R5\n\n"
-          echo "::notice::nginx: $R5"
+          # === 6. SEARCH FOR CHAT UI CODE (the AI Assistant interface) ===
+          echo "::group::6. Search for Chat UI"
+          R6=$($SSH "echo '--- /opt/ ---'; grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус\|Проверьте интернет' /opt/ 2>/dev/null || echo 'not in /opt'; echo '--- /var/www/ ---'; grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус' /var/www/ 2>/dev/null || echo 'not in /var/www'; echo '--- /home/ ---'; grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус' /home/ 2>/dev/null || echo 'not in /home'; echo '--- /root/ ---'; grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус' /root/ 2>/dev/null || echo 'not in /root'; echo '--- /srv/ ---'; grep -rln 'Соединение прервано\|AI Ассистент\|VPS статус' /srv/ 2>/dev/null || echo 'not in /srv'" 2>&1)
+          echo "$R6"
+          echo "::endgroup::"
+          echo "::notice::chat UI search: $R6"
 
-          # 6. Local curl test
-          R6=$($SSH "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/photo 2>/dev/null || echo 'failed'" 2>&1)
-          REPORT+="=== localhost:8000/api/photo ===\n$R6\n\n"
-          echo "::notice::localhost test: $R6"
+          # === 7. ALL HTML FILES ON VPS ===
+          echo "::group::7. HTML Files"
+          R7=$($SSH "find / -name '*.html' -not -path '*/node_modules/*' -not -path '*/venv/*' -not -path '*/proc/*' -not -path '*/sys/*' 2>/dev/null | head -30 || echo 'none'" 2>&1)
+          echo "$R7"
+          echo "::endgroup::"
+          echo "::notice::HTML files: $R7"
 
-          # 7. Check all running python processes
-          R7=$($SSH "ps aux | grep -E 'uvicorn|gunicorn|python.*web' | grep -v grep || echo 'no python web'" 2>&1)
-          REPORT+="=== Python processes ===\n$R7\n\n"
-          echo "::notice::Python procs: $R7"
+          # === 8. ALL CUSTOM PY FILES ===
+          echo "::group::8. Python Files in /opt/"
+          R8=$($SSH "find /opt/ -name '*.py' 2>/dev/null | sort" 2>&1)
+          echo "$R8"
+          echo "::endgroup::"
+          echo "::notice::Python files: $(echo "$R8" | wc -l) files"
 
-          # Send to Telegram
-          MSG="🔍 VPS Diagnostic\n\n$REPORT"
-          curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-            -d chat_id="$TG_CHAT_ID" \
-            --data-urlencode "text=$(echo -e "$MSG")" > /dev/null 2>&1 || true
+          # === 9. CURL TESTS ===
+          echo "::group::9. Curl Tests"
+          R9=$($SSH "echo '--- localhost:8000 ---'; curl -s -o /dev/null -w 'HTTP %{http_code} (%{time_total}s)' http://localhost:8000/ 2>&1; echo ''; echo '--- localhost:8000 HTML ---'; curl -s http://localhost:8000/ 2>/dev/null | head -10; echo ''; echo '--- localhost:8000/api/stats ---'; curl -s http://localhost:8000/api/stats 2>/dev/null | head -5; echo ''; echo '--- chat.marbomebel.ru ---'; curl -s -o /dev/null -w 'HTTP %{http_code} (%{time_total}s)' https://chat.marbomebel.ru/ 2>&1; echo ''" 2>&1)
+          echo "$R9"
+          echo "::endgroup::"
+          echo "::notice::curl: $R9"
 
-          echo "Diagnostics complete v2"
+          # === 10. OPENAI KEY CHECK ===
+          echo "::group::10. Environment"
+          R10=$($SSH "grep -c OPENAI_API_KEY /opt/p0-foundation/.env 2>/dev/null && echo 'OPENAI_API_KEY in .env' || echo 'NO OPENAI_API_KEY'; echo '---'; cat /opt/p0-foundation/.env 2>/dev/null | grep -v KEY | grep -v TOKEN | grep -v PASS | grep -v SECRET | head -20 || echo 'no .env'" 2>&1)
+          echo "$R10"
+          echo "::endgroup::"
+          echo "::notice::env: $R10"
+
+          # === 11. N8N CHECK ===
+          echo "::group::11. N8N Status"
+          R11=$($SSH "systemctl status n8n 2>/dev/null | head -10; echo '--- N8N port ---'; ss -tlnp | grep 5678" 2>&1)
+          echo "$R11"
+          echo "::endgroup::"
+          echo "::notice::n8n: $(echo "$R11" | head -1)"
+
+          # === 12. RESOURCES ===
+          echo "::group::12. Resources"
+          R12=$($SSH "df -h / && echo '---' && free -h && echo '---' && uptime" 2>&1)
+          echo "$R12"
+          echo "::endgroup::"
+          echo "::notice::resources: $R12"
+
+          echo "DIAGNOSTICS COMPLETE v3"
