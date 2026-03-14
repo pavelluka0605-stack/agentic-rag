@@ -7,6 +7,7 @@ on:
       - "claude/*"
     paths:
       - ".github/workflows/test-photo-api.yml"
+      - "claude-chat/**"
   workflow_dispatch:
 
 concurrency:
@@ -17,12 +18,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup SSH
         run: |
@@ -31,52 +28,48 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Download index.html via SSH cat
+      - name: Deploy fixed server.js to VPS
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-          mkdir -p claude-chat/public
-          $SSH "cat /opt/claude-chat/public/index.html" > claude-chat/public/index.html
-          echo "Downloaded: $(wc -l < claude-chat/public/index.html) lines, $(wc -c < claude-chat/public/index.html) bytes"
 
-      - name: Verify server.js fix deployed
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        continue-on-error: true
-        run: |
-          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          # Backup
+          $SSH "cp /opt/claude-chat/server.js /opt/claude-chat/server.js.bak.$(date +%s)"
+
+          # Upload fixed server.js
+          $SCP claude-chat/server.js "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js"
+          echo "Uploaded server.js"
+
+          # Restart
+          $SSH "systemctl restart claude-chat 2>/dev/null && echo 'systemd restarted' || (cd /opt/claude-chat && pm2 restart claude-chat 2>/dev/null && echo 'pm2 restarted') || (cd /opt/claude-chat && pkill -f 'node server.js' 2>/dev/null; sleep 1; cd /opt/claude-chat && nohup node server.js > /var/log/claude-chat.log 2>&1 & echo 'manual restart')"
+
+          sleep 3
           echo "=== HEALTH ==="
           $SSH "curl -s http://localhost:3847/api/health"
-          echo ""
-          echo "=== HEARTBEAT CONFIG ==="
-          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS' /opt/claude-chat/server.js"
-          echo ""
-          echo "=== NGINX ==="
-          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null | head -60"
-          echo ""
-          echo "=== SERVICE ==="
-          $SSH "systemctl status claude-chat --no-pager 2>/dev/null | head -15"
 
-      - name: Commit index.html to main
+      - name: Get index.html error handler and nginx config
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if [ -f claude-chat/public/index.html ] && [ -s claude-chat/public/index.html ]; then
-            git add claude-chat/public/index.html
-            CHANGES=$(git diff --cached --stat)
-            if [ -n "$CHANGES" ]; then
-              echo "$CHANGES"
-              git commit -m "chore: add index.html from VPS"
-              git push origin main
-            else
-              echo "No changes to commit"
-            fi
-          else
-            echo "ERROR: index.html not downloaded or empty"
-            exit 1
-          fi
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+
+          echo "=== INDEX.HTML ERROR HANDLER (lines 1200-1260) ==="
+          $SSH "sed -n '1200,1260p' /opt/claude-chat/public/index.html"
+
+          echo ""
+          echo "=== INDEX.HTML SSE/FETCH SECTION (lines 700-800) ==="
+          $SSH "sed -n '700,800p' /opt/claude-chat/public/index.html"
+
+          echo ""
+          echo "=== NGINX CONFIG ==="
+          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null | head -80"
+
+          echo ""
+          echo "=== HEARTBEAT IN DEPLOYED SERVER.JS ==="
+          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS\|5000\|15000' /opt/claude-chat/server.js"
