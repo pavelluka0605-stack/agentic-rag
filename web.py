@@ -653,7 +653,7 @@ Rules:
 
 @app.post("/api/voice/transcribe")
 async def api_voice_transcribe(audio: UploadFile = File(...)):
-    """Only transcribe, don't save — for preview."""
+    """Transcribe audio with Whisper, then polish with GPT-4o."""
     from openai import OpenAI
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
 
@@ -672,7 +672,27 @@ async def api_voice_transcribe(audio: UploadFile = File(...)):
                 file=f,
                 language="ru",
             )
-        return {"text": transcript.text.strip()}
+        raw_text = transcript.text.strip()
+        if not raw_text:
+            return {"text": "", "raw": ""}
+
+        # Polish with GPT-4o: fix punctuation, formatting, keep meaning
+        polish = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": (
+                    "You receive raw speech-to-text transcription in Russian. "
+                    "Fix punctuation, capitalization, and obvious speech recognition errors. "
+                    "Keep the original meaning and wording. Do NOT add or remove content. "
+                    "Reply with the corrected text only, no explanations."
+                )},
+                {"role": "user", "content": raw_text},
+            ],
+            temperature=0,
+            max_tokens=2000,
+        )
+        polished = polish.choices[0].message.content.strip()
+        return {"text": polished, "raw": raw_text}
     finally:
         os.unlink(tmp_path)
 
@@ -1010,13 +1030,17 @@ HTML = """<!DOCTYPE html>
   <!-- Voice -->
   <div id="panel-voice" class="hidden">
     <div class="voice-area">
-      <div class="input-bar" style="margin-bottom:16px">
-        <input id="textInput" placeholder="Введите текст..." style="flex:1" />
-        <button onclick="sendText()" style="background:#238636;color:#fff">Send</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()" style="width:48px;height:48px;font-size:20px;flex-shrink:0">&#127908;</button>
+        <div class="voice-timer hidden" id="voiceTimer" style="font-size:14px;color:#8b949e">0:00</div>
       </div>
-      <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()">&#127908;</button>
-      <div class="voice-timer hidden" id="voiceTimer">0:00</div>
-      <div class="voice-status" id="voiceStatus">Tap to record or type text above</div>
+      <div class="input-bar" style="margin-bottom:8px">
+        <textarea id="textInput" placeholder="Введите текст или надиктуйте голосом..." rows="3" style="flex:1;resize:vertical;font-family:inherit;font-size:14px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="sendText()" style="background:#238636;color:#fff;padding:8px 20px">Send</button>
+      </div>
+      <div class="voice-status" id="voiceStatus" style="margin-top:8px;font-size:13px">Tap mic to dictate or type text</div>
     </div>
     <div class="voice-result hidden" id="voiceResult">
       <div class="transcript" id="voiceTranscript"></div>
@@ -1400,13 +1424,15 @@ async function sendText() {
   }
 }
 
-// Enter key to send text
+// Ctrl+Enter or Cmd+Enter to send text
 document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('textInput');
-  if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') sendText(); });
+  if (input) input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendText(); }
+  });
 });
 
-// ─── Voice Recording ─────────────────────────────
+// ─── Voice Recording → Transcribe → Text Input ──
 let mediaRecorder = null;
 let audioChunks = [];
 let voiceTimerInterval = null;
@@ -1423,7 +1449,6 @@ function toggleVoice() {
 async function startVoice() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({audio: true});
-    // Use mp4 on iOS Safari, webm elsewhere
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
       : MediaRecorder.isTypeSupported('audio/mp4')
@@ -1436,15 +1461,14 @@ async function startVoice() {
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
     mediaRecorder.onstop = () => {
       stream.getTracks().forEach(t => t.stop());
-      sendVoice();
+      transcribeVoice();
     };
 
     mediaRecorder.start();
     document.getElementById('voiceBtn').classList.add('recording');
-    document.getElementById('voiceStatus').textContent = 'Recording...';
-    document.getElementById('voiceResult').classList.add('hidden');
+    document.getElementById('voiceBtn').textContent = '\\u23F9';
+    document.getElementById('voiceStatus').textContent = 'Recording... tap to stop';
 
-    // Timer
     voiceStartTime = Date.now();
     document.getElementById('voiceTimer').classList.remove('hidden');
     voiceTimerInterval = setInterval(() => {
@@ -1463,21 +1487,20 @@ function stopVoice() {
     mediaRecorder.stop();
   }
   document.getElementById('voiceBtn').classList.remove('recording');
+  document.getElementById('voiceBtn').textContent = '\\u{1F3A4}';
   clearInterval(voiceTimerInterval);
   document.getElementById('voiceTimer').classList.add('hidden');
-  document.getElementById('voiceStatus').textContent = 'Transcribing...';
+  document.getElementById('voiceStatus').textContent = 'Transcribing with GPT...';
 }
 
-async function sendVoice() {
+async function transcribeVoice() {
   const ext = (mediaRecorder && mediaRecorder.mimeType.includes('mp4')) ? 'mp4' : 'webm';
   const blob = new Blob(audioChunks, {type: mediaRecorder ? mediaRecorder.mimeType : 'audio/webm'});
   const formData = new FormData();
   formData.append('audio', blob, 'voice.' + ext);
-  formData.append('project', 'default');
-  formData.append('auto_categorize', 'true');
 
   try {
-    const res = await fetch(`${API}/api/voice`, {method: 'POST', body: formData});
+    const res = await fetch(`${API}/api/voice/transcribe`, {method: 'POST', body: formData});
     const data = await res.json();
 
     if (data.error) {
@@ -1485,18 +1508,20 @@ async function sendVoice() {
       return;
     }
 
-    document.getElementById('voiceStatus').textContent = 'Saved! #' + data.id;
-    document.getElementById('voiceResult').classList.remove('hidden');
-    document.getElementById('voiceTranscript').textContent = data.text;
-    document.getElementById('voiceCatInfo').innerHTML =
-      `<span class="cat-badge ${data.category}">${data.category}(${data.kind})</span> ` +
-      (data.tags||[]).map(t => `<span class="tag">${t}</span>`).join(' ') +
-      (data.priority > 0 ? ` <span class="prio">P${data.priority}</span>` : '');
+    if (!data.text || !data.text.trim()) {
+      document.getElementById('voiceStatus').textContent = 'Empty transcription — try again';
+      return;
+    }
 
-    loadStats();
-    loadTimeline(currentCat);
+    // Put transcribed text into input field for review/edit
+    const input = document.getElementById('textInput');
+    const existing = input.value.trim();
+    input.value = existing ? existing + ' ' + data.text : data.text;
+    input.focus();
+
+    document.getElementById('voiceStatus').textContent = 'Transcribed! Edit if needed, then Send (Ctrl+Enter)';
   } catch (err) {
-    document.getElementById('voiceStatus').textContent = 'Network error';
+    document.getElementById('voiceStatus').textContent = 'Error: ' + (err.message || 'Transcription failed');
   }
 }
 
