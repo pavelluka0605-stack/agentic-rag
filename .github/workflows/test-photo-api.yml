@@ -28,54 +28,37 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Diagnostics to summary
+      - name: Get diagnostics and files
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          mkdir -p output
 
-          {
-            echo "## Health Check"
-            echo '```json'
-            $SSH "curl -s http://localhost:3847/api/health"
-            echo ''
-            echo '```'
+          # Get index.html
+          $SSH "cat /opt/claude-chat/public/index.html" > output/index.html
+          echo "index.html: $(wc -l < output/index.html) lines"
 
-            echo "## Server.js Heartbeat/Timeout Lines"
-            echo '```'
-            $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS\|5000\|15000\|clearInterval\|clearTimeout' /opt/claude-chat/server.js"
-            echo '```'
+          # Get nginx config
+          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null" > output/nginx.conf || echo "no nginx"
 
-            echo "## Nginx Config"
-            echo '```'
-            $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null || echo 'no configs'"
-            echo '```'
+          # Get health check
+          $SSH "curl -s http://localhost:3847/api/health" > output/health.json
 
-            echo "## Index.html Error Handler (lines 1200-1260)"
-            echo '```javascript'
-            $SSH "sed -n '1200,1260p' /opt/claude-chat/public/index.html"
-            echo '```'
+          # Get deployed server.js key lines
+          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS\|5000\|15000\|clearInterval\|clearTimeout' /opt/claude-chat/server.js" > output/server-grep.txt
 
-            echo "## Index.html SSE/Fetch (lines 700-780)"
-            echo '```javascript'
-            $SSH "sed -n '700,780p' /opt/claude-chat/public/index.html"
-            echo '```'
+          # Get service status
+          $SSH "systemctl status claude-chat --no-pager 2>/dev/null || pm2 list 2>/dev/null || echo 'no service'" > output/service.txt
 
-            echo "## Index.html reconnect/recovery functions"
-            echo '```javascript'
-            $SSH "grep -n -A5 'Соединение прервано\|recoverBackground\|savePendingRequest\|reconnect\|EventSource\|reader\|getReader\|ReadableStream' /opt/claude-chat/public/index.html | head -80"
-            echo '```'
+          # Get logs
+          $SSH "journalctl -u claude-chat -n 20 --no-pager 2>/dev/null || echo 'no logs'" > output/logs.txt
 
-            echo "## Claude-chat service"
-            echo '```'
-            $SSH "systemctl status claude-chat --no-pager 2>/dev/null | head -15 || echo 'no systemd service'"
-            $SSH "pm2 list 2>/dev/null || echo 'no pm2'"
-            echo '```'
-
-            echo "## Claude-chat logs (last 15)"
-            echo '```'
-            $SSH "journalctl -u claude-chat -n 15 --no-pager 2>/dev/null || echo 'no journalctl logs'"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: vps-diagnostics
+          path: output/
+          retention-days: 1
