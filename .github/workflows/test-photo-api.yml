@@ -32,43 +32,24 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Download index.html from VPS
+      - name: Download index.html via SSH cat
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
-          mkdir -p claude-chat/public
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html" claude-chat/public/index.html
-          echo "index.html downloaded: $(wc -l < claude-chat/public/index.html) lines, $(wc -c < claude-chat/public/index.html) bytes"
-
-      - name: Deploy fixed server.js to VPS
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
 
-          # Backup current server.js
-          $SSH "cp /opt/claude-chat/server.js /opt/claude-chat/server.js.bak"
-          echo "Backed up server.js"
+          # Check what files exist
+          echo "=== Files in /opt/claude-chat/public/ ==="
+          $SSH "ls -la /opt/claude-chat/public/" || echo "directory not found"
 
-          # Upload fixed server.js
-          $SCP claude-chat/server.js "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js"
-          echo "Uploaded fixed server.js"
+          # Download via SSH cat (more reliable than SCP for large files)
+          mkdir -p claude-chat/public
+          $SSH "cat /opt/claude-chat/public/index.html" > claude-chat/public/index.html
+          echo "Downloaded index.html: $(wc -l < claude-chat/public/index.html) lines, $(wc -c < claude-chat/public/index.html) bytes"
 
-          # Restart claude-chat service
-          $SSH "systemctl restart claude-chat 2>/dev/null || (cd /opt/claude-chat && pm2 restart claude-chat 2>/dev/null) || echo 'Manual restart needed'"
-          echo "Restarted service"
-
-          # Verify it's running
-          sleep 2
-          $SSH "curl -s http://localhost:3847/api/health" || echo "Health check failed"
-
-      - name: Get proxy timeout configs
+      - name: Verify deploy and get configs
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -76,20 +57,35 @@ jobs:
         continue-on-error: true
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-          echo "=== NGINX CONFIG ==="
-          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null" || echo "no nginx configs"
-          echo ""
-          echo "=== TRAEFIK CONFIG ==="
-          $SSH "docker inspect traefik 2>/dev/null | head -100" || echo "no traefik"
-          echo ""
-          echo "=== TRAEFIK DYNAMIC CONFIG ==="
-          $SSH "find /opt/ -path '*/traefik/*' -name '*.yml' -o -name '*.yaml' -o -name '*.toml' 2>/dev/null | xargs head -50 2>/dev/null" || echo "no dynamic config"
 
-      - name: Commit index.html to branch
+          echo "=== HEALTH CHECK ==="
+          $SSH "curl -s http://localhost:3847/api/health" || echo "health check failed"
+
+          echo ""
+          echo "=== SERVER.JS HEARTBEAT LINE ==="
+          $SSH "grep -n 'heartbeat\|setInterval\|timeout\|TIMEOUT' /opt/claude-chat/server.js" || echo "no matches"
+
+          echo ""
+          echo "=== NGINX CONFIG ==="
+          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null | head -80" || echo "no nginx configs"
+
+          echo ""
+          echo "=== CLAUDE-CHAT SERVICE STATUS ==="
+          $SSH "systemctl status claude-chat --no-pager 2>/dev/null || pm2 status 2>/dev/null || echo 'no service manager'"
+
+          echo ""
+          echo "=== CLAUDE-CHAT LOGS (last 10) ==="
+          $SSH "journalctl -u claude-chat -n 10 --no-pager 2>/dev/null || pm2 logs claude-chat --lines 10 --nostream 2>/dev/null || echo 'no logs'"
+
+      - name: Commit index.html
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add claude-chat/public/
-          git diff --cached --stat
-          git commit -m "chore: add index.html from VPS" || echo "No changes"
-          git push origin claude/fix-connection-error-oXw4p || echo "Push failed (will be in main via auto-merge)"
+          if [ -f claude-chat/public/index.html ] && [ -s claude-chat/public/index.html ]; then
+            git add claude-chat/public/index.html
+            git diff --cached --stat
+            git commit -m "chore: add index.html from VPS (via ssh cat)" || echo "No changes"
+            git push origin claude/fix-connection-error-oXw4p || echo "Push to claude branch failed"
+          else
+            echo "ERROR: index.html not downloaded or empty"
+          fi
