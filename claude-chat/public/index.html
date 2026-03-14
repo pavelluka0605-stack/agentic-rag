@@ -588,28 +588,40 @@ async function pollForResult(requestId) {
 // --- Recover session on app reopen ---
 async function recoverSession() {
   $connBanner.classList.remove('show');
-  showTyping();
+  showTyping('Восстанавливаю');
   try {
     const resp = await fetch(`${API}/api/recover/${sessionId}`, {
       headers: { 'Authorization': `Bearer ${TOKEN}` },
     });
     if (!resp.ok) {
       removeTyping();
-      addMessage('error', 'Не удалось восстановить. Попробуйте отправить сообщение заново.');
+      addMessage('error', 'Не удалось восстановить. Отправьте сообщение заново.');
       return;
     }
     const data = await resp.json();
     removeTyping();
 
+    // Старые запросы (>5 мин) — не ждём
+    const MAX_AGE_MS = 5 * 60 * 1000;
+    if (data.status === 'running' && data.ageMs && data.ageMs > MAX_AGE_MS) {
+      addMessage('error', 'Предыдущий запрос истёк. Отправьте сообщение заново.');
+      if (data.requestId) {
+        fetch(`${API}/api/cancel/${data.requestId}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${TOKEN}` },
+        }).catch(() => {});
+      }
+      return;
+    }
+
     if (data.status === 'running') {
-      // Still processing — poll for result
-      showTyping();
-      if (data.requestId) pollForResult(data.requestId);
+      showTyping('Запрос обрабатывается');
+      if (data.requestId) {
+        currentRequestId = data.requestId;
+        pollForResult(data.requestId);
+      }
     } else if (data.status === 'completed' && data.fullText) {
-      // Got the answer
       addMessage('bot', data.fullText, { elapsed: data.elapsed ? `${data.elapsed}s` : '' });
-    } else {
-      // Nothing to recover
     }
   } catch (err) {
     removeTyping();
@@ -626,11 +638,28 @@ async function checkPendingOnLoad() {
     if (!resp.ok) return;
     const data = await resp.json();
 
+    // Игнорировать запросы старше 5 минут — они мёртвые
+    const MAX_AGE_MS = 5 * 60 * 1000;
+    if (data.ageMs && data.ageMs > MAX_AGE_MS && data.status === 'running') {
+      // Старый зависший запрос — не показываем, пытаемся отменить
+      if (data.requestId) {
+        fetch(`${API}/api/cancel/${data.requestId}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${TOKEN}` },
+        }).catch(() => {});
+      }
+      return;
+    }
+
     if (data.status === 'running') {
-      showTyping();
-      if (data.requestId) pollForResult(data.requestId);
+      // Запрос ещё выполняется и не слишком старый — ждём
+      showTyping('Запрос обрабатывается');
+      if (data.requestId) {
+        currentRequestId = data.requestId;
+        pollForResult(data.requestId);
+      }
     } else if (data.status === 'completed' && data.fullText) {
-      // Check if this message is already in our history
+      // Проверяем, не показан ли уже этот ответ
       const lastBot = history.filter(m => m.role === 'assistant').pop();
       if (!lastBot || lastBot.content !== data.fullText) {
         addMessage('bot', data.fullText, { elapsed: data.elapsed ? `${data.elapsed}s` : '' });

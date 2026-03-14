@@ -495,6 +495,7 @@ app.get('/api/recover/:sessionId', auth, (req, res) => {
     // There's still a running request — return its current state
     const bg = backgroundResults.get(pendingRequestId);
     if (bg) {
+      const ageMs = Date.now() - (bg.startTime || Date.now());
       return res.json({
         status: bg.done ? 'completed' : 'running',
         requestId: pendingRequestId,
@@ -502,6 +503,7 @@ app.get('/api/recover/:sessionId', auth, (req, res) => {
         elapsed: bg.elapsed,
         code: bg.code,
         done: bg.done,
+        ageMs,
       });
     }
   }
