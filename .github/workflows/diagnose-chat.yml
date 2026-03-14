@@ -1,0 +1,128 @@
+name: "Diagnose Chat App"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: "Full Chat Diagnostics"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Run Full Diagnostics
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          set +e
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+
+          echo "========================================="
+          echo "=== 1. WEBAPP SERVICE STATUS ==="
+          echo "========================================="
+          $SSH "systemctl status webapp.service 2>/dev/null || echo 'webapp.service NOT FOUND'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 2. WEBAPP LOGS (last 50 lines) ==="
+          echo "========================================="
+          $SSH "journalctl -u webapp -n 50 --no-pager 2>/dev/null || echo 'no logs'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 3. PORT 8000 LISTENER ==="
+          echo "========================================="
+          $SSH "ss -tlnp | grep 8000 || echo 'PORT 8000 NOT LISTENING'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 4. ALL PYTHON PROCESSES ==="
+          echo "========================================="
+          $SSH "ps aux | grep -E 'python|uvicorn|gunicorn|fastapi' | grep -v grep || echo 'NO PYTHON PROCESSES'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 5. NGINX CONFIG for chat.marbomebel ==="
+          echo "========================================="
+          $SSH "grep -r 'chat.marbomebel' /etc/nginx/ 2>/dev/null || echo 'NO NGINX CONFIG for chat.marbomebel'"
+          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null | head -100"
+
+          echo ""
+          echo "========================================="
+          echo "=== 6. CURL LOCALHOST:8000 ==="
+          echo "========================================="
+          $SSH "curl -s -o /dev/null -w 'HTTP %{http_code} (%{time_total}s)\n' http://localhost:8000/ 2>/dev/null || echo 'CURL FAILED'"
+          $SSH "curl -s http://localhost:8000/ 2>/dev/null | head -5 || echo 'NO RESPONSE'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 7. FILES IN /opt/webapp/ ==="
+          echo "========================================="
+          $SSH "ls -la /opt/webapp/ 2>/dev/null || echo '/opt/webapp NOT FOUND'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 8. web.py TITLE/HEADER (what UI is served?) ==="
+          echo "========================================="
+          $SSH "grep -n 'title\|Ассистент\|chat\|Ошибка\|Соединение\|VPS статус\|N8N логи\|docker ps\|Ресурсы\|онлайн\|Сообщение' /opt/webapp/web.py 2>/dev/null | head -30 || echo 'NO MATCHES'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 9. ALL HTML/PY FILES IN /opt/ ==="
+          echo "========================================="
+          $SSH "find /opt/ -name '*.html' -o -name '*.py' 2>/dev/null | sort"
+
+          echo ""
+          echo "========================================="
+          echo "=== 10. web.py on VPS vs repo DIFF (first 20 lines) ==="
+          echo "========================================="
+          $SSH "head -20 /opt/webapp/web.py 2>/dev/null"
+
+          echo ""
+          echo "========================================="
+          echo "=== 11. DISK SPACE & MEMORY ==="
+          echo "========================================="
+          $SSH "df -h / && echo '---' && free -h"
+
+          echo ""
+          echo "========================================="
+          echo "=== 12. OTHER SERVICES ON COMMON PORTS ==="
+          echo "========================================="
+          $SSH "ss -tlnp | grep -E ':80 |:443 |:3000 |:5678 |:8000 |:8080 |:8443 '"
+
+          echo ""
+          echo "========================================="
+          echo "=== 13. SEARCH FOR CHAT UI CODE ==="
+          echo "========================================="
+          $SSH "grep -rn 'Соединение прервано\|Проверьте интернет\|VPS статус\|AI Ассистент\|docker ps.*Ресурсы' /opt/ 2>/dev/null | head -20 || echo 'NOT FOUND IN /opt/'"
+          $SSH "grep -rn 'Соединение прервано\|Проверьте интернет\|VPS статус\|AI Ассистент' /var/www/ /home/ /root/ /srv/ 2>/dev/null | head -20 || echo 'NOT FOUND ELSEWHERE'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 14. SYSTEMD SERVICES (all custom) ==="
+          echo "========================================="
+          $SSH "systemctl list-units --type=service --state=running | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@' || echo 'none'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 15. DOCKER CONTAINERS ==="
+          echo "========================================="
+          $SSH "docker ps -a 2>/dev/null || echo 'NO DOCKER'"
+
+          echo ""
+          echo "========================================="
+          echo "=== 16. OPENAI_API_KEY IN ENV ==="
+          echo "========================================="
+          $SSH "grep -c OPENAI_API_KEY /opt/p0-foundation/.env 2>/dev/null && echo 'OPENAI_API_KEY exists in .env' || echo 'OPENAI_API_KEY NOT in .env'"
+
+          echo ""
+          echo "DIAGNOSTICS COMPLETE"
