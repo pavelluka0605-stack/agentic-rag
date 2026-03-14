@@ -143,6 +143,11 @@ if systemctl is-enabled --quiet webapp 2>/dev/null; then
   check_service "Webapp" "webapp" "http://localhost:8000/" 5
 fi
 
+# Claude Chat (chat.marbomebel.ru)
+if systemctl is-enabled --quiet claude-chat 2>/dev/null; then
+  check_service "Claude Chat" "claude-chat" "http://localhost:3847/api/health" 10
+fi
+
 
 # ═══════════════════════════════════════════════════════════════
 # 2. ГЛУБОКАЯ ПРОВЕРКА API — НЕ ПРОСТО "ЗАПУЩЕН", А "ОТВЕЧАЕТ"
@@ -173,6 +178,38 @@ if systemctl is-active --quiet webapp 2>/dev/null; then
     FIXES="${FIXES}\n  - Webapp API вернул HTTP $API_CODE — перезапущен"
   elif [ "$API_CODE" = "500" ]; then
     ISSUES="${ISSUES}\n  - Webapp /api/projects — HTTP 500 (ошибка приложения)"
+  fi
+fi
+
+# --- Claude Chat: проверка что API реально работает ---
+if systemctl is-active --quiet claude-chat 2>/dev/null; then
+  CHAT_HEALTH=$(curl -s --max-time 10 http://localhost:3847/api/health 2>/dev/null || echo "TIMEOUT")
+
+  if echo "$CHAT_HEALTH" | grep -q "TIMEOUT\|Connection refused"; then
+    log "FIX: Claude Chat /api/health не отвечает — перезапуск"
+
+    # Убить zombie на порту 3847
+    ZOMBIE_PID=$(lsof -ti :3847 2>/dev/null || true)
+    if [ -n "$ZOMBIE_PID" ]; then
+      kill -9 "$ZOMBIE_PID" 2>/dev/null || true
+      sleep 2
+    fi
+
+    systemctl restart claude-chat 2>/dev/null || true
+    sleep 5
+    FIXES="${FIXES}\n  - Claude Chat: /api/health не отвечал — перезапущен"
+  elif echo "$CHAT_HEALTH" | grep -q '"activeRequests"'; then
+    # Проверить не зависли ли запросы
+    ACTIVE=$(echo "$CHAT_HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('activeRequests',0))" 2>/dev/null || echo "0")
+    UPTIME=$(echo "$CHAT_HEALTH" | python3 -c "import sys,json; print(int(json.load(sys.stdin).get('uptime',0)))" 2>/dev/null || echo "0")
+
+    # Если activeRequests=2 (MAX) больше 10 мин — зависшие запросы, перезапуск
+    if [ "${ACTIVE:-0}" -ge 2 ] && [ "${UPTIME:-0}" -gt 600 ]; then
+      log "FIX: Claude Chat stuck — ${ACTIVE} active requests for too long, restarting"
+      systemctl restart claude-chat 2>/dev/null || true
+      sleep 5
+      FIXES="${FIXES}\n  - Claude Chat: зависшие запросы (${ACTIVE} активных) — перезапущен"
+    fi
   fi
 fi
 
@@ -225,6 +262,7 @@ kill_zombie_on_port() {
 kill_zombie_on_port 5678 "n8n"
 kill_zombie_on_port 8000 "webapp"
 kill_zombie_on_port 3100 "vk-longpoll"
+kill_zombie_on_port 3847 "claude-chat"
 
 
 # ═══════════════════════════════════════════════════════════════
