@@ -18,12 +18,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup SSH
         run: |
@@ -32,56 +28,58 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Get files and diagnostics
+      - name: Deploy server.js fix and patch index.html
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
 
-          # Get index.html
-          mkdir -p claude-chat/public
-          $SSH "cat /opt/claude-chat/public/index.html" > claude-chat/public/index.html
-          echo "index.html: $(wc -l < claude-chat/public/index.html) lines"
+          # 1. Backup and deploy server.js
+          $SSH "cp /opt/claude-chat/server.js /opt/claude-chat/server.js.bak"
+          $SCP claude-chat/server.js "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js"
+          echo "✓ server.js deployed"
 
-          # Get diagnostics
-          $SSH "curl -s http://localhost:3847/api/health" > /tmp/health.json
-          cat /tmp/health.json
+          # 2. Patch index.html on VPS to improve error handling
+          # Replace the generic "Соединение прервано" with auto-recovery
+          $SSH 'cd /opt/claude-chat/public && cp index.html index.html.bak'
 
-          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS' /opt/claude-chat/server.js" > /tmp/server-check.txt
-          cat /tmp/server-check.txt
+          # Use sed to modify the error handling: add auto-retry after connection error
+          $SSH "cd /opt/claude-chat/public && sed -i \"s/errMsg = '\\\"Соединение прервано\\. Проверьте интернет и попробуйте ещё раз\\.\\\"';/errMsg = '\\\"Соединение прервано\\. Автоматически переподключаемся\\.\\.\\.\\\"';\\n              setTimeout(() => { if (typeof recoverBackgroundRequest === 'function') recoverBackgroundRequest(); }, 3000);/\" index.html" || echo "sed patch failed (non-critical)"
 
-          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null" > /tmp/nginx.conf
-          cat /tmp/nginx.conf
+          # 3. Restart service
+          $SSH "systemctl restart claude-chat 2>/dev/null || (cd /opt/claude-chat && pm2 restart claude-chat 2>/dev/null) || (pkill -f 'node.*server.js' 2>/dev/null; sleep 1; cd /opt/claude-chat && nohup node server.js >> /var/log/claude-chat.log 2>&1 &)"
+          sleep 3
 
-          $SSH "systemctl status claude-chat --no-pager 2>/dev/null || echo 'no systemd'" > /tmp/status.txt
-          cat /tmp/status.txt
+          # 4. Health check
+          echo "=== HEALTH CHECK ==="
+          $SSH "curl -s http://localhost:3847/api/health" && echo ""
 
-      - name: Commit files to main
+          # 5. Verify heartbeat config in deployed server.js
+          echo "=== DEPLOYED SERVER.JS KEY LINES ==="
+          $SSH "grep -n 'heartbeat\|setInterval\|TIMEOUT_MS\|5000\|clearInterval' /opt/claude-chat/server.js"
+
+          # 6. Check nginx proxy timeouts
+          echo "=== NGINX PROXY TIMEOUTS ==="
+          $SSH "grep -i 'timeout\|proxy_read\|proxy_send\|proxy_connect\|keepalive' /etc/nginx/sites-enabled/* 2>/dev/null || echo 'no timeout configs in nginx'"
+
+      - name: Test SSE connection
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        continue-on-error: true
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
 
-          # Add index.html
-          git add claude-chat/public/index.html
+          # Get the bearer token from .env
+          TOKEN=$($SSH "grep BEARER_TOKEN /opt/claude-chat/.env | cut -d= -f2")
 
-          # Create diagnostics file
-          {
-            echo "=== HEALTH ==="
-            cat /tmp/health.json 2>/dev/null
-            echo ""
-            echo "=== SERVER CHECK ==="
-            cat /tmp/server-check.txt 2>/dev/null
-            echo ""
-            echo "=== NGINX ==="
-            cat /tmp/nginx.conf 2>/dev/null
-            echo ""
-            echo "=== STATUS ==="
-            cat /tmp/status.txt 2>/dev/null
-          } > claude-chat/diagnostics.txt
-          git add claude-chat/diagnostics.txt
-
-          git diff --cached --stat
-          git commit -m "chore: add index.html and diagnostics from VPS" || echo "No changes"
-          git push origin HEAD:main || echo "Push failed"
+          # Test SSE endpoint with a simple message
+          echo "=== SSE TEST (10s timeout) ==="
+          $SSH "timeout 10 curl -s -N -X POST http://localhost:3847/api/chat \
+            -H 'Content-Type: application/json' \
+            -H 'Authorization: Bearer $TOKEN' \
+            -d '{\"message\": \"echo hello\"}' 2>&1 || echo 'SSE test completed/timed out'"
