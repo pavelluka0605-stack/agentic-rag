@@ -32,7 +32,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Download source files from VPS
+      - name: Download index.html from VPS
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -40,17 +40,32 @@ jobs:
         run: |
           SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           mkdir -p claude-chat/public
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js" claude-chat/
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/package.json" claude-chat/
           $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html" claude-chat/public/
-          echo "Files downloaded:"
-          ls -la claude-chat/ claude-chat/public/
+          wc -l claude-chat/public/index.html
+          ls -la claude-chat/public/
 
-      - name: Commit and push to branch
+      - name: Get proxy configs
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          echo "=== NGINX CONFIGS ==="
+          $SSH "ls /etc/nginx/sites-enabled/ 2>/dev/null && echo '---' && cat /etc/nginx/sites-enabled/* 2>/dev/null" || echo "no nginx"
+          echo "=== TRAEFIK DYNAMIC ==="
+          $SSH "find /opt/ -name 'traefik*' -o -name 'dynamic*' 2>/dev/null | head -10"
+          $SSH "docker inspect traefik 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(l) for l in d[0].get(\"Args\",[]) if \"timeout\" in l.lower() or \"idle\" in l.lower()]' 2>/dev/null" || echo "no traefik timeout args"
+          echo "=== CLAUDE-CHAT SERVICE ==="
+          $SSH "systemctl cat claude-chat 2>/dev/null" || echo "no service"
+          echo "=== CLAUDE-CHAT LOGS (last 20) ==="
+          $SSH "journalctl -u claude-chat -n 20 --no-pager 2>/dev/null" || echo "no logs"
+
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add claude-chat/
           git diff --cached --stat
-          git commit -m "chore: copy claude-chat source from VPS for analysis" || echo "No changes to commit"
+          git commit -m "chore: add index.html from VPS" || echo "No changes"
           git push origin claude/fix-connection-error-oXw4p
