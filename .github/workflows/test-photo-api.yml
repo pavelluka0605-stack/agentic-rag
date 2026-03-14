@@ -18,8 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -27,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Download Source
+      - name: ErrContext
         continue-on-error: true
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -35,66 +33,71 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
+          R=$(timeout 10 $SSH "sed -n '1215,1250p' /opt/claude-chat/public/index.html 2>/dev/null" 2>&1)
+          echo "::warning::ERR_HTML: $R"
 
-          mkdir -p /tmp/chat-src
-
-          # Download key files
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/server.js" /tmp/chat-src/ 2>/dev/null || echo "no server.js"
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html" /tmp/chat-src/ 2>/dev/null || echo "no index.html"
-          $SCP "$VPS_USER@$VPS_HOST:/opt/claude-chat/package.json" /tmp/chat-src/ 2>/dev/null || echo "no package.json"
-          $SCP -r "$VPS_USER@$VPS_HOST:/opt/claude-chat/.env" /tmp/chat-src/ 2>/dev/null || echo "no .env"
-
-          echo "Downloaded files:"
-          ls -la /tmp/chat-src/
-
-      - name: Copy to repo
+      - name: FetchCode
         continue-on-error: true
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          mkdir -p claude-chat
-          cp /tmp/chat-src/server.js claude-chat/ 2>/dev/null || true
-          cp /tmp/chat-src/index.html claude-chat/ 2>/dev/null || true
-          cp /tmp/chat-src/package.json claude-chat/ 2>/dev/null || true
-          # Don't copy .env (secrets)
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "grep -n 'fetch\|async\|await\|sendMessage\|api/' /opt/claude-chat/public/index.html 2>/dev/null | head -15" 2>&1)
+          echo "::warning::FETCH: $R"
 
-          echo "=== server.js (lines around error) ==="
-          grep -n 'Соединение\|прервано\|Проверьте\|timeout\|connection\|abort\|error\|ECONNRESET\|ETIMEDOUT' claude-chat/server.js 2>/dev/null | head -20 || echo "no matches in server.js"
-
-          echo ""
-          echo "=== index.html (lines around error) ==="
-          grep -n 'Соединение\|прервано\|Проверьте\|timeout\|connection\|error\|fetch\|abort' claude-chat/index.html 2>/dev/null | head -20 || echo "no matches in index.html"
-
-      - name: Commit Source
-        run: |
-          if [ -f claude-chat/server.js ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add claude-chat/
-            git commit -m "chore: add claude-chat source from VPS for analysis" || echo "No changes"
-            git push origin main || echo "Push to main failed"
-          fi
-
-      - name: ErrorLines
+      - name: ServerExec
         continue-on-error: true
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          if [ -f claude-chat/index.html ]; then
-            # Show 10 lines around the error message
-            R=$(grep -n -B5 -A5 'Соединение прервано' claude-chat/index.html 2>/dev/null | head -20)
-            echo "::warning::ERRCTX: $R"
-          fi
-
-      - name: ServerTimeout
-        continue-on-error: true
-        run: |
-          if [ -f claude-chat/server.js ]; then
-            R=$(grep -n 'timeout\|TIMEOUT\|120\|setTimeout\|maxTime\|abort' claude-chat/server.js 2>/dev/null | head -15)
-            echo "::warning::TIMEOUT: $R"
-          fi
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "grep -n 'exec\|spawn\|ssh\|timeout\|app.post\|app.get\|router\|OPENAI\|openai\|chat/completions\|AbortController' /opt/claude-chat/server.js 2>/dev/null | head -20" 2>&1)
+          echo "::warning::EXEC: $R"
 
       - name: ServerAPI
         continue-on-error: true
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          if [ -f claude-chat/server.js ]; then
-            R=$(grep -n 'app.post\|app.get\|router\.\|ssh\|exec\|spawn\|child_process' claude-chat/server.js 2>/dev/null | head -15)
-            echo "::warning::API: $R"
-          fi
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "sed -n '1,30p' /opt/claude-chat/server.js 2>/dev/null" 2>&1)
+          echo "::warning::HEAD: $R"
+
+      - name: ServerChat
+        continue-on-error: true
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "sed -n '200,260p' /opt/claude-chat/server.js 2>/dev/null" 2>&1)
+          echo "::warning::CHAT: $R"
+
+      - name: ServerErr
+        continue-on-error: true
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "wc -l /opt/claude-chat/server.js; echo '---'; grep -c 'timeout\|Timeout' /opt/claude-chat/server.js; echo '---'; grep -n 'catch\|error\|Error\|ECONNRESET\|ETIMEDOUT\|abort' /opt/claude-chat/server.js | head -10" 2>&1)
+          echo "::warning::SERR: $R"
+
+      - name: EnvVars
+        continue-on-error: true
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "cat /opt/claude-chat/.env 2>/dev/null | grep -v KEY | grep -v TOKEN | grep -v PASS | grep -v SECRET || echo 'no .env'" 2>&1)
+          echo "::warning::ENV: $R"
