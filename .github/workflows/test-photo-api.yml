@@ -16,13 +16,8 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -30,66 +25,82 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Diagnose and Save
+      - name: Nginx
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          set +e
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
-          OUT="diagnostic-report.txt"
-          echo "VPS Diagnostic Report - $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > $OUT
-          echo "================================================" >> $OUT
+          R=$(timeout 15 $SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'NOT FOUND'" 2>&1)
+          echo "::warning::NGINX: $R"
 
-          echo "" >> $OUT
-          echo "=== 1. NGINX CONFIG (chat-marbomebel) ===" >> $OUT
-          timeout 15 $SSH "cat /etc/nginx/sites-enabled/chat-marbomebel 2>/dev/null || echo 'FILE NOT FOUND'" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== 2. CHAT UI SEARCH ===" >> $OUT
-          timeout 20 $SSH "grep -rn 'Соединение прервано' /opt/ /var/www/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT FOUND: Соединение прервано'" >> $OUT 2>&1
-          timeout 20 $SSH "grep -rn 'AI Ассистент' /opt/ /var/www/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT FOUND: AI Ассистент'" >> $OUT 2>&1
-          timeout 20 $SSH "grep -rn 'VPS статус' /opt/ /var/www/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT FOUND: VPS статус'" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== 3. DOCKER ===" >> $OUT
-          timeout 10 $SSH "docker ps -a 2>/dev/null || echo 'NO DOCKER'" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== 4. CURL localhost:8000 ===" >> $OUT
-          timeout 10 $SSH "curl -s -w '\nHTTP %{http_code} time=%{time_total}s\n' http://localhost:8000/ 2>&1 | head -10" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== 5. WEBAPP STATUS + LOGS ===" >> $OUT
-          timeout 10 $SSH "systemctl is-active webapp" >> $OUT 2>&1
-          timeout 10 $SSH "journalctl -u webapp -n 15 --no-pager 2>/dev/null" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== 6. WEB.PY VERSION CHECK ===" >> $OUT
-          timeout 10 $SSH "wc -lc /opt/webapp/web.py; md5sum /opt/webapp/web.py; grep -c 'conn-error' /opt/webapp/web.py && echo 'HAS conn-error banner' || echo 'NO conn-error banner'" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== 7. ALL CUSTOM SERVICES ===" >> $OUT
-          timeout 10 $SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended'" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== 8. LISTENING PORTS ===" >> $OUT
-          timeout 10 $SSH "ss -tlnp" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== 9. RESOURCES ===" >> $OUT
-          timeout 10 $SSH "df -h / && free -h" >> $OUT 2>&1
-
-          echo "" >> $OUT
-          echo "=== DONE ===" >> $OUT
-
-          cat $OUT
-
-      - name: Commit Report
+      - name: Chat Search
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add diagnostic-report.txt
-          git commit -m "chore: VPS diagnostic report $(date -u '+%Y-%m-%d %H:%M')" || echo "No changes"
-          git push origin main || echo "Push failed"
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 20 $SSH "grep -rl 'Соединение прервано' /opt/ /var/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT_FOUND'" 2>&1)
+          echo "::warning::SEARCH_CONNECTION: $R"
+
+      - name: Chat Search 2
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 20 $SSH "grep -rl 'VPS статус\|AI Ассистент' /opt/ /var/ /home/ /root/ 2>/dev/null | head -5 || echo 'NOT_FOUND'" 2>&1)
+          echo "::warning::SEARCH_ASSISTANT: $R"
+
+      - name: Docker
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "docker ps --format '{{.Names}} | {{.Status}} | {{.Ports}}' 2>/dev/null || echo 'NO_DOCKER'" 2>&1)
+          echo "::warning::DOCKER: $R"
+
+      - name: Curl
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "curl -s http://localhost:8000/ 2>/dev/null | grep -oE '<title>[^<]+</title>' || echo 'NO_TITLE'" 2>&1)
+          echo "::warning::CURL_TITLE: $R"
+
+      - name: WebPy
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "wc -lc /opt/webapp/web.py; grep -c 'conn-error' /opt/webapp/web.py && echo 'HAS_FIX' || echo 'NO_FIX'" 2>&1)
+          echo "::warning::WEBPY: $R"
+
+      - name: Services
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "systemctl list-units --type=service --state=running --no-pager | grep -vE 'systemd|dbus|ssh|cron|snap|serial|getty|journal|log|networkd|resolved|udev|polkit|modprobe|user@|packagekit|multipathd|unattended' | awk '{print \$1}' | tr '\n' ' '" 2>&1)
+          echo "::warning::SERVICES: $R"
+
+      - name: Logs
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no -o ConnectTimeout=10 $VPS_USER@$VPS_HOST"
+          R=$(timeout 10 $SSH "journalctl -u webapp -n 5 --no-pager 2>/dev/null | tail -5" 2>&1)
+          echo "::warning::LOGS: $R"
