@@ -9,6 +9,7 @@ on:
     paths:
       - "p0-foundation/**"
       - ".github/workflows/deploy-p0.yml"
+      - "claude-chat/**"
       - "*.py"
       - "requirements.txt"
   workflow_dispatch:
