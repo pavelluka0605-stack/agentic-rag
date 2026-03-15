@@ -43,15 +43,16 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Export VK photos
+      - name: Export VK market photos
         env:
           VK_TOKEN: ${{ secrets.VK_USER_TOKEN }}
           ACTION: ${{ inputs.action || 'scan' }}
           VK_SCREEN_NAME: mebelit_krsk
         run: |
           python3 << 'PYTHON'
-          import requests, json, os, time, hashlib
+          import requests, json, os, time
           from pathlib import Path
+          from datetime import datetime
 
           TOKEN = os.environ["VK_TOKEN"]
           SCREEN_NAME = os.environ.get("VK_SCREEN_NAME", "mebelit_krsk")
@@ -60,6 +61,7 @@ jobs:
           V = "5.199"
           PHOTO_DIR = Path("site-analysis/vk-photos")
           REPORT_FILE = Path("site-analysis/vk-photo-report.md")
+          debug_log = []
 
           def vk(method, **params):
               params.update(access_token=TOKEN, v=V)
@@ -67,187 +69,215 @@ jobs:
               data = r.json()
               if "error" in data:
                   err = data['error']
-                  print(f"  VK API error [{method}]: code={err.get('error_code')} msg={err.get('error_msg', err)}")
+                  msg = f"VK API error [{method}]: code={err.get('error_code')} msg={err.get('error_msg', err)}"
+                  print(f"  {msg}")
+                  debug_log.append(msg)
                   return None
               resp = data.get("response")
-              print(f"  [OK] {method} → {type(resp).__name__}" + (f" items={len(resp.get('items',[]))}" if isinstance(resp, dict) and 'items' in resp else ""))
+              info = f"[OK] {method}"
+              if isinstance(resp, dict) and "items" in resp:
+                  info += f" → {len(resp['items'])} items (count={resp.get('count','?')})"
+              print(f"  {info}")
               return resp
 
-          # Debug log file
-          debug_log = []
+          # ── 0. Определяем GROUP_ID ──
+          print(f"=== Определяем ID группы: {SCREEN_NAME} ===")
+          debug_log.append(f"Token length: {len(TOKEN)}")
 
-          # ── 0. Определяем GROUP_ID по screen_name ──
-          print(f"=== Определяем ID группы по screen_name: {SCREEN_NAME} ===")
-          debug_log.append(f"Token length: {len(TOKEN)}, first 10 chars: {TOKEN[:10]}...")
-          resolved = vk("utils.resolveScreenName", screen_name=SCREEN_NAME)
-          debug_log.append(f"resolveScreenName result: {resolved}")
-          if resolved and isinstance(resolved, dict) and resolved.get("type") in ("group", "page"):
-              GROUP_ID = str(resolved["object_id"])
-              print(f"  Найдена группа ID: {GROUP_ID}")
-          elif resolved and isinstance(resolved, dict) and "object_id" in resolved:
-              GROUP_ID = str(resolved["object_id"])
-              print(f"  Найдена (тип: {resolved.get('type')}), ID: {GROUP_ID}")
-          else:
-              # Fallback: try groups.getById with screen_name directly
-              print(f"  resolveScreenName не вернул ID, пробуем groups.getById...")
-              fallback = vk("groups.getById", group_id=SCREEN_NAME, fields="members_count")
-              debug_log.append(f"groups.getById fallback: {fallback}")
-              if fallback and isinstance(fallback, dict) and "groups" in fallback:
-                  GROUP_ID = str(fallback["groups"][0]["id"])
-                  print(f"  Получен через groups.getById: {GROUP_ID}")
-              elif fallback and isinstance(fallback, list) and len(fallback) > 0:
-                  GROUP_ID = str(fallback[0]["id"])
-                  print(f"  Получен через groups.getById (list): {GROUP_ID}")
-              else:
-                  GROUP_ID = SCREEN_NAME
-                  print(f"  Не удалось разрешить, используем как ID: {GROUP_ID}")
+          # groups.getById работает с screen_name напрямую
+          group_info = vk("groups.getById", group_id=SCREEN_NAME,
+                          fields="members_count,description,status,site,market")
+          GROUP_ID = SCREEN_NAME
+          group_name = "mebelit_krsk"
+          members = "?"
+          desc = site = status = ""
+          has_market = False
 
-          # ── 1. Получаем инфо о группе ──
-          print("=== Информация о группе ===")
-          group_info = vk("groups.getById", group_id=GROUP_ID, fields="members_count,description,status,site,contacts")
-          if group_info and "groups" in group_info:
+          if group_info and isinstance(group_info, dict) and "groups" in group_info:
               g = group_info["groups"][0]
+              GROUP_ID = str(g["id"])
               group_name = g.get("name", "?")
               members = g.get("members_count", "?")
               desc = g.get("description", "")
               site = g.get("site", "")
               status = g.get("status", "")
-              print(f"  Название: {group_name}")
-              print(f"  Подписчики: {members}")
-              print(f"  Описание: {desc[:200]}")
-              print(f"  Сайт: {site}")
-              print(f"  Статус: {status}")
+              market = g.get("market", {})
+              has_market = market.get("enabled", 0) == 1 if isinstance(market, dict) else bool(market)
+              debug_log.append(f"Group: {group_name}, ID: {GROUP_ID}, market: {market}")
           elif group_info and isinstance(group_info, list):
               g = group_info[0]
+              GROUP_ID = str(g["id"])
               group_name = g.get("name", "?")
               members = g.get("members_count", "?")
               desc = g.get("description", "")
               site = g.get("site", "")
-              status = g.get("status", "")
-              print(f"  Название: {group_name}")
-              print(f"  Подписчики: {members}")
-          else:
-              group_name = "mebelit_krsk"
-              members = "?"
-              desc = ""
-              site = ""
-              status = ""
-              print("  Не удалось получить инфо о группе")
+              market = g.get("market", {})
+              has_market = market.get("enabled", 0) == 1 if isinstance(market, dict) else bool(market)
+
+          print(f"  Группа: {group_name} (ID: {GROUP_ID})")
+          print(f"  Подписчики: {members}")
+          print(f"  Маркет: {'да' if has_market else 'нет/неизвестно'}")
 
           owner_id = f"-{GROUP_ID}"
 
-          # ── 2. Альбомы ──
-          print("\n=== Альбомы ===")
-          albums = vk("photos.getAlbums", owner_id=owner_id, need_system=1)
-          album_list = []
-          if albums:
-              for a in albums.get("items", []):
-                  aid = a["id"]
-                  title = a.get("title", "?")
-                  size = a.get("size", 0)
-                  album_list.append({"id": aid, "title": title, "size": size})
-                  print(f"  [{aid}] {title} — {size} фото")
-              print(f"  Итого альбомов: {albums.get('count', 0)}")
-          else:
-              print("  Нет доступа к альбомам или альбомов нет")
-
-          # ── 3. Фото со стены (посты с фото) ──
-          print("\n=== Посты с фото (стена) ===")
-          wall_photos = []
+          # ── 1. Получаем товары (market.get) ──
+          print("\n=== Товары (Market) ===")
+          all_products = []
           offset = 0
-          total_posts = 0
-          posts_with_photos = 0
+          total_market = 0
 
-          while offset < 500:  # макс 500 постов
-              wall = vk("wall.get", owner_id=owner_id, count=100, offset=offset)
-              if not wall or not wall.get("items"):
+          while True:
+              market_resp = vk("market.get", owner_id=owner_id, count=200, offset=offset,
+                               extended=1)
+              if not market_resp:
+                  # Попробуем без extended
+                  market_resp = vk("market.get", owner_id=owner_id, count=200, offset=offset)
+              if not market_resp or not market_resp.get("items"):
+                  if offset == 0:
+                      debug_log.append(f"market.get returned: {market_resp}")
                   break
-              total_posts = wall["count"]
-              for post in wall["items"]:
-                  attachments = post.get("attachments", [])
-                  for att in attachments:
-                      if att["type"] == "photo":
-                          photo = att["photo"]
-                          # Берём максимальный размер
-                          sizes = photo.get("sizes", [])
-                          if sizes:
-                              best = max(sizes, key=lambda s: s.get("width", 0) * s.get("height", 0))
-                              wall_photos.append({
-                                  "url": best["url"],
-                                  "width": best.get("width", 0),
-                                  "height": best.get("height", 0),
-                                  "photo_id": photo.get("id"),
-                                  "date": photo.get("date", 0),
-                                  "text": post.get("text", "")[:200],
-                                  "post_id": post.get("id"),
-                                  "likes": post.get("likes", {}).get("count", 0),
-                                  "source": "wall"
-                              })
-                              posts_with_photos += 1
-              offset += 100
+              total_market = market_resp.get("count", 0)
+              items = market_resp["items"]
+              all_products.extend(items)
+              print(f"  Загружено: {len(all_products)}/{total_market}")
+              if len(items) < 200:
+                  break
+              offset += 200
               time.sleep(0.35)
 
-          print(f"  Всего постов: {total_posts}")
-          print(f"  Фото со стены: {len(wall_photos)}")
+          print(f"  Всего товаров: {total_market}, загружено: {len(all_products)}")
 
-          # ── 4. Фото из альбомов ──
-          print("\n=== Фото из альбомов ===")
-          album_photos = []
-          for album in album_list:
-              if album["size"] == 0:
-                  continue
-              print(f"  Сканирую альбом: {album['title']}...")
-              offset = 0
-              while offset < album["size"]:
-                  photos = vk("photos.get", owner_id=owner_id, album_id=album["id"],
-                              count=200, offset=offset, photo_sizes=1)
-                  if not photos or not photos.get("items"):
-                      break
-                  for photo in photos["items"]:
+          # ── 2. Получаем подборки товаров (market.getAlbums) ──
+          print("\n=== Подборки товаров ===")
+          market_albums = []
+          albums_resp = vk("market.getAlbums", owner_id=owner_id, count=100)
+          if albums_resp and albums_resp.get("items"):
+              for a in albums_resp["items"]:
+                  market_albums.append({
+                      "id": a["id"],
+                      "title": a.get("title", "?"),
+                      "count": a.get("count", 0)
+                  })
+                  print(f"  [{a['id']}] {a.get('title','?')} — {a.get('count',0)} товаров")
+          else:
+              print("  Подборок нет или нет доступа")
+
+          # ── 3. Извлекаем фото из товаров ──
+          print("\n=== Извлечение фото из товаров ===")
+          product_photos = []
+
+          for product in all_products:
+              pid = product.get("id", 0)
+              title = product.get("title", "")
+              price_info = product.get("price", {})
+              price_text = price_info.get("text", "") if isinstance(price_info, dict) else ""
+              description = product.get("description", "")[:300]
+              likes = product.get("likes", {}).get("count", 0) if isinstance(product.get("likes"), dict) else 0
+              availability = product.get("availability", 0)
+              date = product.get("date", 0)
+
+              # Главное фото товара
+              thumb = product.get("thumb_photo", "")
+              photos_list = product.get("photos", [])
+
+              # Если есть массив photos — берём все фото товара
+              if photos_list:
+                  for photo in photos_list:
                       sizes = photo.get("sizes", [])
                       if sizes:
                           best = max(sizes, key=lambda s: s.get("width", 0) * s.get("height", 0))
-                          album_photos.append({
+                          product_photos.append({
                               "url": best["url"],
                               "width": best.get("width", 0),
                               "height": best.get("height", 0),
                               "photo_id": photo.get("id"),
-                              "date": photo.get("date", 0),
-                              "text": photo.get("text", "")[:200],
-                              "album_id": album["id"],
-                              "album_title": album["title"],
-                              "likes": photo.get("likes", {}).get("count", 0) if "likes" in photo else 0,
-                              "source": "album"
+                              "product_id": pid,
+                              "title": title,
+                              "price": price_text,
+                              "description": description,
+                              "likes": likes,
+                              "availability": availability,
+                              "date": date,
+                              "source": "market"
                           })
-                  offset += 200
-                  time.sleep(0.35)
-              print(f"    → {album['title']}: найдено {sum(1 for p in album_photos if p['album_id']==album['id'])} фото")
+              elif thumb:
+                  # Если photos нет, берём thumb_photo URL
+                  product_photos.append({
+                      "url": thumb,
+                      "width": 0,
+                      "height": 0,
+                      "photo_id": None,
+                      "product_id": pid,
+                      "title": title,
+                      "price": price_text,
+                      "description": description,
+                      "likes": likes,
+                      "availability": availability,
+                      "date": date,
+                      "source": "market_thumb"
+                  })
 
-          all_photos = wall_photos + album_photos
+          # Если photos массив пуст, загрузим детали каждого товара
+          if all_products and not any(p.get("photos") for p in all_products):
+              print("  Фото не в списке, загружаем детали каждого товара...")
+              product_photos = []
+              for i, product in enumerate(all_products):
+                  pid = product["id"]
+                  detail = vk("market.getById", item_ids=f"{owner_id}_{pid}", extended=1)
+                  if detail and detail.get("items"):
+                      item = detail["items"][0]
+                      title = item.get("title", "")
+                      price_info = item.get("price", {})
+                      price_text = price_info.get("text", "") if isinstance(price_info, dict) else ""
+                      description = item.get("description", "")[:300]
+                      likes = item.get("likes", {}).get("count", 0) if isinstance(item.get("likes"), dict) else 0
+                      availability = item.get("availability", 0)
+                      date = item.get("date", 0)
+
+                      for photo in item.get("photos", []):
+                          sizes = photo.get("sizes", [])
+                          if sizes:
+                              best = max(sizes, key=lambda s: s.get("width", 0) * s.get("height", 0))
+                              product_photos.append({
+                                  "url": best["url"],
+                                  "width": best.get("width", 0),
+                                  "height": best.get("height", 0),
+                                  "photo_id": photo.get("id"),
+                                  "product_id": pid,
+                                  "title": title,
+                                  "price": price_text,
+                                  "description": description,
+                                  "likes": likes,
+                                  "availability": availability,
+                                  "date": date,
+                                  "source": "market_detail"
+                              })
+                  if (i + 1) % 50 == 0:
+                      print(f"  Обработано: {i+1}/{len(all_products)}")
+                  time.sleep(0.35)
 
           # Дедупликация по photo_id
           seen = set()
           unique_photos = []
-          for p in all_photos:
-              pid = p.get("photo_id")
-              if pid and pid not in seen:
-                  seen.add(pid)
+          for p in product_photos:
+              key = p.get("photo_id") or p.get("url", "")
+              if key and key not in seen:
+                  seen.add(key)
                   unique_photos.append(p)
 
-          print(f"\n=== ИТОГО ===")
-          print(f"  Фото со стены: {len(wall_photos)}")
-          print(f"  Фото из альбомов: {len(album_photos)}")
-          print(f"  Уникальных фото: {len(unique_photos)}")
+          # Фильтр >= 600px (отсекаем мелкие превью)
+          good_photos = [p for p in unique_photos if p["width"] >= 600 or p["height"] >= 600 or p["width"] == 0]
 
-          # Фильтр: только фото > 600px (отсекаем аватарки и мелочь)
-          good_photos = [p for p in unique_photos if p["width"] >= 600 or p["height"] >= 600]
+          print(f"\n=== ИТОГО ===")
+          print(f"  Товаров: {len(all_products)}")
+          print(f"  Подборок: {len(market_albums)}")
+          print(f"  Фото из товаров: {len(product_photos)}")
+          print(f"  Уникальных фото: {len(unique_photos)}")
           print(f"  Фото >= 600px: {len(good_photos)}")
 
-          # ── 5. Генерируем отчёт ──
-          from datetime import datetime
-
+          # ── 4. Генерируем отчёт ──
           report = []
-          report.append(f"# VK Photo Export Report — {group_name}")
+          report.append(f"# VK Market Photo Export — {group_name}")
           report.append(f"")
           report.append(f"**Дата:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
           report.append(f"**Группа:** vk.com/mebelit_krsk (ID: {GROUP_ID})")
@@ -255,38 +285,40 @@ jobs:
           report.append(f"**Описание:** {desc[:300]}")
           report.append(f"**Сайт:** {site}")
           report.append(f"")
-          report.append(f"## Статистика")
+          report.append(f"## Статистика товаров")
           report.append(f"")
           report.append(f"| Метрика | Значение |")
           report.append(f"|---------|----------|")
-          report.append(f"| Всего постов на стене | {total_posts} |")
-          report.append(f"| Фото со стены | {len(wall_photos)} |")
-          report.append(f"| Альбомов | {len(album_list)} |")
-          report.append(f"| Фото из альбомов | {len(album_photos)} |")
-          report.append(f"| Уникальных фото (всего) | {len(unique_photos)} |")
-          report.append(f"| Фото >= 600px (для сайта) | {len(good_photos)} |")
+          report.append(f"| Всего товаров | {total_market} |")
+          report.append(f"| Подборок | {len(market_albums)} |")
+          report.append(f"| Фото из товаров | {len(product_photos)} |")
+          report.append(f"| Уникальных фото | {len(unique_photos)} |")
+          report.append(f"| Фото >= 600px | {len(good_photos)} |")
           report.append(f"")
 
-          if album_list:
-              report.append(f"## Альбомы")
+          if market_albums:
+              report.append(f"## Подборки товаров")
               report.append(f"")
-              report.append(f"| ID | Название | Кол-во фото |")
-              report.append(f"|----|----------|------------|")
-              for a in album_list:
-                  report.append(f"| {a['id']} | {a['title']} | {a['size']} |")
-              report.append(f"")
-
-          # Топ-10 фото по лайкам
-          top_liked = sorted(good_photos, key=lambda p: p.get("likes", 0), reverse=True)[:10]
-          if top_liked:
-              report.append(f"## Топ-10 фото по лайкам")
-              report.append(f"")
-              for i, p in enumerate(top_liked, 1):
-                  report.append(f"{i}. **{p['likes']} лайков** ({p['width']}x{p['height']}) — {p.get('text', '')[:80]}")
-                  report.append(f"   URL: {p['url']}")
+              report.append(f"| ID | Название | Кол-во |")
+              report.append(f"|----|----------|--------|")
+              for a in market_albums:
+                  report.append(f"| {a['id']} | {a['title']} | {a['count']} |")
               report.append(f"")
 
-          # ── 6. Скачиваем если action=download ──
+          # Список всех товаров
+          if all_products:
+              report.append(f"## Товары ({len(all_products)})")
+              report.append(f"")
+              report.append(f"| # | Название | Цена | Фото |")
+              report.append(f"|---|----------|------|------|")
+              for i, p in enumerate(all_products, 1):
+                  title = p.get("title", "?")[:50]
+                  price = p.get("price", {}).get("text", "?") if isinstance(p.get("price"), dict) else "?"
+                  n_photos = sum(1 for ph in unique_photos if ph.get("product_id") == p.get("id"))
+                  report.append(f"| {i} | {title} | {price} | {n_photos} |")
+              report.append(f"")
+
+          # ── 5. Скачиваем если download ──
           if ACTION == "download" and good_photos:
               PHOTO_DIR.mkdir(parents=True, exist_ok=True)
               print(f"\n=== Скачивание {len(good_photos)} фото ===")
@@ -295,7 +327,8 @@ jobs:
                   ext = "jpg"
                   if ".png" in p["url"]:
                       ext = "png"
-                  fname = f"{p.get('source', 'unknown')}_{p.get('photo_id', i)}.{ext}"
+                  safe_title = "".join(c if c.isalnum() or c in "-_ " else "" for c in p.get("title","")[:30]).strip().replace(" ","_") or "product"
+                  fname = f"market_{p.get('product_id', i)}_{safe_title}_{i}.{ext}"
                   fpath = PHOTO_DIR / fname
                   if fpath.exists():
                       continue
@@ -309,7 +342,7 @@ jobs:
                   except Exception as e:
                       print(f"  Ошибка: {fname} — {e}")
                   time.sleep(0.1)
-              print(f"  Скачано всего: {downloaded}")
+              print(f"  Скачано: {downloaded}")
               report.append(f"## Скачанные фото")
               report.append(f"")
               report.append(f"Скачано **{downloaded}** фото в `site-analysis/vk-photos/`")
@@ -320,7 +353,7 @@ jobs:
               report.append(f"Запустите workflow с action=**download** для скачивания фото.")
               report.append(f"")
 
-          # Сохраняем JSON со всеми URL (всегда)
+          # Сохраняем JSON
           json_path = Path("site-analysis/vk-photos-index.json")
           json_path.parent.mkdir(parents=True, exist_ok=True)
           with open(json_path, "w", encoding="utf-8") as f:
@@ -328,20 +361,21 @@ jobs:
                   "group": group_name,
                   "group_id": GROUP_ID,
                   "members": members,
+                  "source": "market (товары)",
+                  "total_products": len(all_products),
+                  "market_albums": market_albums,
                   "total_photos": len(unique_photos),
                   "good_photos": len(good_photos),
-                  "albums": album_list,
                   "photos": good_photos
               }, f, ensure_ascii=False, indent=2)
           report.append(f"Индекс фото сохранён в `site-analysis/vk-photos-index.json`")
 
-          # Сохраняем debug лог
-          debug_path = Path("site-analysis/vk-debug.log")
-          debug_path.write_text("\n".join(debug_log), encoding="utf-8")
+          # Debug лог
+          Path("site-analysis/vk-debug.log").write_text("\n".join(debug_log), encoding="utf-8")
 
-          # Сохраняем отчёт
+          # Отчёт
           REPORT_FILE.write_text("\n".join(report), encoding="utf-8")
-          print(f"\nОтчёт сохранён в {REPORT_FILE}")
+          print(f"\nОтчёт сохранён: {REPORT_FILE}")
 
           PYTHON
 
