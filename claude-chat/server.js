@@ -273,7 +273,6 @@ app.post('/api/chat', auth, (req, res) => {
   let prompt = message;
   if (history && Array.isArray(history) && history.length > 0) {
     const context = history
-      .slice(-6) // last 6 messages for context
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
       .join('\n');
     prompt = `Previous conversation:\n${context}\n\nUser: ${message}`;
@@ -532,8 +531,8 @@ app.get('/api/history/:sessionId', auth, (req, res) => {
   if (!conv) {
     return res.json({ messages: [] });
   }
-  // Return last 50 messages
-  const messages = conv.messages.slice(-50).map(m => ({
+  // Return all messages
+  const messages = conv.messages.map(m => ({
     role: m.role,
     content: m.content,
     timestamp: m.timestamp,
