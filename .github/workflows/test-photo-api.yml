@@ -43,20 +43,30 @@ jobs:
           OUT="diag-output.txt"
 
           $SSH 'bash -s' <<'REMOTE' 2>&1 | tee $OUT
-          echo "=== STEP 1: Disable systemd for claude-chat ==="
-          systemctl stop claude-chat 2>/dev/null || true
-          systemctl disable claude-chat 2>/dev/null || true
-          echo "systemd disabled"
-
-          echo ""
-          echo "=== STEP 2: Restart PM2 claude-chat ==="
-          pm2 restart claude-chat 2>&1
-          sleep 3
-
-          echo ""
-          echo "=== STEP 3: Check ==="
+          echo "=== STEP 1: PM2 status ==="
           pm2 list
+
+          echo ""
+          echo "=== STEP 2: Health check ==="
           curl -s --max-time 5 http://localhost:3847/api/health
+
+          echo ""
+          echo "=== STEP 3: index.html version check ==="
+          echo "--- First 5 lines of title/meta ---"
+          grep -i '<title\|<meta.*description\|version\|double-tap\|дублирован' /opt/claude-chat/public/index.html || echo "no matches"
+
+          echo ""
+          echo "--- File sizes ---"
+          ls -la /opt/claude-chat/public/index.html /opt/claude-chat/server.js /opt/claude-chat/package.json
+
+          echo ""
+          echo "--- package.json version ---"
+          cat /opt/claude-chat/package.json | head -5
+
+          echo ""
+          echo "=== STEP 4: Curl main page (first 30 lines) ==="
+          curl -s --max-time 5 http://localhost:3847/ | head -30
+
           echo ""
           echo "DONE"
           REMOTE
@@ -68,6 +78,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet && echo "No changes" || {
-            git commit -m "diag: fix - disable systemd, pm2 restart [skip ci]"
+            git commit -m "diag: verify march 14 version deployed [skip ci]"
             git push origin main
           }
