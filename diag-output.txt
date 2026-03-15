@@ -1,21 +1,58 @@
-=== STEP 1: Disable systemd for claude-chat ===
-systemd disabled
-
-=== STEP 2: Restart PM2 claude-chat ===
-Use --update-env to update environment variables
-[PM2] Applying action restartProcessId on app [claude-chat](ids: [ 0 ])
-[PM2] [claude-chat](0) ✓
+=== STEP 1: PM2 status ===
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 806654   │ 0s     │ 78   │ online    │ 0%       │ 20.6mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 806742   │ 66m    │ 79   │ online    │ 0%       │ 56.5mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
-=== STEP 3: Check ===
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 806742   │ 0s     │ 79   │ online    │ 0%       │ 54.3mb   │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+=== STEP 2: Health check ===
+{"status":"ok","uptime":4018.057240612,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T06:44:41.143Z"}
+=== STEP 3: index.html version check ===
+--- First 5 lines of title/meta ---
+<title>AI Ассистент</title>
+
+--- File sizes ---
+-rw-r--r-- 1 root root   420 Mar 15 05:37 /opt/claude-chat/package.json
+-rw-r--r-- 1 root root 29503 Mar 15 05:37 /opt/claude-chat/public/index.html
+-rw-r--r-- 1 root root 22368 Mar 15 05:37 /opt/claude-chat/server.js
+
+--- package.json version ---
+{
+  "name": "claude-chat",
+  "version": "1.0.0",
+  "description": "Mobile PWA chat for VPS management via Claude Code CLI",
+  "main": "server.js",
+
+=== STEP 4: Curl main page (first 30 lines) ===
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AI Ассистент</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a14;
+  --surface: #12121e;
+  --surface2: #1a1a2e;
+  --border: #2a2a3e;
+  --text: #e0e0f0;
+  --text2: #8888aa;
+  --accent: #7c5cfc;
+  --accent2: #9b7dff;
+  --user-bg: #7c5cfc;
+  --bot-bg: #1e1e32;
+  --error: #ff4466;
+  --success: #44cc88;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text);
+  height: 100vh; height: 100dvh;
+  display: flex; flex-direction: column;
 
 DONE
