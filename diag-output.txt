@@ -1,90 +1,21 @@
-=== STEP 1: Copy fresh files to VPS ===
-Files copied
+=== 1. Traefik container name ===
+Traefik container: 581a07387d54
 
-=== STEP 2: Stop and delete old PM2 process ===
-[PM2] Applying action stopProcessId on app [claude-chat](ids: [ 0 ])
-[PM2] [claude-chat](0) ✓
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 0    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-[PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
-[PM2] [claude-chat](0) ✓
-┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-Old process removed
+=== 2. Traefik static config ===
+Version:      3.6.9
+Codename:     ramequin
+Go version:   go1.25.7
+Built:        2026-02-23T17:12:19Z
+OS/Arch:      linux/amd64
 
-=== STEP 3: Install deps ===
+=== 3. Traefik dynamic config files ===
 
-20 packages are looking for funding
-  run `npm fund` for details
+=== 4. Traefik dynamic config content ===
 
-found 0 vulnerabilities
+=== 5. Traefik routers via API ===
+Traefik API not available or error
 
-=== STEP 4: Start fresh PM2 process ===
-[PM2] Starting /opt/claude-chat/server.js in fork_mode (1 instance)
-[PM2] Done.
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 810041   │ 0s     │ 0    │ online    │ 0%       │ 18.1mb   │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 810041   │ 4s     │ 0    │ online    │ 0%       │ 58.2mb   │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-
-=== STEP 5: Health check ===
-{"status":"ok","uptime":4.23878514,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T06:56:32.764Z"}
-
-=== STEP 6: Verify index.html on disk ===
-f69499b91889d4bbe8d1c1e958826903  /opt/claude-chat/public/index.html
-4b6d0688d389934b4d3e07f083a39525  /opt/claude-chat/server.js
--rw-r--r-- 1 root root 29503 Mar 15 06:56 /opt/claude-chat/public/index.html
--rw-r--r-- 1 root root 22368 Mar 15 06:56 /opt/claude-chat/server.js
-
-=== STEP 7: What browser actually gets ===
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>AI Ассистент</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-...
-<title>AI Ассистент</title>
-Response length: 29629 bytes
-Has double-tap protection: 3
-Has PWA manifest: 0
-Avatar type: &#9670;
-
-=== STEP 8: Docker containers ===
-CONTAINER ID   NAMES                    PORTS                                                                          IMAGE
-e292f6cbdd5a   mebelit-wp-wordpress-1   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp                                        wordpress:6.7-php8.2-apache
-ef1604097c60   mebelit-wp-db-1          0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp                         mysql:8.0
-581a07387d54   n8n-traefik-traefik-1    0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp   traefik
-b77d63637705   n8n-postgres-1           5432/tcp                                                                       pgvector/pgvector:pg16
-43bc332d60fe   n8n-voice-app-1          80/tcp                                                                         nginx:alpine
-f22e23598ce9   n8n-n8n-1                5678/tcp                                                                       n8nio/n8n:latest
-a2ffa3a5ed71   openclaw                                                                                                alpine/openclaw:latest
-
-=== STEP 9: Docker reverse proxy config ===
-no caddy
-no traefik
-no docker nginx
-
-=== STEP 10: Docker compose files ===
-/opt/n8n/docker-compose.yml
-/opt/openclaw/docker-compose.yml
-/opt/claude-chat/mebelit-wp/docker-compose.yml
-/opt/clawtest/docker-compose.yml
---- /opt/n8n/docker-compose.yml ---
+=== 6. Traefik docker-compose (n8n) ===
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -125,92 +56,98 @@ services:
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
       TZ: ${TZ}
       N8N_PROXY_HOPS: "1"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - postgres
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.n8n.rule=Host("n8n.marbomebel.ru")
+      - traefik.http.routers.n8n.entrypoints=websecure
+      - traefik.http.routers.n8n.tls=true
+      - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
+      - traefik.http.services.n8n.loadbalancer.server.port=5678
 
---- /opt/openclaw/docker-compose.yml ---
-services:
-  openclaw:
-    image: alpine/openclaw:latest
-    container_name: openclaw
+  voice-app:
+    image: nginx:alpine
     restart: unless-stopped
     networks:
       - n8n-traefik_default
+    volumes:
+      - /root/n8n-automation/pwa:/usr/share/nginx/html:ro
+      - /root/n8n-automation/pwa/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     labels:
       - traefik.enable=true
-      - traefik.http.routers.openclaw.rule=Host("claw.marbomebel.ru")
-      - traefik.http.routers.openclaw.entrypoints=websecure
-      - traefik.http.routers.openclaw.tls=true
-      - traefik.http.routers.openclaw.tls.certresolver=mytlschallenge
-      - traefik.http.services.openclaw.loadbalancer.server.port=18789
+      - traefik.http.routers.voice.rule=Host("n8n.marbomebel.ru") && PathPrefix("/voice")
+      - traefik.http.routers.voice.entrypoints=websecure
+      - traefik.http.routers.voice.tls=true
+      - traefik.http.routers.voice.tls.certresolver=mytlschallenge
+      - traefik.http.routers.voice.priority=100
+      - traefik.http.middlewares.voice-strip.stripprefix.prefixes=/voice
+      - traefik.http.routers.voice.middlewares=voice-strip
+      - traefik.http.services.voice.loadbalancer.server.port=80
 
 networks:
   n8n-traefik_default:
     external: true
-
---- /opt/claude-chat/mebelit-wp/docker-compose.yml ---
-version: '3.8'
-
-services:
-  db:
-    image: mysql:8.0
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: mebelit
-      MYSQL_USER: mebelit
-      MYSQL_PASSWORD: mebelit_pass_2024
-      MYSQL_ROOT_PASSWORD: root_pass_2024
-    volumes:
-      - db_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
-
-  wordpress:
-    image: wordpress:6.7-php8.2-apache
-    restart: unless-stopped
-    depends_on:
-      - db
-    ports:
-      - "8080:80"
-    environment:
-      WORDPRESS_DB_HOST: db:3306
-      WORDPRESS_DB_NAME: mebelit
-      WORDPRESS_DB_USER: mebelit
-      WORDPRESS_DB_PASSWORD: mebelit_pass_2024
-      WORDPRESS_TABLE_PREFIX: ml_
-    volumes:
-      - wp_data:/var/www/html
-      - ./theme/mebelit:/var/www/html/wp-content/themes/mebelit
 
 volumes:
-  db_data:
-  wp_data:
+  postgres_data:
+  n8n_data:
 
---- /opt/clawtest/docker-compose.yml ---
-services:
-  whoami:
-    image: traefik/whoami
-    container_name: clawtest-whoami
-    restart: unless-stopped
-    networks:
-      - n8n-traefik_default
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.clawtest.rule=Host("claw.marbomebel.ru")
-      - traefik.http.routers.clawtest.entrypoints=websecure
-      - traefik.http.routers.clawtest.tls=true
-      - traefik.http.routers.clawtest.tls.certresolver=mytlschallenge
-      - traefik.http.services.clawtest.loadbalancer.server.port=80
+=== 7. All Traefik labels on running containers ===
 
-networks:
-  n8n-traefik_default:
-    external: true
+/n8n-voice-app-1:
+  traefik.enable = true
+  traefik.http.middlewares.voice-strip.stripprefix.prefixes = /voice
+  traefik.http.routers.voice.entrypoints = websecure
+  traefik.http.routers.voice.middlewares = voice-strip
+  traefik.http.routers.voice.priority = 100
+  traefik.http.routers.voice.rule = Host("n8n.marbomebel.ru") && PathPrefix("/voice")
+  traefik.http.routers.voice.tls = true
+  traefik.http.routers.voice.tls.certresolver = mytlschallenge
+  traefik.http.services.voice.loadbalancer.server.port = 80
 
+/n8n-n8n-1:
+  traefik.enable = true
+  traefik.http.routers.n8n.entrypoints = websecure
+  traefik.http.routers.n8n.rule = Host("n8n.marbomebel.ru")
+  traefik.http.routers.n8n.tls = true
+  traefik.http.routers.n8n.tls.certresolver = mytlschallenge
+  traefik.http.services.n8n.loadbalancer.server.port = 5678
 
-=== STEP 11: Test direct curl vs domain ===
-Direct localhost:3847:
-<title>AI Ассистент</title>
-Via domain (host header):
-port 80 blocked or different
-External HTTPS:
-<title>AI Ассистент</title>
+/openclaw:
+  traefik.enable = true
+  traefik.http.routers.openclaw.entrypoints = websecure
+  traefik.http.routers.openclaw.rule = Host("claw.marbomebel.ru")
+  traefik.http.routers.openclaw.tls = true
+  traefik.http.routers.openclaw.tls.certresolver = mytlschallenge
+  traefik.http.services.openclaw.loadbalancer.server.port = 18789
+
+=== 8. What does HTTPS return (full response headers) ===
+---
+
+=== 9. Compare: direct PM2 vs HTTPS ===
+PM2 direct md5:
+09ff1f0bfff113be37857974857fe30e  -
+HTTPS md5:
+09ff1f0bfff113be37857974857fe30e  -
+PM2 file on disk md5:
+f69499b91889d4bbe8d1c1e958826903  /opt/claude-chat/public/index.html
+
+=== 10. Nginx status ===
+inactive
+nginx not a systemd service
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+Processes on key ports:
+LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:8080       0.0.0.0:*    users:(("docker-proxy",pid=753007,fd=7))                                                                                                                          
+LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=810041,fd=20))                                                                                                                      
+LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*    users:(("uvicorn",pid=706575,fd=6))                                                                                                                               
+LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=577310,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:8080          [::]:*    users:(("docker-proxy",pid=753015,fd=7))                                                                                                                          
 
 DONE
