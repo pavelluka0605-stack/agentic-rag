@@ -7,7 +7,7 @@ Files copied
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 79   │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 0    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 [PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
 [PM2] [claude-chat](0) ✓
@@ -29,22 +29,22 @@ found 0 vulnerabilities
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 809079   │ 0s     │ 0    │ online    │ 0%       │ 18.6mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 809498   │ 0s     │ 0    │ online    │ 0%       │ 18.5mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 809079   │ 4s     │ 0    │ online    │ 0%       │ 59.1mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 809498   │ 4s     │ 0    │ online    │ 0%       │ 58.4mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
 === STEP 5: Health check ===
-{"status":"ok","uptime":4.235256964,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T06:52:56.900Z"}
+{"status":"ok","uptime":4.24513401,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T06:54:41.770Z"}
 
 === STEP 6: Verify index.html on disk ===
 f69499b91889d4bbe8d1c1e958826903  /opt/claude-chat/public/index.html
 4b6d0688d389934b4d3e07f083a39525  /opt/claude-chat/server.js
--rw-r--r-- 1 root root 29503 Mar 15 06:52 /opt/claude-chat/public/index.html
--rw-r--r-- 1 root root 22368 Mar 15 06:52 /opt/claude-chat/server.js
+-rw-r--r-- 1 root root 29503 Mar 15 06:54 /opt/claude-chat/public/index.html
+-rw-r--r-- 1 root root 22368 Mar 15 06:54 /opt/claude-chat/server.js
 
 === STEP 7: What browser actually gets ===
 <!DOCTYPE html>
@@ -64,16 +64,7 @@ Has double-tap protection: 3
 Has PWA manifest: 0
 Avatar type: &#9670;
 
-=== STEP 8: Check nginx/proxy config ===
-# configuration file /etc/nginx/sites-enabled/chat-marbomebel:
-server {
-    listen 80;
-    server_name chat.marbomebel.ru;
-
-    location / {
-        proxy_pass http://127.0.0.1:3847;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+=== STEP 8: Full nginx config for chat ===
 server {
     listen 80;
     server_name chat.marbomebel.ru;
@@ -91,6 +82,24 @@ server {
         proxy_send_timeout 300s;
     }
 }
-no conf.d chat config
+
+=== SSL certs ===
+no SSL certs for chat.marbomebel.ru
+no letsencrypt at all
+
+=== All nginx sites ===
+chat-marbomebel
+
+=== Nginx listen ports ===
+/etc/nginx/sites-enabled/chat-marbomebel:    listen 80;
+
+=== Port 443 check ===
+LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
+LISTEN 0      4096         0.0.0.0:8080       0.0.0.0:*    users:(("docker-proxy",pid=753007,fd=7))                                                                                                                          
+LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*    users:(("uvicorn",pid=706575,fd=6))                                                                                                                               
+LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=577310,fd=7))                                                                                                                          
+LISTEN 0      4096            [::]:8080          [::]:*    users:(("docker-proxy",pid=753015,fd=7))                                                                                                                          
 
 DONE
