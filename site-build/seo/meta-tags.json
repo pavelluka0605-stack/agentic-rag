@@ -1,0 +1,172 @@
+{
+  "_comment": "Meta tags for кухнирема.рф — all pages. Configure via RankMath Pro.",
+  "_note_punycode": "кухнирема.рф = xn--e1afaihifegddo7k.xn--p1ai",
+  "_base_url": "https://xn--e1afaihifegddo7k.xn--p1ai",
+
+  "pages": {
+    "/": {
+      "title": "Кухни на заказ в Красноярске от производителя — Кухни Рема",
+      "description": "Кухни на заказ в Красноярске с точностью до 1 см. От 63 700 руб. Фурнитура Blum, Hettich. Рассрочка без банка. Бесплатный замер и 3D-проект.",
+      "og": {
+        "og:type": "website",
+        "og:title": "Кухни Рема — кухни на заказ в Красноярске",
+        "og:description": "Индивидуальные кухни от производителя. Шаг модуля 1 см — идеально впишется в ваше пространство. Рассчитайте стоимость онлайн.",
+        "og:image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-home.jpg",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/",
+        "og:locale": "ru_RU",
+        "og:site_name": "Кухни Рема"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/",
+      "focus_keyword": "кухни на заказ красноярск",
+      "secondary_keywords": ["купить кухню красноярск", "кухни на заказ недорого красноярск", "кухня от производителя красноярск"]
+    },
+
+    "/pryamye-kuhni/": {
+      "title": "Прямые кухни на заказ в Красноярске от 63 700 руб. — Кухни Рема",
+      "description": "Прямые кухни на заказ от производителя в Красноярске. Индивидуальные размеры, фурнитура Blum. Каталог с ценами и фото реальных проектов.",
+      "og": {
+        "og:type": "website",
+        "og:title": "Прямые кухни на заказ — каталог с ценами | Кухни Рема",
+        "og:description": "Прямые кухни от 63 700 руб. Реальные фото, точные цены. Изготовление от 14 дней.",
+        "og:image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-pryamye.jpg",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/pryamye-kuhni/"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/pryamye-kuhni/",
+      "focus_keyword": "прямые кухни на заказ красноярск",
+      "secondary_keywords": ["прямая кухня купить красноярск", "линейная кухня на заказ"]
+    },
+
+    "/uglovye-kuhni/": {
+      "title": "Угловые кухни на заказ в Красноярске от 96 300 руб. — Кухни Рема",
+      "description": "Угловые кухни на заказ от производителя в Красноярске. С точностью до 1 см. Каталог моделей с реальными фото и ценами. Бесплатный замер.",
+      "og": {
+        "og:type": "website",
+        "og:title": "Угловые кухни на заказ — каталог с ценами | Кухни Рема",
+        "og:description": "Угловые кухни от 96 300 руб. Идеально впишется в ваше пространство. Реальные фото готовых проектов.",
+        "og:image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-uglovye.jpg",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/uglovye-kuhni/"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/uglovye-kuhni/",
+      "focus_keyword": "угловые кухни на заказ красноярск",
+      "secondary_keywords": ["угловая кухня цена красноярск", "г-образная кухня на заказ"]
+    },
+
+    "/p-obraznye-kuhni/": {
+      "title": "П-образные кухни на заказ в Красноярске от 98 600 руб. — Кухни Рема",
+      "description": "П-образные кухни на заказ в Красноярске от производителя. Максимум рабочего пространства. Индивидуальные размеры, фурнитура Blum и Hettich.",
+      "og": {
+        "og:type": "website",
+        "og:title": "П-образные кухни на заказ — каталог | Кухни Рема",
+        "og:description": "П-образные кухни от 98 600 руб. Максимум функциональности. Реальные фото и точные цены.",
+        "og:image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-p-obraznye.jpg",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/p-obraznye-kuhni/"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/p-obraznye-kuhni/",
+      "focus_keyword": "п-образная кухня на заказ красноярск",
+      "secondary_keywords": ["п-образная кухня цена", "кухня буквой п на заказ"]
+    },
+
+    "/kuhnya/{model}/": {
+      "_comment": "Template for CPT Kitchen single pages. Replace {{model_*}} dynamically.",
+      "title": "Кухня {{model_name}} — {{kitchen_type}} от {{price}} руб. | Кухни Рема",
+      "description": "Кухня {{model_name}} на заказ в Красноярске. {{facade_material}}, фурнитура {{hardware}}. Фото, характеристики, цена. Рассрочка без банка.",
+      "og": {
+        "og:type": "product",
+        "og:title": "Кухня {{model_name}} — {{price}} руб. | Кухни Рема",
+        "og:description": "{{model_description_short}}. Изготовление от 14 дней. Бесплатный замер по Красноярску.",
+        "og:image": "{{model_image_url}}",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/kuhnya/{{model_slug}}/"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/kuhnya/{{model_slug}}/",
+      "focus_keyword": "кухня {{model_name}} купить",
+      "secondary_keywords": ["кухня {{model_name}} цена", "{{model_name}} на заказ красноярск"]
+    },
+
+    "/portfolio/": {
+      "title": "Портфолио — реализованные кухни на заказ | Кухни Рема Красноярск",
+      "description": "Фото реализованных кухонь от Кухни Рема. Более 40 проектов: прямые, угловые, П-образные. Реальные фото в интерьерах клиентов Красноярска.",
+      "og": {
+        "og:type": "website",
+        "og:title": "Портфолио кухонь — реальные проекты | Кухни Рема",
+        "og:description": "40+ реализованных проектов кухонь. Реальные фото в интерьерах наших клиентов.",
+        "og:image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-portfolio.jpg",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/portfolio/"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/portfolio/",
+      "focus_keyword": "кухни на заказ красноярск фото",
+      "secondary_keywords": ["портфолио кухонь", "кухни реальные фото красноярск"]
+    },
+
+    "/o-kompanii/": {
+      "title": "О компании Кухни Рема — производство кухонь в Красноярске",
+      "description": "Кухни Рема — собственное производство кухонь в Красноярске. Работаем без посредников. Фурнитура Blum, Hettich. Материалы Egger, AGT. Гарантия качества.",
+      "og": {
+        "og:type": "website",
+        "og:title": "О компании Кухни Рема | Производство в Красноярске",
+        "og:description": "Собственное производство. Работаем без посредников — от замера до установки.",
+        "og:image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-about.jpg",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/o-kompanii/"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/o-kompanii/",
+      "focus_keyword": "кухня от производителя красноярск",
+      "secondary_keywords": ["производство кухонь красноярск", "кухни без посредников красноярск"]
+    },
+
+    "/kontakty/": {
+      "title": "Контакты Кухни Рема — адрес, телефон, бесплатный замер",
+      "description": "Кухни Рема: ул. 2-я Огородная, 24, Красноярск. Тел. +7 (391) 216-97-59. Бесплатный замер кухни по всему Красноярску. Запишитесь онлайн.",
+      "og": {
+        "og:type": "website",
+        "og:title": "Контакты | Кухни Рема Красноярск",
+        "og:description": "Адрес, телефон, карта проезда. Запишитесь на бесплатный замер кухни.",
+        "og:image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-contacts.jpg",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/kontakty/"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/kontakty/",
+      "focus_keyword": "замер кухни бесплатно красноярск",
+      "secondary_keywords": ["кухни рема контакты", "кухни на заказ красноярск адрес"]
+    },
+
+    "/kalkulyator/": {
+      "title": "Калькулятор кухни онлайн — рассчитайте стоимость | Кухни Рема",
+      "description": "Рассчитайте стоимость кухни на заказ за 5 минут. Выберите планировку, укажите размеры — получите точный расчёт. Бесплатный замер в подарок.",
+      "og": {
+        "og:type": "website",
+        "og:title": "Калькулятор кухни — рассчитайте стоимость онлайн | Кухни Рема",
+        "og:description": "Узнайте стоимость вашей кухни за 5 минут. Онлайн-калькулятор с визуальным выбором планировки.",
+        "og:image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-calculator.jpg",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:url": "https://xn--e1afaihifegddo7k.xn--p1ai/kalkulyator/"
+      },
+      "canonical": "https://xn--e1afaihifegddo7k.xn--p1ai/kalkulyator/",
+      "focus_keyword": "дизайн кухни бесплатно красноярск",
+      "secondary_keywords": ["расчёт кухни онлайн", "калькулятор кухни на заказ"]
+    }
+  },
+
+  "global_meta": {
+    "charset": "utf-8",
+    "viewport": "width=device-width, initial-scale=1",
+    "format-detection": "telephone=no",
+    "theme-color": "#ffffff",
+    "yandex-verification": "{{yandex_verification_code}}",
+    "google-site-verification": "{{google_verification_code}}"
+  }
+}
