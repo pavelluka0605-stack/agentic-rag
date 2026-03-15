@@ -1,9 +1,12 @@
-=== External check Sun Mar 15 10:12:29 UTC 2026 ===
+=== EXTERNAL VERIFY Sun Mar 15 10:35:09 UTC 2026 ===
 Title: <title>AI Ассистент</title>
-RAG count: 16
-StatusLine: id="statusLine">онлайн<
-Health: {"status":"ok","uptime":116.545804363,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:12:32.118Z"}
-Size: 29629
-Manifest link: 0
+RAG: 16
+Manifest: 0
 0
-HTTP status: HTTP/2 200 
+StatusLine: id="statusLine">онлайн<
+Health: {"status":"ok","uptime":12.411035262,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:35:13.099Z"}
+HTTP: HTTP/2 200 
+Size: 29629
+Systemd: not-found
+disabled
+PM2: │ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 825453   │ 18s    │ 0    │ online    │ 0%       │ 54.4mb   │ root     │ disabled │
