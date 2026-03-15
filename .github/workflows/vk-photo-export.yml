@@ -46,15 +46,15 @@ jobs:
       - name: Export VK photos
         env:
           VK_TOKEN: ${{ secrets.VK_TOKEN }}
-          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
           ACTION: ${{ inputs.action || 'scan' }}
+          VK_SCREEN_NAME: mebelit_krsk
         run: |
           python3 << 'PYTHON'
           import requests, json, os, time, hashlib
           from pathlib import Path
 
           TOKEN = os.environ["VK_TOKEN"]
-          GROUP_ID = os.environ["VK_GROUP_ID"]
+          SCREEN_NAME = os.environ.get("VK_SCREEN_NAME", "mebelit_krsk")
           ACTION = os.environ.get("ACTION", "scan")
           API = "https://api.vk.com/method"
           V = "5.199"
@@ -69,6 +69,17 @@ jobs:
                   print(f"  VK API error: {data['error'].get('error_msg', data['error'])}")
                   return None
               return data.get("response")
+
+          # ── 0. Определяем GROUP_ID по screen_name ──
+          print(f"=== Определяем ID группы по screen_name: {SCREEN_NAME} ===")
+          resolved = vk("utils.resolveScreenName", screen_name=SCREEN_NAME)
+          if resolved and resolved.get("type") in ("group", "page"):
+              GROUP_ID = str(resolved["object_id"])
+              print(f"  Найдена группа ID: {GROUP_ID}")
+          else:
+              # Попробуем как есть — может SCREEN_NAME = числовой ID
+              GROUP_ID = SCREEN_NAME
+              print(f"  Не удалось разрешить screen_name, используем как ID: {GROUP_ID}")
 
           # ── 1. Получаем инфо о группе ──
           print("=== Информация о группе ===")
