@@ -1,0 +1,430 @@
+{
+  "cpt_registration": {
+    "post_type": "kitchen",
+    "args": {
+      "labels": {
+        "name": "Кухни",
+        "singular_name": "Кухня",
+        "add_new": "Добавить кухню",
+        "add_new_item": "Добавить новую кухню",
+        "edit_item": "Редактировать кухню",
+        "new_item": "Новая кухня",
+        "view_item": "Посмотреть кухню",
+        "view_items": "Посмотреть кухни",
+        "search_items": "Найти кухню",
+        "not_found": "Кухни не найдены",
+        "not_found_in_trash": "В корзине кухонь не найдено",
+        "all_items": "Все кухни",
+        "archives": "Архив кухонь",
+        "attributes": "Атрибуты кухни",
+        "insert_into_item": "Вставить в кухню",
+        "uploaded_to_this_item": "Загружено для этой кухни",
+        "filter_items_list": "Фильтр списка кухонь",
+        "items_list_navigation": "Навигация по списку кухонь",
+        "items_list": "Список кухонь",
+        "menu_name": "Кухни"
+      },
+      "public": true,
+      "publicly_queryable": true,
+      "show_ui": true,
+      "show_in_menu": true,
+      "show_in_nav_menus": true,
+      "show_in_admin_bar": true,
+      "show_in_rest": true,
+      "has_archive": true,
+      "hierarchical": false,
+      "exclude_from_search": false,
+      "capability_type": "post",
+      "map_meta_cap": true,
+      "supports": [
+        "title",
+        "editor",
+        "thumbnail",
+        "excerpt"
+      ],
+      "rewrite": {
+        "slug": "kuhnya",
+        "with_front": false,
+        "feeds": true
+      },
+      "menu_position": 5,
+      "menu_icon": "dashicons-food"
+    }
+  },
+
+  "taxonomies": [
+    {
+      "taxonomy": "kitchen_type",
+      "object_type": ["kitchen"],
+      "args": {
+        "labels": {
+          "name": "Типы кухонь",
+          "singular_name": "Тип кухни",
+          "search_items": "Найти тип",
+          "all_items": "Все типы",
+          "parent_item": "Родительский тип",
+          "parent_item_colon": "Родительский тип:",
+          "edit_item": "Редактировать тип",
+          "update_item": "Обновить тип",
+          "add_new_item": "Добавить новый тип",
+          "new_item_name": "Название нового типа",
+          "menu_name": "Тип кухни"
+        },
+        "hierarchical": true,
+        "public": true,
+        "show_ui": true,
+        "show_admin_column": true,
+        "show_in_nav_menus": true,
+        "show_in_rest": true,
+        "rewrite": {
+          "slug": "tip-kuhni",
+          "with_front": false,
+          "hierarchical": true
+        }
+      },
+      "default_terms": [
+        { "name": "Прямая", "slug": "pryamaya" },
+        { "name": "Угловая", "slug": "uglovaya" },
+        { "name": "П-образная", "slug": "p-obraznaya" }
+      ]
+    },
+    {
+      "taxonomy": "kitchen_style",
+      "object_type": ["kitchen"],
+      "args": {
+        "labels": {
+          "name": "Стили кухонь",
+          "singular_name": "Стиль кухни",
+          "search_items": "Найти стиль",
+          "all_items": "Все стили",
+          "parent_item": "Родительский стиль",
+          "parent_item_colon": "Родительский стиль:",
+          "edit_item": "Редактировать стиль",
+          "update_item": "Обновить стиль",
+          "add_new_item": "Добавить новый стиль",
+          "new_item_name": "Название нового стиля",
+          "menu_name": "Стиль кухни"
+        },
+        "hierarchical": true,
+        "public": true,
+        "show_ui": true,
+        "show_admin_column": true,
+        "show_in_nav_menus": true,
+        "show_in_rest": true,
+        "rewrite": {
+          "slug": "stil-kuhni",
+          "with_front": false,
+          "hierarchical": true
+        }
+      },
+      "default_terms": [
+        { "name": "Современный", "slug": "sovremennyj" },
+        { "name": "Классический", "slug": "klassicheskij" },
+        { "name": "Лофт", "slug": "loft" },
+        { "name": "Минимализм", "slug": "minimalizm" }
+      ]
+    },
+    {
+      "taxonomy": "kitchen_material",
+      "object_type": ["kitchen"],
+      "args": {
+        "labels": {
+          "name": "Материалы фасада",
+          "singular_name": "Материал фасада",
+          "search_items": "Найти материал",
+          "all_items": "Все материалы",
+          "parent_item": "Родительский материал",
+          "parent_item_colon": "Родительский материал:",
+          "edit_item": "Редактировать материал",
+          "update_item": "Обновить материал",
+          "add_new_item": "Добавить новый материал",
+          "new_item_name": "Название нового материала",
+          "menu_name": "Материал фасада"
+        },
+        "hierarchical": true,
+        "public": true,
+        "show_ui": true,
+        "show_admin_column": true,
+        "show_in_nav_menus": true,
+        "show_in_rest": true,
+        "rewrite": {
+          "slug": "material-fasada",
+          "with_front": false,
+          "hierarchical": true
+        }
+      },
+      "default_terms": [
+        { "name": "МДФ пленка", "slug": "mdf-plenka" },
+        { "name": "МДФ эмаль", "slug": "mdf-emal" },
+        { "name": "МДФ пластик", "slug": "mdf-plastik" },
+        { "name": "ЛДСП", "slug": "ldsp" },
+        { "name": "Массив", "slug": "massiv" }
+      ]
+    }
+  ],
+
+  "acf_field_group": {
+    "key": "group_kitchen_specs",
+    "title": "Характеристики кухни",
+    "fields": [
+      {
+        "key": "field_kitchen_price",
+        "label": "Цена",
+        "name": "kitchen_price",
+        "type": "number",
+        "instructions": "Цена кухни в рублях",
+        "required": 1,
+        "min": 0,
+        "step": 1,
+        "prepend": "",
+        "append": "руб.",
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_sale_price",
+        "label": "Цена со скидкой",
+        "name": "kitchen_sale_price",
+        "type": "number",
+        "instructions": "Цена со скидкой (оставьте пустым, если нет скидки)",
+        "required": 0,
+        "min": 0,
+        "step": 1,
+        "prepend": "",
+        "append": "руб.",
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_dimensions",
+        "label": "Размеры кухни",
+        "name": "kitchen_dimensions",
+        "type": "text",
+        "instructions": "Формат: ширина x глубина x высота (мм), например 2400x600x2200",
+        "required": 0,
+        "placeholder": "2400x600x2200",
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_countertop",
+        "label": "Материал столешницы",
+        "name": "kitchen_countertop",
+        "type": "select",
+        "instructions": "Выберите материал столешницы",
+        "required": 0,
+        "choices": {
+          "postforming": "Постформинг",
+          "stone": "Камень",
+          "ldsp": "ЛДСП"
+        },
+        "default_value": "postforming",
+        "allow_null": 0,
+        "multiple": 0,
+        "ui": 1,
+        "return_format": "value",
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_hardware",
+        "label": "Фурнитура",
+        "name": "kitchen_hardware",
+        "type": "select",
+        "instructions": "Производитель фурнитуры",
+        "required": 0,
+        "choices": {
+          "blum": "Blum",
+          "hettich": "Hettich",
+          "gtv": "GTV",
+          "standard": "Стандарт"
+        },
+        "default_value": "standard",
+        "allow_null": 0,
+        "multiple": 0,
+        "ui": 1,
+        "return_format": "value",
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_gallery",
+        "label": "Галерея фото",
+        "name": "kitchen_gallery",
+        "type": "gallery",
+        "instructions": "3-5 фотографий кухни",
+        "required": 0,
+        "return_format": "array",
+        "preview_size": "medium",
+        "insert": "append",
+        "library": "all",
+        "min": 0,
+        "max": 10,
+        "min_width": 800,
+        "min_height": 600,
+        "mime_types": "jpg, jpeg, png, webp"
+      },
+      {
+        "key": "field_kitchen_3d_render",
+        "label": "3D-визуализация",
+        "name": "kitchen_3d_render",
+        "type": "image",
+        "instructions": "3D-рендер кухни (опционально)",
+        "required": 0,
+        "return_format": "array",
+        "preview_size": "medium",
+        "library": "all",
+        "mime_types": "jpg, jpeg, png, webp",
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_facade_color",
+        "label": "Цвет фасада",
+        "name": "kitchen_facade_color",
+        "type": "color_picker",
+        "instructions": "Основной цвет фасада",
+        "required": 0,
+        "default_value": "#FFFFFF",
+        "enable_opacity": 0,
+        "return_format": "string",
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_equipment",
+        "label": "Описание комплектации",
+        "name": "kitchen_equipment",
+        "type": "textarea",
+        "instructions": "Подробное описание комплектации кухни",
+        "required": 0,
+        "rows": 4,
+        "new_lines": "br",
+        "placeholder": "Верхние шкафы: 3 шт.\nНижние шкафы: 4 шт.\nМойка: нержавейка\nСмеситель: в комплекте"
+      },
+      {
+        "key": "field_kitchen_module_step",
+        "label": "Шаг модуля",
+        "name": "kitchen_module_step",
+        "type": "number",
+        "instructions": "Шаг модуля в сантиметрах",
+        "required": 0,
+        "default_value": 1,
+        "min": 1,
+        "max": 100,
+        "step": 1,
+        "append": "см",
+        "wrapper": {
+          "width": "33",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_production_time",
+        "label": "Срок изготовления",
+        "name": "kitchen_production_time",
+        "type": "text",
+        "instructions": "Срок изготовления кухни",
+        "required": 0,
+        "default_value": "от 14 дней",
+        "placeholder": "от 14 дней",
+        "wrapper": {
+          "width": "33",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_installment",
+        "label": "Рассрочка доступна",
+        "name": "kitchen_installment",
+        "type": "true_false",
+        "instructions": "Доступна ли покупка в рассрочку",
+        "required": 0,
+        "default_value": 1,
+        "ui": 1,
+        "ui_on_text": "Да",
+        "ui_off_text": "Нет",
+        "wrapper": {
+          "width": "34",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_vk_market_id",
+        "label": "VK Market ID",
+        "name": "kitchen_vk_market_id",
+        "type": "number",
+        "instructions": "ID товара в VK Market (для связи с VK)",
+        "required": 0,
+        "min": 0,
+        "step": 1,
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      },
+      {
+        "key": "field_kitchen_sort_order",
+        "label": "Порядок сортировки",
+        "name": "kitchen_sort_order",
+        "type": "number",
+        "instructions": "Порядок отображения в каталоге (меньше = выше)",
+        "required": 0,
+        "default_value": 0,
+        "min": 0,
+        "step": 1,
+        "wrapper": {
+          "width": "50",
+          "class": "",
+          "id": ""
+        }
+      }
+    ],
+    "location": [
+      [
+        {
+          "param": "post_type",
+          "operator": "==",
+          "value": "kitchen"
+        }
+      ]
+    ],
+    "menu_order": 0,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": [
+      "comments",
+      "send-trackbacks"
+    ],
+    "active": true,
+    "description": "ACF поля для CPT Kitchen - характеристики, цены, галерея, связь с VK Market",
+    "show_in_rest": 1
+  }
+}
