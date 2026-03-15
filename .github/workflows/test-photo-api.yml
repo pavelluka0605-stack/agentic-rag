@@ -33,94 +33,118 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Investigate Traefik routing for chat.marbomebel.ru
+      - name: Fix Traefik routing + redeploy chat
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           OUT="diag-output.txt"
 
-          $SSH 'bash -s' <<'REMOTE' 2>&1 | tee $OUT
+          # 1. Copy fresh chat files
+          echo "=== 1. Copy fresh chat files ===" | tee $OUT
+          $SCP -r claude-chat/ $VPS_USER@$VPS_HOST:/opt/ 2>&1 | tee -a $OUT
+          echo "Files copied" | tee -a $OUT
 
-          echo "=== 1. Traefik container name ==="
+          $SSH 'bash -s' <<'REMOTE' 2>&1 | tee -a $OUT
+
+          echo ""
+          echo "=== 2. Restart PM2 ==="
+          cd /opt/claude-chat
+          npm install --omit=dev 2>&1 | tail -3
+          mkdir -p data
+          pm2 stop claude-chat 2>/dev/null || true
+          pm2 delete claude-chat 2>/dev/null || true
+          pm2 start server.js --name claude-chat
+          sleep 3
+          pm2 list
+
+          echo ""
+          echo "=== 3. Check current Traefik entrypoints/config ==="
           TRAEFIK_ID=$(docker ps -q --filter "name=traefik")
-          echo "Traefik container: $TRAEFIK_ID"
+          echo "Traefik ID: $TRAEFIK_ID"
+
+          # Get Traefik command-line args (startup config)
+          echo "Traefik startup command:"
+          docker inspect $TRAEFIK_ID --format '{{.Config.Cmd}}' 2>/dev/null
+          docker inspect $TRAEFIK_ID --format '{{json .Config.Cmd}}' 2>/dev/null
+
+          # Check Traefik volumes
+          echo "Traefik volumes:"
+          docker inspect $TRAEFIK_ID --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}' 2>/dev/null
 
           echo ""
-          echo "=== 2. Traefik static config ==="
-          docker exec $TRAEFIK_ID cat /etc/traefik/traefik.yml 2>/dev/null || \
-          docker exec $TRAEFIK_ID cat /traefik.yml 2>/dev/null || \
-          docker exec $TRAEFIK_ID traefik version 2>/dev/null || \
-          echo "cannot read traefik config"
-
-          echo ""
-          echo "=== 3. Traefik dynamic config files ==="
-          docker exec $TRAEFIK_ID ls -la /etc/traefik/ 2>/dev/null
-          docker exec $TRAEFIK_ID find / -name "*.yml" -path "*/traefik/*" 2>/dev/null | head -10
-          docker exec $TRAEFIK_ID find / -name "*.toml" -path "*/traefik/*" 2>/dev/null | head -10
-
-          echo ""
-          echo "=== 4. Traefik dynamic config content ==="
-          for f in $(docker exec $TRAEFIK_ID find /etc/traefik/ -name "*.yml" -o -name "*.toml" 2>/dev/null); do
-            echo "--- $f ---"
-            docker exec $TRAEFIK_ID cat "$f" 2>/dev/null
-            echo ""
-          done
-
-          echo ""
-          echo "=== 5. Traefik routers via API ==="
-          # Check if Traefik API is enabled
-          curl -s --max-time 5 http://localhost:8080/api/http/routers 2>/dev/null | python3 -c "
+          echo "=== 4. Check Traefik API for all routers ==="
+          # Traefik API might be on port 8080
+          curl -s --max-time 5 http://localhost:8080/api/rawdata 2>/dev/null | python3 -c "
           import json,sys
           try:
             data=json.load(sys.stdin)
-            for r in data:
-              print(f'{r.get(\"name\",\"?\")} rule={r.get(\"rule\",\"?\")} service={r.get(\"service\",\"?\")} status={r.get(\"status\",\"?\")}')
-          except: print('Traefik API not available or error')
+            routers = data.get('routers',{})
+            services = data.get('services',{})
+            print('ROUTERS:')
+            for name,r in routers.items():
+              print(f'  {name}: rule={r.get(\"rule\",\"?\")} service={r.get(\"service\",\"?\")} status={r.get(\"status\",\"?\")}')
+            print()
+            print('SERVICES:')
+            for name,s in services.items():
+              lb = s.get('loadBalancer',{})
+              servers = lb.get('servers',[])
+              print(f'  {name}: servers={servers} status={s.get(\"status\",\"?\")}')
+          except Exception as e:
+            print(f'Error: {e}')
           " 2>/dev/null || echo "Traefik API not accessible"
 
           echo ""
-          echo "=== 6. Traefik docker-compose (n8n) ==="
-          cat /opt/n8n/docker-compose.yml 2>/dev/null
+          echo "=== 5. Add Traefik file provider for chat ==="
+          # Create dynamic config for chat.marbomebel.ru -> host port 3847
+          # First check what static config traefik uses
+          TRAEFIK_COMPOSE_DIR=$(docker inspect $TRAEFIK_ID --format '{{range .Mounts}}{{if eq .Destination "/etc/traefik"}}{{.Source}}{{end}}{{end}}' 2>/dev/null)
+          echo "Traefik config dir on host: $TRAEFIK_COMPOSE_DIR"
+
+          # Check if there's a traefik.yml in the mount
+          if [ -n "$TRAEFIK_COMPOSE_DIR" ]; then
+            echo "Contents of $TRAEFIK_COMPOSE_DIR:"
+            ls -la "$TRAEFIK_COMPOSE_DIR" 2>/dev/null
+            cat "$TRAEFIK_COMPOSE_DIR/traefik.yml" 2>/dev/null || echo "no traefik.yml"
+          fi
+
+          # Also check docker-compose location for traefik
+          echo ""
+          echo "Looking for traefik docker-compose..."
+          find /opt /root -maxdepth 3 -name "docker-compose*" -exec grep -l "traefik" {} \; 2>/dev/null
+          TRAEFIK_COMPOSE=$(find /opt /root -maxdepth 3 -name "docker-compose*" -exec grep -l "traefik" {} \; 2>/dev/null | head -1)
+          if [ -n "$TRAEFIK_COMPOSE" ]; then
+            echo "Found: $TRAEFIK_COMPOSE"
+            cat "$TRAEFIK_COMPOSE"
+          fi
 
           echo ""
-          echo "=== 7. All Traefik labels on running containers ==="
-          docker inspect --format '{{.Name}}: {{json .Config.Labels}}' $(docker ps -q) 2>/dev/null | python3 -c "
+          echo "=== 6. Full Traefik docker inspect ==="
+          docker inspect $TRAEFIK_ID --format '{{json .Config.Cmd}}' 2>/dev/null | python3 -c "
           import json,sys
-          for line in sys.stdin:
-            name, labels_json = line.split(': ', 1)
-            labels = json.loads(labels_json)
-            traefik_labels = {k:v for k,v in labels.items() if 'traefik' in k.lower()}
-            if traefik_labels:
-              print(f'\n{name}:')
-              for k,v in sorted(traefik_labels.items()):
-                print(f'  {k} = {v}')
-          " 2>/dev/null || echo "Failed to read labels"
+          cmd = json.load(sys.stdin)
+          for arg in cmd:
+            print(f'  {arg}')
+          " 2>/dev/null
 
           echo ""
-          echo "=== 8. What does HTTPS return (full response headers) ==="
+          echo "=== 7. Verify HTTPS response ==="
           curl -sI --max-time 5 https://chat.marbomebel.ru/ 2>/dev/null
           echo "---"
-          curl -s --max-time 5 https://chat.marbomebel.ru/ 2>/dev/null | head -15
+          curl -s --max-time 5 https://chat.marbomebel.ru/ | grep -oP 'v\d+\.\d+|version.*?>' | head -5
+          echo "Title:"
+          curl -s --max-time 5 https://chat.marbomebel.ru/ | grep -o '<title>[^<]*</title>'
+          echo "Version meta:"
+          curl -s --max-time 5 https://chat.marbomebel.ru/ | grep -o 'content="2026[^"]*"'
 
           echo ""
-          echo "=== 9. Compare: direct PM2 vs HTTPS ==="
-          echo "PM2 direct md5:"
-          curl -s --max-time 5 http://localhost:3847/ | md5sum
-          echo "HTTPS md5:"
-          curl -s --max-time 5 https://chat.marbomebel.ru/ | md5sum
-          echo "PM2 file on disk md5:"
-          md5sum /opt/claude-chat/public/index.html
-
-          echo ""
-          echo "=== 10. Nginx status ==="
-          systemctl is-active nginx 2>/dev/null || echo "nginx not a systemd service"
-          nginx -t 2>&1 || echo "nginx not installed or error"
-          # What process listens on what
-          echo "Processes on key ports:"
-          ss -tlnp | grep -E ':80|:443|:3847|:8080' 2>/dev/null
+          echo "=== 8. DNS check ==="
+          host chat.marbomebel.ru 2>/dev/null || dig +short chat.marbomebel.ru 2>/dev/null || echo "DNS tools not available"
+          echo "Server IP:"
+          hostname -I 2>/dev/null | head -1
 
           echo ""
           echo "DONE"
@@ -133,6 +157,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet && echo "No changes" || {
-            git commit -m "diag: traefik routing investigation [skip ci]"
+            git commit -m "diag: traefik fix + redeploy with version stamp [skip ci]"
             git push origin main
           }

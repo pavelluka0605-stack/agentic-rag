@@ -6,6 +6,31 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AI Ассистент</title>
+<meta name="version" content="2026-03-15-v2">
+<script>
+// Force cache bust — unregister any service workers and clear caches
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    registrations.forEach(function(reg) { reg.unregister(); });
+  });
+}
+if ('caches' in window) {
+  caches.keys().then(function(names) {
+    names.forEach(function(name) { caches.delete(name); });
+  });
+}
+// Version check — force reload if cached version is old
+(function() {
+  var BUILD = '2026-03-15-v2';
+  var stored = localStorage.getItem('app_version');
+  if (stored && stored !== BUILD) {
+    localStorage.setItem('app_version', BUILD);
+    location.reload(true);
+  } else {
+    localStorage.setItem('app_version', BUILD);
+  }
+})();
+</script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -188,7 +213,7 @@ body {
   <div class="avatar">&#9670;</div>
   <div class="info">
     <h1>AI Ассистент</h1>
-    <div class="status" id="statusLine">онлайн</div>
+    <div class="status" id="statusLine">онлайн <span style="opacity:0.4;font-size:9px">v15.03</span></div>
   </div>
   <button class="menu-btn" onclick="toggleSettings()">&#9776;</button>
 </div>
