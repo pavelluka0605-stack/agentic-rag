@@ -6,10 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AI Ассистент</title>
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-180.png">
-<link rel="icon" type="image/png" href="/favicon.png">
-<meta name="theme-color" content="#7c5cfc">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -129,8 +125,7 @@ body {
   margin-bottom: 4px;
 }
 .input-area .send-btn.visible { display: flex; }
-.input-area .send-btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
-.input-area .send-btn { touch-action: manipulation; }
+.input-area .send-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* Attachments preview */
 .attachments {
@@ -189,7 +184,7 @@ body {
 <body>
 
 <div class="header">
-  <div class="avatar"><img src="/logo.svg" alt="AI" style="width:28px;height:28px;"></div>
+  <div class="avatar">&#9670;</div>
   <div class="info">
     <h1>AI Ассистент</h1>
     <div class="status" id="statusLine">онлайн</div>
@@ -253,7 +248,6 @@ let pendingPhotos = []; // { file, dataUrl }
 let history = [];
 let pollAbort = null; // AbortController for polling
 let clientTimeout = null; // total client-side timeout
-let requestStartTime = null; // когда начался текущий запрос
 
 const $messages = document.getElementById('messages');
 const $input = document.getElementById('msgInput');
@@ -347,13 +341,8 @@ function removeTyping() {
 }
 
 // --- Send message ---
-let lastSendTime = 0;
 async function sendMessage() {
   if (sending) return; // debounce
-
-  // Защита от двойного тапа на мобильном (минимум 1.5с между отправками)
-  const now = Date.now();
-  if (now - lastSendTime < 1500) return;
 
   const text = $input.value.trim();
   const photos = [...pendingPhotos];
@@ -361,7 +350,6 @@ async function sendMessage() {
   if (!text && photos.length === 0) return;
 
   // Prevent double send
-  lastSendTime = now;
   sending = true;
   $sendBtn.disabled = true;
   $input.value = '';
@@ -402,10 +390,6 @@ async function sendMessage() {
 
   showTyping();
   $connBanner.classList.remove('show');
-
-  // Запоминаем время начала запроса в localStorage
-  requestStartTime = Date.now();
-  localStorage.setItem('chat_request_start', requestStartTime.toString());
 
   // Hard client-side timeout: 6 minutes — guarantees UI never hangs forever
   clientTimeout = setTimeout(() => {
@@ -494,7 +478,6 @@ async function sendMessage() {
             saveLocalHistory();
           }
           currentRequestId = null;
-          localStorage.removeItem('chat_request_start');
         }
       }
     }
@@ -544,8 +527,6 @@ async function cancelCurrentRequest() {
   currentRequestId = null;
   sending = false;
   $sendBtn.disabled = false;
-  requestStartTime = null;
-  localStorage.removeItem('chat_request_start');
   addMessage('error', 'Запрос отменён');
 }
 
@@ -650,35 +631,17 @@ async function recoverSession() {
 
 // --- Auto-recover on page load ---
 async function checkPendingOnLoad() {
-  // Первая проверка: клиентский возраст запроса (не зависит от сервера)
-  const MAX_AGE_MS = 5 * 60 * 1000;
-  const savedStart = localStorage.getItem('chat_request_start');
-  if (savedStart) {
-    const age = Date.now() - parseInt(savedStart, 10);
-    if (age > MAX_AGE_MS) {
-      // Запрос старше 5 мин — точно мёртвый, убираем
-      localStorage.removeItem('chat_request_start');
-      removeTyping();
-      return;
-    }
-  } else {
-    // Нет активного запроса — нечего восстанавливать
-    return;
-  }
-
   try {
     const resp = await fetch(`${API}/api/recover/${sessionId}`, {
       headers: { 'Authorization': `Bearer ${TOKEN}` },
     });
-    if (!resp.ok) {
-      localStorage.removeItem('chat_request_start');
-      return;
-    }
+    if (!resp.ok) return;
     const data = await resp.json();
 
-    // Двойная проверка: серверный возраст
+    // Игнорировать запросы старше 5 минут — они мёртвые
+    const MAX_AGE_MS = 5 * 60 * 1000;
     if (data.ageMs && data.ageMs > MAX_AGE_MS && data.status === 'running') {
-      localStorage.removeItem('chat_request_start');
+      // Старый зависший запрос — не показываем, пытаемся отменить
       if (data.requestId) {
         fetch(`${API}/api/cancel/${data.requestId}`, {
           method: 'POST',
@@ -689,25 +652,20 @@ async function checkPendingOnLoad() {
     }
 
     if (data.status === 'running') {
+      // Запрос ещё выполняется и не слишком старый — ждём
       showTyping('Запрос обрабатывается');
       if (data.requestId) {
         currentRequestId = data.requestId;
         pollForResult(data.requestId);
       }
     } else if (data.status === 'completed' && data.fullText) {
-      localStorage.removeItem('chat_request_start');
+      // Проверяем, не показан ли уже этот ответ
       const lastBot = history.filter(m => m.role === 'assistant').pop();
       if (!lastBot || lastBot.content !== data.fullText) {
         addMessage('bot', data.fullText, { elapsed: data.elapsed ? `${data.elapsed}s` : '' });
       }
-    } else {
-      // status: 'none' — запрос потерян
-      localStorage.removeItem('chat_request_start');
     }
-  } catch (_) {
-    // Сервер недоступен — не показываем зависший индикатор
-    localStorage.removeItem('chat_request_start');
-  }
+  } catch (_) {}
 }
 
 // --- Photos ---
