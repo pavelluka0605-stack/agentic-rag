@@ -1,0 +1,351 @@
+{
+  "_comment": "RankMath Pro configuration for кухнирема.рф. Import via RankMath > Status & Tools > Import/Export or configure manually.",
+
+  "general": {
+    "separator": "—",
+    "homepage_title": "Кухни на заказ в Красноярске от производителя %sep% %sitename%",
+    "homepage_description": "Кухни на заказ в Красноярске с точностью до 1 см. От 63 700 руб. Фурнитура Blum, Hettich. Рассрочка без банка. Бесплатный замер и 3D-проект.",
+    "sitename": "Кухни Рема",
+    "breadcrumbs": {
+      "enabled": true,
+      "separator": "›",
+      "home_label": "Главная",
+      "home_link": true,
+      "prefix": "",
+      "show_post_title": true,
+      "archive_format": "%s",
+      "404_label": "Страница не найдена"
+    },
+    "webmaster_tools": {
+      "yandex_verification": "{{yandex_verification_code}}",
+      "google_verification": "{{google_verification_code}}",
+      "bing_verification": "",
+      "baidu_verification": ""
+    },
+    "analytics": {
+      "yandex_metrika_id": "103970425",
+      "google_analytics_id": ""
+    }
+  },
+
+  "titles_meta": {
+    "post_types": {
+      "post": {
+        "title": "%title% %sep% %sitename%",
+        "description": "%excerpt%",
+        "robots": {
+          "index": true,
+          "follow": true
+        },
+        "schema_type": "Article",
+        "custom_robots": false,
+        "add_meta_box": true,
+        "link_suggestions": true,
+        "primary_taxonomy": "category"
+      },
+      "page": {
+        "title": "%title% %sep% %sitename%",
+        "description": "%excerpt%",
+        "robots": {
+          "index": true,
+          "follow": true
+        },
+        "schema_type": "WebPage",
+        "custom_robots": false,
+        "add_meta_box": true
+      },
+      "kitchen": {
+        "_comment": "CPT Kitchen — custom post type for kitchen models",
+        "title": "Кухня %title% %sep% %sitename%",
+        "description": "Кухня %title% на заказ в Красноярске. Реальные фото, цена, характеристики. Рассчитайте стоимость онлайн.",
+        "robots": {
+          "index": true,
+          "follow": true
+        },
+        "schema_type": "Product",
+        "custom_robots": false,
+        "add_meta_box": true,
+        "link_suggestions": true,
+        "primary_taxonomy": "kitchen_type",
+        "slug": "kuhnya",
+        "bulk_editing": true
+      }
+    },
+    "taxonomies": {
+      "kitchen_type": {
+        "_comment": "Taxonomy: kitchen type (прямые, угловые, п-образные)",
+        "title": "%term% кухни на заказ в Красноярске %sep% %sitename%",
+        "description": "%term_description%",
+        "robots": {
+          "index": true,
+          "follow": true
+        },
+        "add_meta_box": true
+      },
+      "kitchen_style": {
+        "_comment": "Taxonomy: kitchen style (модерн, классика, лофт, минимализм)",
+        "title": "Кухни в стиле %term% на заказ %sep% %sitename%",
+        "description": "%term_description%",
+        "robots": {
+          "index": true,
+          "follow": true
+        },
+        "add_meta_box": true
+      },
+      "category": {
+        "title": "%term% %sep% %sitename%",
+        "description": "%term_description%",
+        "robots": {
+          "index": true,
+          "follow": true
+        }
+      },
+      "post_tag": {
+        "robots": {
+          "index": false,
+          "follow": true
+        }
+      }
+    },
+    "author_archive": {
+      "robots": {
+        "index": false,
+        "follow": true
+      }
+    },
+    "date_archive": {
+      "robots": {
+        "index": false,
+        "follow": true
+      }
+    },
+    "search_results": {
+      "title": "Результаты поиска: %searchphrase% %sep% %sitename%",
+      "robots": {
+        "index": false,
+        "follow": true
+      }
+    },
+    "404_page": {
+      "title": "Страница не найдена %sep% %sitename%"
+    }
+  },
+
+  "sitemap": {
+    "enabled": true,
+    "items_per_page": 200,
+    "include": {
+      "post_types": ["page", "post", "kitchen"],
+      "taxonomies": ["kitchen_type", "kitchen_style", "category"]
+    },
+    "exclude": {
+      "post_types": ["attachment", "revision", "nav_menu_item"],
+      "taxonomies": ["post_tag", "post_format"],
+      "specific_posts": [],
+      "specific_terms": []
+    },
+    "images": {
+      "include_in_sitemap": true
+    },
+    "ping_search_engines": true,
+    "include_featured_image": true,
+    "exclude_empty_terms": true
+  },
+
+  "schema": {
+    "default_type_per_post_type": {
+      "post": "Article",
+      "page": "WebPage",
+      "kitchen": "Product"
+    },
+    "organization": {
+      "type": "Organization",
+      "name": "Кухни Рема",
+      "url": "https://xn--e1afaihifegddo7k.xn--p1ai/",
+      "logo": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/logo-kuhni-rema.png",
+      "phone": "+7 (391) 216-97-59",
+      "email": "info@кухнирема.рф"
+    },
+    "local_business": {
+      "type": "FurnitureStore",
+      "use_on_all_pages": true
+    },
+    "breadcrumbs_in_schema": true
+  },
+
+  "redirections": {
+    "_comment": "301 redirects from old mebelit.site URL paths to new кухнирема.рф paths",
+    "rules": [
+      {
+        "source": "/straight",
+        "destination": "/pryamye-kuhni/",
+        "type": 301,
+        "status": "active",
+        "note": "Old straight kitchens page"
+      },
+      {
+        "source": "/straight/(.*)",
+        "destination": "/pryamye-kuhni/",
+        "type": 301,
+        "status": "active",
+        "note": "Old straight kitchens subpages"
+      },
+      {
+        "source": "/corner",
+        "destination": "/uglovye-kuhni/",
+        "type": 301,
+        "status": "active",
+        "note": "Old corner kitchens page"
+      },
+      {
+        "source": "/corner/(.*)",
+        "destination": "/uglovye-kuhni/",
+        "type": 301,
+        "status": "active",
+        "note": "Old corner kitchens subpages"
+      },
+      {
+        "source": "/quiz",
+        "destination": "/kalkulyator/",
+        "type": 301,
+        "status": "active",
+        "note": "Old quiz page"
+      },
+      {
+        "source": "/uglovye-kuhni",
+        "destination": "/uglovye-kuhni/",
+        "type": 301,
+        "status": "active",
+        "note": "Old dead page (was 404 on mebelit.site)"
+      },
+      {
+        "source": "/p-obraznye-kuhni",
+        "destination": "/p-obraznye-kuhni/",
+        "type": 301,
+        "status": "active",
+        "note": "Old dead page (was 404 on mebelit.site)"
+      },
+      {
+        "source": "/privacy-policy",
+        "destination": "/politika-konfidencialnosti/",
+        "type": 301,
+        "status": "active",
+        "note": "Old privacy policy"
+      },
+      {
+        "source": "/politika-konfidencialnosti",
+        "destination": "/politika-konfidencialnosti/",
+        "type": 301,
+        "status": "active",
+        "note": "Old privacy policy (duplicate)"
+      },
+      {
+        "source": "/catalog",
+        "destination": "/uglovye-kuhni/",
+        "type": 301,
+        "status": "active",
+        "note": "Generic catalog redirect"
+      },
+      {
+        "source": "/about",
+        "destination": "/o-kompanii/",
+        "type": 301,
+        "status": "active",
+        "note": "Old about page"
+      },
+      {
+        "source": "/contacts",
+        "destination": "/kontakty/",
+        "type": 301,
+        "status": "active",
+        "note": "Old contacts page"
+      },
+      {
+        "source": "/portfolio",
+        "destination": "/portfolio/",
+        "type": 301,
+        "status": "active",
+        "note": "Portfolio (trailing slash fix)"
+      }
+    ],
+    "auto_redirect_attachments": true,
+    "redirect_404_to_homepage": false,
+    "monitor_404": true
+  },
+
+  "local_seo": {
+    "enabled": true,
+    "business_type": "FurnitureStore",
+    "business_name": "Кухни Рема",
+    "business_url": "https://xn--e1afaihifegddo7k.xn--p1ai/",
+    "business_email": "info@кухнирема.рф",
+    "phone": "+7 (391) 216-97-59",
+    "address": {
+      "street": "ул. 2-я Огородная, д. 24",
+      "locality": "Красноярск",
+      "region": "Красноярский край",
+      "postal_code": "660131",
+      "country": "RU"
+    },
+    "coordinates": {
+      "lat": 56.0153,
+      "lng": 92.8684
+    },
+    "opening_hours": {
+      "monday": "09:00-19:00",
+      "tuesday": "09:00-19:00",
+      "wednesday": "09:00-19:00",
+      "thursday": "09:00-19:00",
+      "friday": "09:00-19:00",
+      "saturday": "10:00-17:00",
+      "sunday": "closed"
+    },
+    "price_range": "₽₽",
+    "about_page": "/o-kompanii/",
+    "contact_page": "/kontakty/",
+    "show_on_all_pages": true,
+    "hide_opening_hours": false,
+    "multiple_locations": false
+  },
+
+  "social": {
+    "vk_url": "https://vk.com/marbomebel",
+    "facebook_url": "",
+    "instagram_url": "",
+    "twitter_url": "",
+    "youtube_url": "",
+    "open_graph": {
+      "enabled": true,
+      "default_image": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/og-default.jpg",
+      "image_overlay": false,
+      "facebook_app_id": "",
+      "facebook_admin_id": ""
+    },
+    "twitter_cards": {
+      "enabled": true,
+      "card_type": "summary_large_image"
+    }
+  },
+
+  "performance": {
+    "link_suggestions": true,
+    "instant_indexing": {
+      "_comment": "For Yandex Indexing API and Google Indexing API",
+      "enabled": true,
+      "post_types": ["kitchen", "post", "page"]
+    },
+    "image_seo": {
+      "add_alt_tag": true,
+      "alt_format": "%title% — Кухни Рема Красноярск",
+      "add_title_tag": true,
+      "title_format": "%title%"
+    }
+  },
+
+  "content_ai": {
+    "_comment": "RankMath Content AI settings — use for blog posts (phase 2)",
+    "enabled": false,
+    "target_country": "RU",
+    "target_language": "Russian"
+  }
+}

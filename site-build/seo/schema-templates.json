@@ -1,0 +1,299 @@
+{
+  "_comment": "JSON-LD Schema.org templates for кухнирема.рф — WordPress + RankMath Pro",
+  "_usage": "Insert via RankMath Custom Schema or wp_head hook. Replace {{placeholders}} with dynamic values.",
+
+  "LocalBusiness": {
+    "@context": "https://schema.org",
+    "@type": "FurnitureStore",
+    "@id": "https://xn--e1afaihifegddo7k.xn--p1ai/#organization",
+    "name": "Кухни Рема",
+    "alternateName": "Кухни на заказ Красноярск — Кухни Рема",
+    "url": "https://xn--e1afaihifegddo7k.xn--p1ai/",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/logo-kuhni-rema.png",
+      "width": 300,
+      "height": 80
+    },
+    "image": [
+      "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/hero-kitchen-1.webp",
+      "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/hero-kitchen-2.webp"
+    ],
+    "description": "Кухни на заказ в Красноярске от производителя. Индивидуальное производство с шагом модуля 1 см. Фурнитура Blum, Hettich, материалы Egger, AGT.",
+    "telephone": "+7 (391) 216-97-59",
+    "email": "info@кухнирема.рф",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "ул. 2-я Огородная, д. 24",
+      "addressLocality": "Красноярск",
+      "addressRegion": "Красноярский край",
+      "postalCode": "660131",
+      "addressCountry": "RU"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 56.0153,
+      "longitude": 92.8684
+    },
+    "hasMap": "https://yandex.ru/maps/-/CDxRrV",
+    "openingHoursSpecification": [
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "opens": "09:00",
+        "closes": "19:00"
+      },
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": "Saturday",
+        "opens": "10:00",
+        "closes": "17:00"
+      }
+    ],
+    "priceRange": "₽₽",
+    "currenciesAccepted": "RUB",
+    "paymentAccepted": "Cash, Credit Card, Bank Transfer",
+    "areaServed": {
+      "@type": "City",
+      "name": "Красноярск"
+    },
+    "sameAs": [
+      "https://vk.com/marbomebel"
+    ],
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.5",
+      "reviewCount": "{{review_count}}",
+      "bestRating": "5",
+      "worstRating": "1"
+    }
+  },
+
+  "Product": {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "Кухня {{model_name}}",
+    "description": "{{model_description}}",
+    "image": [
+      "{{image_url_1}}",
+      "{{image_url_2}}",
+      "{{image_url_3}}"
+    ],
+    "sku": "KR-{{model_slug}}",
+    "brand": {
+      "@type": "Brand",
+      "name": "Кухни Рема"
+    },
+    "manufacturer": {
+      "@type": "Organization",
+      "name": "Кухни Рема",
+      "@id": "https://xn--e1afaihifegddo7k.xn--p1ai/#organization"
+    },
+    "category": "{{kitchen_type}}",
+    "material": "{{facade_material}}",
+    "offers": {
+      "@type": "Offer",
+      "url": "https://xn--e1afaihifegddo7k.xn--p1ai/kuhnya/{{model_slug}}/",
+      "priceCurrency": "RUB",
+      "price": "{{price}}",
+      "priceValidUntil": "{{price_valid_until}}",
+      "availability": "https://schema.org/InStock",
+      "itemCondition": "https://schema.org/NewCondition",
+      "seller": {
+        "@type": "Organization",
+        "name": "Кухни Рема"
+      },
+      "deliveryLeadTime": {
+        "@type": "QuantitativeValue",
+        "minValue": 14,
+        "maxValue": 30,
+        "unitCode": "DAY"
+      },
+      "shippingDetails": {
+        "@type": "OfferShippingDetails",
+        "shippingDestination": {
+          "@type": "DefinedRegion",
+          "addressCountry": "RU",
+          "addressRegion": "Красноярский край"
+        },
+        "shippingRate": {
+          "@type": "MonetaryAmount",
+          "value": "0",
+          "currency": "RUB"
+        },
+        "deliveryTime": {
+          "@type": "ShippingDeliveryTime",
+          "handlingTime": {
+            "@type": "QuantitativeValue",
+            "minValue": 14,
+            "maxValue": 30,
+            "unitCode": "DAY"
+          }
+        }
+      }
+    },
+    "additionalProperty": [
+      {
+        "@type": "PropertyValue",
+        "name": "Тип кухни",
+        "value": "{{kitchen_type}}"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Материал фасада",
+        "value": "{{facade_material}}"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Фурнитура",
+        "value": "{{hardware}}"
+      },
+      {
+        "@type": "PropertyValue",
+        "name": "Столешница",
+        "value": "{{countertop}}"
+      }
+    ]
+  },
+
+  "BreadcrumbList": {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Главная",
+        "item": "https://xn--e1afaihifegddo7k.xn--p1ai/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "{{category_name}}",
+        "item": "https://xn--e1afaihifegddo7k.xn--p1ai/{{category_slug}}/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": "Кухня {{model_name}}",
+        "item": "https://xn--e1afaihifegddo7k.xn--p1ai/kuhnya/{{model_slug}}/"
+      }
+    ]
+  },
+
+  "FAQPage": {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Сколько стоит кухня на заказ в Красноярске?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Стоимость кухни на заказ в «Кухни Рема» начинается от 63 700 руб. за прямую кухню, от 96 300 руб. за угловую и от 98 600 руб. за П-образную. Итоговая цена зависит от размеров, материалов фасада, фурнитуры и комплектации. Рассчитайте стоимость вашей кухни за 5 минут в нашем онлайн-калькуляторе."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Какие сроки изготовления кухни на заказ?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Срок изготовления кухни на заказ — от 14 до 30 рабочих дней в зависимости от сложности проекта и загруженности производства. Бесплатный замер — в течение 1-2 дней после заявки. Доставка и установка по Красноярску — бесплатно."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Можно ли купить кухню в рассрочку?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Да, мы предлагаем рассрочку без банка на срок до 3 месяцев. Предоплата составляет всего 10%, остальное — после установки кухни. Без переплат, без процентов, без участия банка."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Что значит «шаг модуля 1 см»?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Это значит, что мы изготавливаем кухонные модули с точностью до 1 сантиметра. Кухня идеально вписывается в ваше пространство без щелей и зазоров — в отличие от серийных кухонь, где модули имеют фиксированные размеры (обычно шаг 15 см). Вы получаете индивидуальную кухню по цене серийного производства."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Какую фурнитуру вы используете?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Мы используем фурнитуру европейских премиум-брендов: Blum и Hettich (Австрия/Германия). Для корпусов и фасадов — плиты Egger и AGT. Это обеспечивает надёжность и долговечность кухни на 15-20 лет эксплуатации."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Вы делаете бесплатный замер?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Да, замер кухни бесплатный по всему Красноярску. Наш дизайнер приедет в удобное для вас время, снимет все размеры с точностью до миллиметра и подготовит 3D-проект вашей будущей кухни. Также вы можете воспользоваться онлайн-калькулятором для предварительного расчёта."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "У вас есть свое производство в Красноярске?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Да, у нас собственное производство в Красноярске. Мы работаем без посредников: от замера и проектирования до изготовления и установки. Это позволяет контролировать качество на каждом этапе и предлагать конкурентные цены — без наценок дилеров и салонов."
+        }
+      }
+    ]
+  },
+
+  "Organization": {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": "https://xn--e1afaihifegddo7k.xn--p1ai/#organization",
+    "name": "Кухни Рема",
+    "url": "https://xn--e1afaihifegddo7k.xn--p1ai/",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://xn--e1afaihifegddo7k.xn--p1ai/wp-content/uploads/logo-kuhni-rema.png",
+      "width": 300,
+      "height": 80
+    },
+    "description": "Производство кухонь на заказ в Красноярске. Индивидуальные кухни с точностью до 1 см по цене серийного производства. Фурнитура Blum, Hettich. Материалы Egger, AGT.",
+    "foundingLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Красноярск",
+        "addressCountry": "RU"
+      }
+    },
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "ул. 2-я Огородная, д. 24",
+      "addressLocality": "Красноярск",
+      "addressRegion": "Красноярский край",
+      "postalCode": "660131",
+      "addressCountry": "RU"
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "+7 (391) 216-97-59",
+      "contactType": "sales",
+      "areaServed": "RU",
+      "availableLanguage": "Russian"
+    },
+    "sameAs": [
+      "https://vk.com/marbomebel"
+    ],
+    "numberOfEmployees": {
+      "@type": "QuantitativeValue",
+      "minValue": 5,
+      "maxValue": 20
+    },
+    "knowsAbout": [
+      "Кухни на заказ",
+      "Производство мебели",
+      "Дизайн кухни",
+      "Кухонная фурнитура Blum",
+      "Кухонная фурнитура Hettich"
+    ]
+  }
+}
