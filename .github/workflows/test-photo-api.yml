@@ -1,48 +1,106 @@
-name: "Verify Chat Deploy"
+name: "Deploy & Verify Chat (March 14)"
 
 on:
   push:
     branches: [main, "claude/*"]
     paths:
       - ".github/workflows/test-photo-api.yml"
+      - "claude-chat/**"
+      - ".github/workflows/deploy-p0.yml"
+      - ".github/workflows/deploy-chat.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: verify-chat
+  group: deploy-chat-final
   cancel-in-progress: true
 
 jobs:
-  verify:
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
 
-      - name: Check external
+      - name: Setup SSH
         run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy March 14 version
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
+
+          # Copy files
+          $SCP -r claude-chat/ $VPS_USER@$VPS_HOST:/opt/
+
+          # Deploy on VPS
+          $SSH 'bash -s' <<'REMOTE'
+          set -e
+
+          # 1. Kill everything
+          systemctl stop claude-chat 2>/dev/null || true
+          systemctl disable claude-chat 2>/dev/null || true
+          rm -f /etc/systemd/system/claude-chat.service
+          systemctl daemon-reload 2>/dev/null || true
+          pm2 delete claude-chat 2>/dev/null || true
+          pkill -f 'node.*claude-chat' 2>/dev/null || true
+          sleep 2
+
+          # 2. Start fresh via PM2
+          cd /opt/claude-chat
+          npm install --omit=dev 2>&1 | tail -3
+          mkdir -p data
+          pm2 start server.js --name claude-chat
+          sleep 3
+          pm2 save --force
+
+          # 3. Verify locally
+          echo "=== LOCAL VERIFY ==="
+          echo "Title: $(curl -s http://localhost:3847/ | grep -oP '<title>[^<]+</title>')"
+          echo "RAG: $(curl -s http://localhost:3847/ | grep -c 'RAG\|rag' || echo 0)"
+          echo "Health: $(curl -s http://localhost:3847/api/health)"
+          REMOTE
+
+      - name: External verify + save
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
+        run: |
+          sleep 5
           OUT="diag-output.txt"
-          echo "=== External check $(date) ===" > $OUT
+          echo "=== EXTERNAL VERIFY $(date) ===" > $OUT
           echo "Title: $(curl -sk https://chat.marbomebel.ru/ | grep -oP '<title>[^<]+</title>')" >> $OUT
-          echo "RAG count: $(curl -sk https://chat.marbomebel.ru/ | grep -c 'RAG\|rag' || echo 0)" >> $OUT
+          echo "RAG: $(curl -sk https://chat.marbomebel.ru/ | grep -c 'RAG\|rag' || echo 0)" >> $OUT
+          echo "Manifest: $(curl -sk https://chat.marbomebel.ru/ | grep -c 'manifest' || echo 0)" >> $OUT
           echo "StatusLine: $(curl -sk https://chat.marbomebel.ru/ | grep -oP 'id=\"statusLine\">[^<]+<')" >> $OUT
           echo "Health: $(curl -sk https://chat.marbomebel.ru/api/health)" >> $OUT
+          echo "HTTP: $(curl -skI https://chat.marbomebel.ru/ | head -1)" >> $OUT
           echo "Size: $(curl -sk https://chat.marbomebel.ru/ | wc -c)" >> $OUT
-          echo "Manifest link: $(curl -sk https://chat.marbomebel.ru/ | grep -c 'manifest' || echo 0)" >> $OUT
-          echo "HTTP status: $(curl -skI https://chat.marbomebel.ru/ | head -1)" >> $OUT
+
+          # Also verify systemd is gone
+          SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          echo "Systemd: $($SSH 'systemctl is-enabled claude-chat 2>&1 || echo disabled')" >> $OUT
+          echo "PM2: $($SSH 'pm2 list 2>/dev/null | grep claude-chat || echo not found')" >> $OUT
+
           cat $OUT
 
-      - name: Save
-        if: always()
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet || {
-            git commit -m "verify: external check [skip ci]"
+            git commit -m "deploy: March 14 + disabled both auto-deploys [skip ci]"
             git push origin HEAD
           }
