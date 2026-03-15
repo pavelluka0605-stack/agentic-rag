@@ -1,175 +1,184 @@
-=== 1. Copy fresh chat files ===
-Files copied
+=== 1. Traefik dynamic config directory ===
+Files in /opt/n8n-traefik/dynamic/:
+total 12
+drwxr-xr-x 2 root root 4096 Mar 13 14:08 .
+drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
+-rw-r--r-- 1 root root  310 Mar 13 14:08 chat.yml
 
-=== 2. Restart PM2 ===
-  run `npm fund` for details
+Content of ALL files in dynamic dir:
+--- /opt/n8n-traefik/dynamic/chat.yml ---
+http:
+  routers:
+    chat-marbomebel:
+      rule: "Host(`chat.marbomebel.ru`)"
+      entryPoints:
+        - websecure
+      service: chat-marbomebel
+      tls:
+        certResolver: mytlschallenge
 
-found 0 vulnerabilities
-[PM2] Applying action stopProcessId on app [claude-chat](ids: [ 0 ])
-[PM2] [claude-chat](0) ✓
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-[PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
-[PM2] [claude-chat](0) ✓
-┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-[PM2] Starting /opt/claude-chat/server.js in fork_mode (1 instance)
-[PM2] Done.
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 814208   │ 0s     │ 0    │ online    │ 0%       │ 15.5mb   │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 814208   │ 3s     │ 0    │ online    │ 0%       │ 57.8mb   │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-
-=== 3. Check current Traefik entrypoints/config ===
-Traefik ID: 581a07387d54
-Traefik startup command:
-[--api.insecure=true --providers.docker=true --providers.docker.exposedbydefault=false --entrypoints.web.address=:80 --entrypoints.web.http.redirections.entryPoint.to=websecure --entrypoints.web.http.redirections.entrypoint.scheme=https --entrypoints.websecure.address=:443 --certificatesresolvers.mytlschallenge.acme.tlschallenge=true --certificatesresolvers.mytlschallenge.acme.email=pavelluka0605@gmail.com --certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json --providers.file.directory=/dynamic --providers.file.watch=true]
-["--api.insecure=true","--providers.docker=true","--providers.docker.exposedbydefault=false","--entrypoints.web.address=:80","--entrypoints.web.http.redirections.entryPoint.to=websecure","--entrypoints.web.http.redirections.entrypoint.scheme=https","--entrypoints.websecure.address=:443","--certificatesresolvers.mytlschallenge.acme.tlschallenge=true","--certificatesresolvers.mytlschallenge.acme.email=pavelluka0605@gmail.com","--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json","--providers.file.directory=/dynamic","--providers.file.watch=true"]
-Traefik volumes:
-/var/run/docker.sock -> /var/run/docker.sock
-/opt/n8n-traefik/dynamic -> /dynamic
-/var/lib/docker/volumes/n8n-traefik_traefik_data/_data -> /letsencrypt
+  services:
+    chat-marbomebel:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:3847"
 
 
-=== 4. Check Traefik API for all routers ===
-Error: Expecting value: line 1 column 1 (char 0)
+=== 2. Traefik API — all routers ===
+80/tcp -> 0.0.0.0:80
+80/tcp -> [::]:80
+443/tcp -> 0.0.0.0:443
+443/tcp -> [::]:443
 
-=== 5. Add Traefik file provider for chat ===
-Traefik config dir on host: 
+  api@internal: rule="PathPrefix(`/api`)" service=api@internal status=enabled provider=internal
+  chat-marbomebel@file: rule="Host(`chat.marbomebel.ru`)" service=chat-marbomebel status=enabled provider=file
+  dashboard@internal: rule="PathPrefix(`/`)" service=dashboard@internal status=enabled provider=internal
+  n8n@docker: rule="Host("n8n.marbomebel.ru")" service=n8n status=enabled provider=docker
+  openclaw@docker: rule="Host("claw.marbomebel.ru")" service=openclaw status=enabled provider=docker
+  voice@docker: rule="Host("n8n.marbomebel.ru") && PathPrefix("/voice")" service=voice status=enabled provider=docker
+  web-to-websecure@internal: rule="HostRegexp(`^.+$`)" service=noop@internal status=enabled provider=internal
 
-Looking for traefik docker-compose...
-/opt/n8n/docker-compose.yml
-/opt/openclaw/docker-compose.yml
-/opt/clawtest/docker-compose.yml
-Found: /opt/n8n/docker-compose.yml
-services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    restart: unless-stopped
-    networks:
-      - n8n-traefik_default
-    environment:
-      POSTGRES_DB: n8n
-      POSTGRES_USER: n8n
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+=== 3. Traefik API — all services ===
+  api@internal: servers=[] status=enabled provider=internal
+  chat-marbomebel@file: servers=[{'url': 'http://172.17.0.1:3847'}] status=enabled provider=file
+  dashboard@internal: servers=[] status=enabled provider=internal
+  n8n@docker: servers=[{'url': 'http://172.19.0.5:5678'}] status=enabled provider=docker
+  noop@internal: servers=[] status=enabled provider=internal
+  openclaw@docker: servers=[{'url': 'http://172.19.0.3:18789'}] status=enabled provider=docker
+  voice@docker: servers=[{'url': 'http://172.19.0.6:80'}] status=enabled provider=docker
 
-  n8n:
-    image: n8nio/n8n:latest
-    restart: unless-stopped
-    networks:
-      - n8n-traefik_default
-    environment:
-      DB_TYPE: postgresdb
-      DB_POSTGRESDB_HOST: postgres
-      DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: n8n
-      DB_POSTGRESDB_USER: n8n
-      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
-      N8N_HOST: n8n.marbomebel.ru
-      N8N_PORT: 5678
-      N8N_PROTOCOL: https
-      WEBHOOK_URL: https://n8n.marbomebel.ru/
-      N8N_EDITOR_BASE_URL: https://n8n.marbomebel.ru/
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
-      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE}
-      N8N_BASIC_AUTH_ACTIVE: ${N8N_BASIC_AUTH_ACTIVE}
-      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
-      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
-      AMOCRM_DOMAIN: marbomebel
-      AMOCRM_TOKEN: "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6IjQ3OTljY2UwYjkxYzgzMDJhM2Y0YTEzZGI3OGVkOTM0OTdlOTdkMTljZTA0MWUyNjM0ZTZjOTViMDFhYTk2ZTVhZjI3YmU2ODNkZTk5MTIwIn0.eyJhdWQiOiJkMTRlYWJjNi1mMDNlLTQ4ODEtYTg5MS02NThmYzMyOGFmNWIiLCJqdGkiOiI0Nzk5Y2NlMGI5MWM4MzAyYTNmNGExM2RiNzhlZDkzNDk3ZTk3ZDE5Y2UwNDFlMjYzNGU2Yzk1YjAxYWE5NmU1YWYyN2JlNjgzZGU5OTEyMCIsImlhdCI6MTc3MjkwOTA3MiwibmJmIjoxNzcyOTA5MDcyLCJleHAiOjE5MTc0NzUyMDAsInN1YiI6Ijc3Nzc5ODQiLCJncmFudF90eXBlIjoiIiwiYWNjb3VudF9pZCI6Mjk5MDIxNzcsImJhc2VfZG9tYWluIjoiYW1vY3JtLnJ1IiwidmVyc2lvbiI6Miwic2NvcGVzIjpbInB1c2hfbm90aWZpY2F0aW9ucyIsImZpbGVzIiwiY3JtIiwiZmlsZXNfZGVsZXRlIiwibm90aWZpY2F0aW9ucyJdLCJoYXNoX3V1aWQiOiI3MWFlZjkwYS1iMTRiLTQ5MjEtYjY0Zi05NDMwODAxMjY0NmMiLCJ1c2VyX2ZsYWdzIjowLCJhcGlfZG9tYWluIjoiYXBpLWIuYW1vY3JtLnJ1In0.X7PISrIuuZ-NV_9pr8XKCAwuxyGgP6c5_2TVKH5naq-rFjjbA3GQhE4MYvWfKVMOv2J9rGUmr-93HQBN-6g3_0XR_mSIo5C28X5BQ9WiO2wriFY7UDVz5O5xLPIk1s-TRYYOFNqK-hid-XVQOsabTEDiGhA_LnGc3ceS_s4xkcVddgQxb5vam1yiEjEYTGr3tJzJz8glDEkC2L-3ID9AVl3uo4xQ8A-B5iphl1_IJST1aK9OoCwbgbvcMybm997ynwPynk9qA4atxnEahWwoWbVga2N5rbxD3UJES-W0SRP2Jqobi5QZ13ez8t5jzXNAT7fh51LAo54TRDq_6iB5IQ"
-      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
-      TZ: ${TZ}
-      N8N_PROXY_HOPS: "1"
-    volumes:
-      - n8n_data:/home/node/.n8n
-    depends_on:
-      - postgres
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.n8n.rule=Host("n8n.marbomebel.ru")
-      - traefik.http.routers.n8n.entrypoints=websecure
-      - traefik.http.routers.n8n.tls=true
-      - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
-      - traefik.http.services.n8n.loadbalancer.server.port=5678
+=== 4. Full external HTTPS response ===
+Headers:
+* Host chat.marbomebel.ru:443 was resolved.
+* IPv6: (none)
+* IPv4: 72.56.127.126
+*   Trying 72.56.127.126:443...
+* Connected to chat.marbomebel.ru (72.56.127.126) port 443
+* ALPN: curl offers h2,http/1.1
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / TLS_AES_128_GCM_SHA256 / X25519 / RSASSA-PSS
+* ALPN: server accepted h2
+* Server certificate:
+*  subject: CN=chat.marbomebel.ru
+*  start date: Mar 13 13:15:25 2026 GMT
+*  expire date: Jun 11 13:15:24 2026 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=R13
+*  SSL certificate verify result: unable to get local issuer certificate (20), continuing anyway.
+*   Certificate level 0: Public key type RSA (4096/152 Bits/secBits), signed using sha256WithRSAEncryption
+*   Certificate level 1: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* using HTTP/2
+* [HTTP/2] [1] OPENED stream for https://chat.marbomebel.ru/
+* [HTTP/2] [1] [:method: GET]
+* [HTTP/2] [1] [:scheme: https]
+* [HTTP/2] [1] [:authority: chat.marbomebel.ru]
 
-  voice-app:
-    image: nginx:alpine
-    restart: unless-stopped
-    networks:
-      - n8n-traefik_default
-    volumes:
-      - /root/n8n-automation/pwa:/usr/share/nginx/html:ro
-      - /root/n8n-automation/pwa/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.voice.rule=Host("n8n.marbomebel.ru") && PathPrefix("/voice")
-      - traefik.http.routers.voice.entrypoints=websecure
-      - traefik.http.routers.voice.tls=true
-      - traefik.http.routers.voice.tls.certresolver=mytlschallenge
-      - traefik.http.routers.voice.priority=100
-      - traefik.http.middlewares.voice-strip.stripprefix.prefixes=/voice
-      - traefik.http.routers.voice.middlewares=voice-strip
-      - traefik.http.services.voice.loadbalancer.server.port=80
-
-networks:
-  n8n-traefik_default:
-    external: true
-
-volumes:
-  postgres_data:
-  n8n_data:
-
-=== 6. Full Traefik docker inspect ===
-  --api.insecure=true
-  --providers.docker=true
-  --providers.docker.exposedbydefault=false
-  --entrypoints.web.address=:80
-  --entrypoints.web.http.redirections.entryPoint.to=websecure
-  --entrypoints.web.http.redirections.entrypoint.scheme=https
-  --entrypoints.websecure.address=:443
-  --certificatesresolvers.mytlschallenge.acme.tlschallenge=true
-  --certificatesresolvers.mytlschallenge.acme.email=pavelluka0605@gmail.com
-  --certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json
-  --providers.file.directory=/dynamic
-  --providers.file.watch=true
-
-=== 7. Verify HTTPS response ===
-HTTP/2 200 
-access-control-allow-headers: Content-Type, Authorization
-access-control-allow-methods: GET, POST, OPTIONS
-access-control-allow-origin: *
-cache-control: no-cache, no-store, must-revalidate
-content-type: text/html; charset=utf-8
-date: Sun, 15 Mar 2026 08:19:14 GMT
-etag: W/"7709-qdCYKpK4/+mBpakQl8XICZgC4rU"
-expires: 0
-pragma: no-cache
-x-powered-by: Express
-content-length: 30473
-
----
-version" content="2026-03-15-v2">
-v15.03
-Title:
+Body first 20 lines:
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>AI Ассистент</title>
-Version meta:
-content="2026-03-15-v2"
+<meta name="version" content="2026-03-15-v2">
+<script>
+// Force cache bust — unregister any service workers and clear caches
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    registrations.forEach(function(reg) { reg.unregister(); });
+  });
+}
+if ('caches' in window) {
+  caches.keys().then(function(names) {
+    names.forEach(function(name) { caches.delete(name); });
+  });
 
-=== 8. DNS check ===
-chat.marbomebel.ru has address 72.56.127.126
-Server IP:
-72.56.127.126 172.19.0.1 172.17.0.1 172.18.0.1 172.20.0.1 
+Body version check:
+<title>AI Ассистент</title>
+version
+2026-03-15
+version
+2026-03-15
+version
+version
+version
+v15.03
+
+=== 5. PM2 direct vs HTTPS full comparison ===
+--- PM2 first 5 lines ---
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+--- HTTPS first 5 lines ---
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+PM2 size: 30473
+HTTPS size: 30473
+
+=== 6. Check if there are multiple processes on 3847 ===
+LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=814208,fd=20))                                                                                                                      
+
+=== 7. PM2 logs (last 20 lines) ===
+[TAILING] Tailing last 20 lines for [claude-chat] process (change the value with --lines option)
+/root/.pm2/logs/claude-chat-error.log last 20 lines:
+0|claude-c |     at Object.keyGenerator (/opt/claude-chat/node_modules/express-rate-limit/dist/index.cjs:658:20)
+0|claude-c |     at /opt/claude-chat/node_modules/express-rate-limit/dist/index.cjs:710:32
+0|claude-c |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|claude-c |     at async /opt/claude-chat/node_modules/express-rate-limit/dist/index.cjs:691:5 {
+0|claude-c |   code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
+0|claude-c |   help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
+0|claude-c | }
+0|claude-c | Transcription error: Invalid character in header content ["Authorization"]
+0|claude-c | Transcription error: OpenAI API error 400: {
+0|claude-c |   "error": {
+0|claude-c |     "message": "audio duration 0.0725 seconds is shorter than 0.1 seconds which is the minimum for this model",
+0|claude-c |     "type": "invalid_request_error",
+0|claude-c |     "param": null,
+0|claude-c |     "code": "invalid_value"
+0|claude-c |   }
+0|claude-c | }
+0|claude-c | Transcription error: getaddrinfo EAI_AGAIN api.openai.com
+0|claude-c | Transcription error: getaddrinfo EAI_AGAIN api.openai.com
+0|claude-c | Transcription error: getaddrinfo EAI_AGAIN api.openai.com
+0|claude-c | Transcription error: getaddrinfo EAI_AGAIN api.openai.com
+
+/root/.pm2/logs/claude-chat-out.log last 20 lines:
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+0|claude-c | Claude CLI: /usr/bin/claude
+0|claude-c | Claude Chat server running on port 3847
+
 
 DONE
