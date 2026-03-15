@@ -1,5 +1,5 @@
 ========================================
-=== VPS FULL DIAGNOSTIC Sun Mar 15 10:31:18 UTC 2026 ===
+=== VPS FULL DIAGNOSTIC Sun Mar 15 10:34:20 UTC 2026 ===
 ========================================
 
 === 1. Service worker files in /opt/claude-chat/public/ ===
@@ -754,7 +754,7 @@ app.listen(PORT, '0.0.0.0', () => {
 │ namespace         │ default                               │
 │ version           │ 1.0.0                                 │
 │ restarts          │ 0                                     │
-│ uptime            │ 20m                                   │
+│ uptime            │ 23m                                   │
 │ script path       │ /opt/claude-chat/server.js            │
 │ script args       │ N/A                                   │
 │ error log path    │ /root/.pm2/logs/claude-chat-error.log │
@@ -783,15 +783,15 @@ app.listen(PORT, '0.0.0.0', () => {
 
  Code metrics value 
 ┌────────────────────────┬──────────────────────┐
-│ Used Heap Size         │ 9.69 MiB             │
-│ Heap Usage             │ 88.25 %              │
+│ Used Heap Size         │ 10.29 MiB            │
+│ Heap Usage             │ 93.77 %              │
 │ Heap Size              │ 10.98 MiB            │
-│ Event Loop Latency p95 │ 1.49 ms              │
-│ Event Loop Latency     │ 0.53 ms              │
+│ Event Loop Latency p95 │ 1.50 ms              │
+│ Event Loop Latency     │ 0.54 ms              │
 │ Active handles         │ 4                    │
 │ Active requests        │ 0                    │
-│ HTTP                   │ 0 req/min            │
-│ HTTP P95 Latency       │ 7.899999999999995 ms │
+│ HTTP                   │ 0.01 req/min         │
+│ HTTP P95 Latency       │ 5.449999999999985 ms │
 │ HTTP Mean Latency      │ 2 ms                 │
 └────────────────────────┴──────────────────────┘
  Divergent env variables from local env 
@@ -908,7 +908,7 @@ Traefik container: 581a07387d54
 < access-control-allow-origin: *
 < cache-control: no-cache, no-store, must-revalidate
 < content-type: text/html; charset=utf-8
-< date: Sun, 15 Mar 2026 10:31:19 GMT
+< date: Sun, 15 Mar 2026 10:34:21 GMT
 < etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 < expires: 0
 < pragma: no-cache
@@ -942,7 +942,7 @@ MATCH: Same content
 ; <<>> DiG 9.18.39-0ubuntu0.24.04.2-Ubuntu <<>> chat.marbomebel.ru
 ;; global options: +cmd
 ;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 2993
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 10825
 ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
 
 ;; OPT PSEUDOSECTION:
@@ -951,11 +951,11 @@ MATCH: Same content
 ;chat.marbomebel.ru.		IN	A
 
 ;; ANSWER SECTION:
-chat.marbomebel.ru.	6459	IN	A	72.56.127.126
+chat.marbomebel.ru.	6277	IN	A	72.56.127.126
 
 ;; Query time: 1 msec
 ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
-;; WHEN: Sun Mar 15 10:31:19 UTC 2026
+;; WHEN: Sun Mar 15 10:34:21 UTC 2026
 ;; MSG SIZE  rcvd: 63
 
 
@@ -970,7 +970,7 @@ access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
 content-type: text/html; charset=utf-8
-date: Sun, 15 Mar 2026 10:31:19 GMT
+date: Sun, 15 Mar 2026 10:34:21 GMT
 etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 expires: 0
 pragma: no-cache
