@@ -1,17 +1,1659 @@
 {
-  "counters": {},
-  "summary": {},
-  "sources": {},
-  "search_engines": {},
-  "geography": {},
-  "top_pages": {},
-  "devices": {},
-  "daily": {},
-  "goals": {},
+  "counters": {
+    "rows": 3,
+    "counters": [
+      {
+        "id": 103970425,
+        "status": "Active",
+        "owner_login": "marbo-mebel",
+        "code_status": "CS_ERR_UNKNOWN",
+        "activity_status": "low",
+        "name": "MEBEIT",
+        "type": "simple",
+        "favorite": 0,
+        "hide_address": 0,
+        "pro": 0,
+        "permission": "own",
+        "webvisor": {
+          "arch_enabled": 0,
+          "arch_type": "none",
+          "load_player_type": "proxy",
+          "wv_version": 2,
+          "allow_wv2": true,
+          "wv_forms": 1
+        },
+        "code_options": {
+          "async": 1,
+          "informer": {
+            "enabled": 0,
+            "type": "ext",
+            "size": 3,
+            "indicator": "pageviews",
+            "color_start": "FFFFFFFF",
+            "color_end": "EFEFEFFF",
+            "color_text": 0,
+            "color_arrow": 1
+          },
+          "visor": 1,
+          "track_hash": 0,
+          "xml_site": 0,
+          "clickmap": 1,
+          "in_one_line": 0,
+          "ecommerce": 1,
+          "alternative_cdn": 0,
+          "ecommerce_object": "dataLayer",
+          "ytm": false,
+          "ssr": true
+        },
+        "create_time": "2025-09-01T17:16:32+03:00",
+        "time_zone_name": "Asia/Krasnoyarsk",
+        "time_zone_offset": 420,
+        "partner_id": 0,
+        "site": "mebelit.site",
+        "site2": {
+          "site": "mebelit.site",
+          "domain": "mebelit.site"
+        },
+        "gdpr_agreement_accepted": 0
+      },
+      {
+        "id": 88894444,
+        "status": "Active",
+        "owner_login": "marbo-mebel",
+        "code_status": "CS_ERR_UNKNOWN",
+        "activity_status": "low",
+        "name": "квиз",
+        "type": "simple",
+        "favorite": 0,
+        "hide_address": 0,
+        "pro": 0,
+        "permission": "own",
+        "webvisor": {
+          "arch_enabled": 0,
+          "arch_type": "none",
+          "load_player_type": "proxy",
+          "wv_version": 2,
+          "allow_wv2": true,
+          "wv_forms": 1
+        },
+        "code_options": {
+          "async": 1,
+          "informer": {
+            "enabled": 0,
+            "type": "ext",
+            "size": 3,
+            "indicator": "pageviews",
+            "color_start": "FFFFFFFF",
+            "color_end": "EFEFEFFF",
+            "color_text": 0,
+            "color_arrow": 1
+          },
+          "visor": 1,
+          "track_hash": 0,
+          "xml_site": 0,
+          "clickmap": 1,
+          "in_one_line": 0,
+          "ecommerce": 0,
+          "alternative_cdn": 0,
+          "ecommerce_object": "dataLayer",
+          "ytm": false,
+          "ssr": false
+        },
+        "create_time": "2022-05-25T20:25:29+03:00",
+        "time_zone_name": "Asia/Krasnoyarsk",
+        "time_zone_offset": 420,
+        "partner_id": 0,
+        "site": "marbomebel.ru",
+        "site2": {
+          "site": "marbomebel.ru",
+          "domain": "marbomebel.ru"
+        },
+        "gdpr_agreement_accepted": 0
+      },
+      {
+        "id": 100492476,
+        "status": "Active",
+        "owner_login": "marbo-mebel",
+        "code_status": "CS_ERR_UNKNOWN",
+        "activity_status": "low",
+        "name": "март-мебель",
+        "type": "simple",
+        "favorite": 0,
+        "hide_address": 0,
+        "pro": 0,
+        "permission": "own",
+        "webvisor": {
+          "arch_enabled": 0,
+          "arch_type": "none",
+          "load_player_type": "proxy",
+          "wv_version": 2,
+          "allow_wv2": true,
+          "wv_forms": 1
+        },
+        "code_options": {
+          "async": 1,
+          "informer": {
+            "enabled": 0,
+            "type": "ext",
+            "size": 3,
+            "indicator": "pageviews",
+            "color_start": "FFFFFFFF",
+            "color_end": "EFEFEFFF",
+            "color_text": 0,
+            "color_arrow": 1
+          },
+          "visor": 1,
+          "track_hash": 0,
+          "xml_site": 0,
+          "clickmap": 1,
+          "in_one_line": 0,
+          "ecommerce": 0,
+          "alternative_cdn": 0,
+          "ecommerce_object": "dataLayer",
+          "ytm": false,
+          "ssr": false
+        },
+        "create_time": "2025-03-20T17:27:58+03:00",
+        "time_zone_name": "Asia/Krasnoyarsk",
+        "time_zone_offset": 420,
+        "partner_id": 0,
+        "site": "март-мебель.рф",
+        "site2": {
+          "site": "март-мебель.рф",
+          "domain": "март-мебель.рф"
+        },
+        "gdpr_agreement_accepted": 0
+      }
+    ]
+  },
+  "summary": {
+    "query": {
+      "ids": [
+        103970425
+      ],
+      "dimensions": [],
+      "metrics": [
+        "ym:s:visits",
+        "ym:s:pageviews",
+        "ym:s:users",
+        "ym:s:bounceRate",
+        "ym:s:pageDepth",
+        "ym:s:avgVisitDurationSeconds"
+      ],
+      "sort": [
+        "-ym:s:visits"
+      ],
+      "date1": "2025-12-15",
+      "date2": "2026-03-15",
+      "limit": 100,
+      "offset": 1,
+      "group": "Week",
+      "benchmarks_version": "1772409600000",
+      "auto_group_size": "1",
+      "exp_bucket_size": "100",
+      "attr_name": "",
+      "funnel_window": "",
+      "benchmarks_quantile": "50",
+      "time_interval": "1SECOND",
+      "intervals": "1",
+      "quantile": "50",
+      "offline_window": "21",
+      "attribution": "LastSign",
+      "currency": "RUB",
+      "benchmarks_attribution": "Automatic",
+      "adfox_event_id": "0",
+      "funnel_pattern": ""
+    },
+    "data": [
+      {
+        "dimensions": [],
+        "metrics": [
+          7287.0,
+          9970.0,
+          5286.0,
+          27.73432139,
+          1.36818993,
+          83.46795664
+        ]
+      }
+    ],
+    "total_rows": 1,
+    "total_rows_rounded": false,
+    "sampled": false,
+    "contains_sensitive_data": false,
+    "sample_share": 1.0,
+    "sample_size": 7322,
+    "sample_space": 7322,
+    "data_lag": 0,
+    "totals": [
+      7287.0,
+      9970.0,
+      5286.0,
+      27.73432139,
+      1.36818993,
+      83.46795664
+    ],
+    "min": [
+      7287.0,
+      9970.0,
+      5286.0,
+      27.73432139,
+      1.36818993,
+      83.46795664
+    ],
+    "max": [
+      7287.0,
+      9970.0,
+      5286.0,
+      27.73432139,
+      1.36818993,
+      83.46795664
+    ]
+  },
+  "sources": {
+    "query": {
+      "ids": [
+        103970425
+      ],
+      "dimensions": [
+        "ym:s:lastTrafficSource"
+      ],
+      "metrics": [
+        "ym:s:visits",
+        "ym:s:users",
+        "ym:s:bounceRate"
+      ],
+      "sort": [
+        "-ym:s:visits"
+      ],
+      "date1": "2025-12-15",
+      "date2": "2026-03-15",
+      "limit": 20,
+      "offset": 1,
+      "group": "Week",
+      "benchmarks_version": "1772409600000",
+      "auto_group_size": "1",
+      "exp_bucket_size": "100",
+      "attr_name": "",
+      "funnel_window": "",
+      "benchmarks_quantile": "50",
+      "time_interval": "1SECOND",
+      "intervals": "1",
+      "quantile": "50",
+      "offline_window": "21",
+      "attribution": "LastSign",
+      "currency": "RUB",
+      "benchmarks_attribution": "Automatic",
+      "adfox_event_id": "0",
+      "funnel_pattern": ""
+    },
+    "data": [
+      {
+        "dimensions": [
+          {
+            "icon_id": "3",
+            "icon_type": "traffic-source",
+            "name": "Ad traffic",
+            "id": "ad"
+          }
+        ],
+        "metrics": [
+          6541.0,
+          4986.0,
+          27.57988075
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "0",
+            "icon_type": "traffic-source",
+            "name": "Direct traffic",
+            "id": "direct"
+          }
+        ],
+        "metrics": [
+          365.0,
+          176.0,
+          23.28767123
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "-1",
+            "icon_type": "traffic-source",
+            "name": "Internal traffic",
+            "id": "internal"
+          }
+        ],
+        "metrics": [
+          246.0,
+          170.0,
+          27.64227642
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "1",
+            "icon_type": "traffic-source",
+            "name": "Link traffic",
+            "id": "referral"
+          }
+        ],
+        "metrics": [
+          45.0,
+          26.0,
+          17.77777778
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "2",
+            "icon_type": "traffic-source",
+            "name": "Search engine traffic",
+            "id": "organic"
+          }
+        ],
+        "metrics": [
+          18.0,
+          14.0,
+          16.66666667
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "8",
+            "icon_type": "traffic-source",
+            "name": "Social network traffic",
+            "id": "social"
+          }
+        ],
+        "metrics": [
+          5.0,
+          5.0,
+          0.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "9",
+            "icon_type": "traffic-source",
+            "name": "Recommendation system traffic",
+            "id": "recommend"
+          }
+        ],
+        "metrics": [
+          5.0,
+          4.0,
+          0.0
+        ]
+      }
+    ],
+    "total_rows": 7,
+    "total_rows_rounded": false,
+    "sampled": false,
+    "contains_sensitive_data": false,
+    "sample_share": 1.0,
+    "sample_size": 7322,
+    "sample_space": 7322,
+    "data_lag": 0,
+    "totals": [
+      7225.0,
+      5228.0,
+      27.23875433
+    ],
+    "min": [
+      5.0,
+      4.0,
+      0.0
+    ],
+    "max": [
+      6541.0,
+      4986.0,
+      27.64227642
+    ]
+  },
+  "search_engines": {
+    "query": {
+      "ids": [
+        103970425
+      ],
+      "dimensions": [
+        "ym:s:lastSearchEngine"
+      ],
+      "metrics": [
+        "ym:s:visits",
+        "ym:s:users"
+      ],
+      "sort": [
+        "-ym:s:visits"
+      ],
+      "date1": "2025-12-15",
+      "date2": "2026-03-15",
+      "limit": 10,
+      "offset": 1,
+      "group": "Week",
+      "benchmarks_version": "1772409600000",
+      "auto_group_size": "1",
+      "exp_bucket_size": "100",
+      "attr_name": "",
+      "funnel_window": "",
+      "benchmarks_quantile": "50",
+      "time_interval": "1SECOND",
+      "intervals": "1",
+      "quantile": "50",
+      "offline_window": "21",
+      "attribution": "LastSign",
+      "currency": "RUB",
+      "benchmarks_attribution": "Automatic",
+      "adfox_event_id": "0",
+      "funnel_pattern": ""
+    },
+    "data": [
+      {
+        "dimensions": [
+          {
+            "name": "Google, search results",
+            "id": "google_search",
+            "favicon": "google.com"
+          }
+        ],
+        "metrics": [
+          9.0,
+          7.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "Yandex Mobile",
+            "id": "yandex_mobile",
+            "favicon": "m.yandex.ru"
+          }
+        ],
+        "metrics": [
+          6.0,
+          4.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "Yandex, search results",
+            "id": "yandex_search",
+            "favicon": "www.yandex.ru"
+          }
+        ],
+        "metrics": [
+          3.0,
+          3.0
+        ]
+      }
+    ],
+    "total_rows": 3,
+    "total_rows_rounded": false,
+    "sampled": false,
+    "contains_sensitive_data": false,
+    "sample_share": 1.0,
+    "sample_size": 7322,
+    "sample_space": 7322,
+    "data_lag": 0,
+    "totals": [
+      18.0,
+      14.0
+    ],
+    "min": [
+      3.0,
+      3.0
+    ],
+    "max": [
+      9.0,
+      7.0
+    ]
+  },
+  "geography": {
+    "query": {
+      "ids": [
+        103970425
+      ],
+      "dimensions": [
+        "ym:s:regionCity"
+      ],
+      "metrics": [
+        "ym:s:visits",
+        "ym:s:users"
+      ],
+      "sort": [
+        "-ym:s:visits"
+      ],
+      "date1": "2025-12-15",
+      "date2": "2026-03-15",
+      "limit": 20,
+      "offset": 1,
+      "group": "Week",
+      "benchmarks_version": "1772409600000",
+      "auto_group_size": "1",
+      "exp_bucket_size": "100",
+      "attr_name": "",
+      "funnel_window": "",
+      "benchmarks_quantile": "50",
+      "time_interval": "1SECOND",
+      "intervals": "1",
+      "quantile": "50",
+      "offline_window": "21",
+      "attribution": "LastSign",
+      "currency": "RUB",
+      "benchmarks_attribution": "Automatic",
+      "adfox_event_id": "0",
+      "funnel_pattern": ""
+    },
+    "data": [
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU KRA",
+            "id": "62",
+            "name": "Krasnoyarsk"
+          }
+        ],
+        "metrics": [
+          5954.0,
+          4497.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU OVB",
+            "id": "65",
+            "name": "Novosibirsk"
+          }
+        ],
+        "metrics": [
+          177.0,
+          142.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU BAX",
+            "id": "197",
+            "name": "Barnaul"
+          }
+        ],
+        "metrics": [
+          83.0,
+          49.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU-MOW",
+            "id": "213",
+            "name": "Moscow"
+          }
+        ],
+        "metrics": [
+          74.0,
+          73.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": null,
+            "id": "20088",
+            "name": "Zelenogorsk"
+          }
+        ],
+        "metrics": [
+          24.0,
+          18.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU LNX",
+            "id": "12",
+            "name": "Smolensk"
+          }
+        ],
+        "metrics": [
+          22.0,
+          1.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": null,
+            "id": "11307",
+            "name": "Kansk"
+          }
+        ],
+        "metrics": [
+          20.0,
+          16.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU ACS",
+            "id": "11302",
+            "name": "Achinsk"
+          }
+        ],
+        "metrics": [
+          19.0,
+          17.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": null,
+            "id": "11303",
+            "name": "Divnogorsk"
+          }
+        ],
+        "metrics": [
+          18.0,
+          17.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "NL AMS",
+            "id": "10466",
+            "name": "Amsterdam"
+          }
+        ],
+        "metrics": [
+          17.0,
+          16.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU-SPE",
+            "id": "2",
+            "name": "Saint Petersburg"
+          }
+        ],
+        "metrics": [
+          17.0,
+          16.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": null,
+            "id": "20670",
+            "name": "Sosnovoborsk"
+          }
+        ],
+        "metrics": [
+          17.0,
+          14.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": null,
+            "id": "20086",
+            "name": "Zheleznogorsk"
+          }
+        ],
+        "metrics": [
+          14.0,
+          13.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU ABA",
+            "id": "1095",
+            "name": "Abakan"
+          }
+        ],
+        "metrics": [
+          11.0,
+          10.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": null,
+            "id": "11310",
+            "name": "Minusinsk"
+          }
+        ],
+        "metrics": [
+          11.0,
+          9.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU NSK",
+            "id": "11311",
+            "name": "Norilsk"
+          }
+        ],
+        "metrics": [
+          11.0,
+          9.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": null,
+            "id": "20085",
+            "name": "Borodino"
+          }
+        ],
+        "metrics": [
+          8.0,
+          6.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU HTA",
+            "id": "68",
+            "name": "Chita"
+          }
+        ],
+        "metrics": [
+          8.0,
+          7.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": "RU LSS",
+            "id": "20090",
+            "name": "Lesosibirsk"
+          }
+        ],
+        "metrics": [
+          7.0,
+          6.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "iso_name": null,
+            "id": "20091",
+            "name": "Nazarovo"
+          }
+        ],
+        "metrics": [
+          7.0,
+          6.0
+        ]
+      }
+    ],
+    "total_rows": 100,
+    "total_rows_rounded": false,
+    "sampled": false,
+    "contains_sensitive_data": false,
+    "sample_share": 1.0,
+    "sample_size": 7322,
+    "sample_space": 7322,
+    "data_lag": 0,
+    "totals": [
+      6676.0,
+      4948.0
+    ],
+    "min": [
+      7.0,
+      1.0
+    ],
+    "max": [
+      5954.0,
+      4497.0
+    ]
+  },
+  "top_pages": {
+    "query": {
+      "ids": [
+        103970425
+      ],
+      "dimensions": [
+        "ym:s:startURL"
+      ],
+      "metrics": [
+        "ym:s:visits",
+        "ym:s:pageviews",
+        "ym:s:bounceRate"
+      ],
+      "sort": [
+        "-ym:s:visits"
+      ],
+      "date1": "2025-12-15",
+      "date2": "2026-03-15",
+      "limit": 20,
+      "offset": 1,
+      "group": "Week",
+      "benchmarks_version": "1772409600000",
+      "auto_group_size": "1",
+      "exp_bucket_size": "100",
+      "attr_name": "",
+      "funnel_window": "",
+      "benchmarks_quantile": "50",
+      "time_interval": "1SECOND",
+      "intervals": "1",
+      "quantile": "50",
+      "offline_window": "21",
+      "attribution": "LastSign",
+      "currency": "RUB",
+      "benchmarks_attribution": "Automatic",
+      "adfox_event_id": "0",
+      "funnel_pattern": ""
+    },
+    "data": [
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          4828.0,
+          6377.0,
+          31.6072908
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/straight",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          633.0,
+          866.0,
+          13.1121643
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/corner",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          587.0,
+          809.0,
+          11.24361158
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          475.0,
+          755.0,
+          42.73684211
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/quiz",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          343.0,
+          500.0,
+          19.5335277
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/pshape",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          86.0,
+          111.0,
+          18.60465116
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/quiz?ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          20.0,
+          26.0,
+          30.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/quiz#popup:myform",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          16.0,
+          27.0,
+          37.5
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?ybaip=1#popup:discount",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          8.0,
+          14.0,
+          12.5
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=2202.ci3E9caVz9w3nfCgjQiiKeBRQLxBmcAX1_1I8a0nGzY8niVPDM2hLr6v6ADMtKc1eWp5cGRra2l3emtleGRnbg.696b66eb4c3936b892708e409074ef2d52460937&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          3.0,
+          3.0,
+          0.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          2.0,
+          50.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=2202.5X2u5pGwqi6O0PFdcWBEnfvEgcjsHlFT1opSW6z-ok6BrZgN6w1ZfyD5_TXRbO4NSC6r6fdZBMbGLbrZ_mjfptpVOhA5QySlquG1XtnvrFNsKRZJex0dsFQOPsIPDNasaWlodHZ6ZmR4bm1wdnVkcA.214c2f72178131651bb13ce1de6da71e0a67dab3&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          3.0,
+          0.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=2202.9pG6uUM0_TyCj6yGb4oqlO9usmsPw8wwc7FsjSasAl_wWqaMYekLvX_87w_-ojdUbG90b2pjb3dxeW9ucGtscA.8dcf47a0cf2f1953fb990979eb6a4b4ea6384dbd&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          3.0,
+          0.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=2202.GxMCOHeii5PKWYAHKBdlLTt7hu7uJXZxRQOFlE2hlxTKzfcW5xzxDR4itVXIWB_8MUsVwDUG1wwI-7UyxTGTS8_lMFeh9etS1NseSBMaXFBvc3djcHd0eGF0eGJka3Nr.249536cce31fa921de3f8c80cd2c6249e07e897e&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          2.0,
+          50.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=2202.Miyy8EE4-zEd3-LBcU1kbQL6dEFe_HUNLkFXjPPlFnPkfcWJr1MK-pJGgatER92pitpDXSMs6zMdYDLaV6FtlE8lMg2SkG3oNBusBBmMfowQbvzCGJftVxX5ED7SiTociSr4n04xdX7sdyZSGxR7Y3JsbmNzbWR4YXB4bndqZG8.1add3e6611472f8f821c173778c9dda4d06d6281&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          3.0,
+          50.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=2202.krTGEeo1UKMhAqOxaxxGZwTQX-jHMjk37Wv4WHRG6iKl5c4BN2oGgE8goPcXc6Hgg63KTsHfJwquFgTriXYwjnRrcmxnYmZxdnFrb3ZxY2g.732126563fcd1e43d63fd53dde7c45ca477dd41e&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          3.0,
+          0.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=2202.w2fXifJLdmfUzPRzqW_W0BxH_rs6B2sM8-hG2Hwvh4IHmVnuSt4uVXe1yNqLXsOvZWZob3RiZ3hrd3ZqeWR1bg.141400b42a11fb404965bd7ad99ec9c693e7f193&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          2.0,
+          50.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?ybaip=1#popup:request",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          3.0,
+          0.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/corner#popup:myformfile",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          2.0,
+          2.0,
+          0.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "name": "https://mebelit.site/?etext=2202.-14beWVb06DiCaorMQcL_45K2aivLqDvYIyLGlTy9U_zlNrb72GGeZNzwxJqN1M7X9k1YuW6VtGUK94YQJPr2B_CoMRdl2wJt2VVd8LwRyhjbnlkaXp2ZHB6ZWdrZXJ1.4796bc98c8a92604da347a7d037b382baa052c39&ybaip=1",
+            "favicon": "mebelit.site"
+          }
+        ],
+        "metrics": [
+          1.0,
+          3.0,
+          0.0
+        ]
+      }
+    ],
+    "total_rows": 289,
+    "total_rows_rounded": false,
+    "sampled": false,
+    "contains_sensitive_data": false,
+    "sample_share": 1.0,
+    "sample_size": 7322,
+    "sample_space": 7322,
+    "data_lag": 0,
+    "totals": [
+      7287.0,
+      9970.0,
+      27.73432139
+    ],
+    "min": [
+      1.0,
+      2.0,
+      0.0
+    ],
+    "max": [
+      4828.0,
+      6377.0,
+      50.0
+    ]
+  },
+  "devices": {
+    "query": {
+      "ids": [
+        103970425
+      ],
+      "dimensions": [
+        "ym:s:deviceCategory"
+      ],
+      "metrics": [
+        "ym:s:visits",
+        "ym:s:users"
+      ],
+      "sort": [
+        "-ym:s:visits"
+      ],
+      "date1": "2025-12-15",
+      "date2": "2026-03-15",
+      "limit": 100,
+      "offset": 1,
+      "group": "Week",
+      "benchmarks_version": "1772409600000",
+      "auto_group_size": "1",
+      "exp_bucket_size": "100",
+      "attr_name": "",
+      "funnel_window": "",
+      "benchmarks_quantile": "50",
+      "time_interval": "1SECOND",
+      "intervals": "1",
+      "quantile": "50",
+      "offline_window": "21",
+      "attribution": "LastSign",
+      "currency": "RUB",
+      "benchmarks_attribution": "Automatic",
+      "adfox_event_id": "0",
+      "funnel_pattern": ""
+    },
+    "data": [
+      {
+        "dimensions": [
+          {
+            "icon_id": "mobile",
+            "icon_type": "device",
+            "name": "Smartphones",
+            "id": "mobile"
+          }
+        ],
+        "metrics": [
+          5589.0,
+          4149.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "desktop",
+            "icon_type": "device",
+            "name": "PC",
+            "id": "desktop"
+          }
+        ],
+        "metrics": [
+          1590.0,
+          1035.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "tablet",
+            "icon_type": "device",
+            "name": "Tablets",
+            "id": "tablet"
+          }
+        ],
+        "metrics": [
+          103.0,
+          100.0
+        ]
+      },
+      {
+        "dimensions": [
+          {
+            "icon_id": "tv",
+            "icon_type": "device",
+            "name": "TV",
+            "id": "tv"
+          }
+        ],
+        "metrics": [
+          5.0,
+          4.0
+        ]
+      }
+    ],
+    "total_rows": 4,
+    "total_rows_rounded": false,
+    "sampled": false,
+    "contains_sensitive_data": false,
+    "sample_share": 1.0,
+    "sample_size": 7322,
+    "sample_space": 7322,
+    "data_lag": 0,
+    "totals": [
+      7287.0,
+      5286.0
+    ],
+    "min": [
+      5.0,
+      4.0
+    ],
+    "max": [
+      5589.0,
+      4149.0
+    ]
+  },
+  "daily": {
+    "query": {
+      "ids": [
+        103970425
+      ],
+      "dimensions": [],
+      "metrics": [
+        "ym:s:visits",
+        "ym:s:users"
+      ],
+      "sort": [
+        "-ym:s:visits"
+      ],
+      "date1": "2025-12-15",
+      "date2": "2026-03-15",
+      "group": "week",
+      "benchmarks_version": "1772409600000",
+      "auto_group_size": "1",
+      "exp_bucket_size": "100",
+      "attr_name": "",
+      "funnel_window": "",
+      "benchmarks_quantile": "50",
+      "time_interval": "1SECOND",
+      "intervals": "1",
+      "quantile": "50",
+      "offline_window": "21",
+      "attribution": "LastSign",
+      "currency": "RUB",
+      "benchmarks_attribution": "Automatic",
+      "adfox_event_id": "0",
+      "funnel_pattern": "",
+      "auto_group_type": "week"
+    },
+    "data": [
+      {
+        "dimensions": [],
+        "metrics": [
+          [
+            501.0,
+            608.0,
+            561.0,
+            578.0,
+            244.0,
+            35.0,
+            1359.0,
+            733.0,
+            64.0,
+            919.0,
+            617.0,
+            570.0,
+            498.0
+          ],
+          [
+            413.0,
+            498.0,
+            483.0,
+            509.0,
+            199.0,
+            23.0,
+            1092.0,
+            573.0,
+            25.0,
+            763.0,
+            486.0,
+            472.0,
+            411.0
+          ]
+        ]
+      }
+    ],
+    "total_rows": 13,
+    "total_rows_rounded": false,
+    "sampled": false,
+    "contains_sensitive_data": false,
+    "sample_share": 1.0,
+    "sample_size": 7322,
+    "sample_space": 7322,
+    "data_lag": 0,
+    "totals": [
+      [
+        501.0,
+        608.0,
+        561.0,
+        578.0,
+        244.0,
+        35.0,
+        1359.0,
+        733.0,
+        64.0,
+        919.0,
+        617.0,
+        570.0,
+        498.0
+      ],
+      [
+        413.0,
+        498.0,
+        483.0,
+        509.0,
+        199.0,
+        23.0,
+        1092.0,
+        573.0,
+        25.0,
+        763.0,
+        486.0,
+        472.0,
+        411.0
+      ]
+    ],
+    "last_period_index": 12,
+    "time_intervals": [
+      [
+        "2025-12-15",
+        "2025-12-21"
+      ],
+      [
+        "2025-12-22",
+        "2025-12-28"
+      ],
+      [
+        "2025-12-29",
+        "2026-01-04"
+      ],
+      [
+        "2026-01-05",
+        "2026-01-11"
+      ],
+      [
+        "2026-01-12",
+        "2026-01-18"
+      ],
+      [
+        "2026-01-19",
+        "2026-01-25"
+      ],
+      [
+        "2026-01-26",
+        "2026-02-01"
+      ],
+      [
+        "2026-02-02",
+        "2026-02-08"
+      ],
+      [
+        "2026-02-09",
+        "2026-02-15"
+      ],
+      [
+        "2026-02-16",
+        "2026-02-22"
+      ],
+      [
+        "2026-02-23",
+        "2026-03-01"
+      ],
+      [
+        "2026-03-02",
+        "2026-03-08"
+      ],
+      [
+        "2026-03-09",
+        "2026-03-15"
+      ]
+    ]
+  },
+  "goals": {
+    "goals": [
+      {
+        "id": 464863111,
+        "name": "страница спасибо",
+        "type": "url",
+        "default_price": 400.0,
+        "is_retargeting": 0,
+        "goal_source": "user",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [
+          {
+            "type": "contain",
+            "url": "/thankyou"
+          }
+        ],
+        "prev_goal_id": 0,
+        "price_locations": []
+      },
+      {
+        "id": 464863193,
+        "name": "страница спасибо sale",
+        "type": "url",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "user",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [
+          {
+            "type": "contain",
+            "url": "/thanksforsales"
+          }
+        ],
+        "prev_goal_id": 0,
+        "price_locations": []
+      },
+      {
+        "id": 464863520,
+        "name": "Квиз",
+        "type": "url",
+        "default_price": 1000.0,
+        "is_retargeting": 0,
+        "goal_source": "user",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [
+          {
+            "type": "contain",
+            "url": "/tilda/form748420572/submitted"
+          }
+        ],
+        "prev_goal_id": 0,
+        "price_locations": []
+      },
+      {
+        "id": 464863636,
+        "name": "Узнать точную стоимость",
+        "type": "url",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "user",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [
+          {
+            "type": "contain",
+            "url": "/tilda/form749232961/submitted"
+          }
+        ],
+        "prev_goal_id": 0,
+        "price_locations": []
+      },
+      {
+        "id": 464876825,
+        "name": "Клик по телефону",
+        "type": "phone",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "user",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [],
+        "prev_goal_id": 0,
+        "hide_phone_number": false
+      },
+      {
+        "id": 464877232,
+        "name": "Автоцель: отправка формы",
+        "type": "form",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "auto",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [],
+        "prev_goal_id": 0,
+        "price_locations": []
+      },
+      {
+        "id": 464877233,
+        "name": "Автоцель: заполнил контактные данные",
+        "type": "contact_data",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "auto",
+        "is_favorite": 0,
+        "status": "Active"
+      },
+      {
+        "id": 464877234,
+        "name": "Автоцель: отправил контактные данные",
+        "type": "contact_data_sent",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "auto",
+        "is_favorite": 0,
+        "status": "Active"
+      },
+      {
+        "id": 465248811,
+        "name": "Автоцель Jivo: запуск чата клиентом",
+        "type": "action",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "auto",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [
+          {
+            "type": "exact",
+            "url": "Jivo_Client_initiate_chat"
+          }
+        ],
+        "prev_goal_id": 0
+      },
+      {
+        "id": 465323572,
+        "name": "Автоцель Jivo: автоприглашение в чат",
+        "type": "action",
+        "default_price": 500.0,
+        "is_retargeting": 0,
+        "goal_source": "auto",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [
+          {
+            "type": "exact",
+            "url": "Jivo_Proactive_invitation_accepted"
+          }
+        ],
+        "prev_goal_id": 0
+      },
+      {
+        "id": 495433559,
+        "name": "Общая цель",
+        "type": "url",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "user",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [
+          {
+            "type": "contain",
+            "url": "/thankyou"
+          },
+          {
+            "type": "contain",
+            "url": "/thanksforsales"
+          },
+          {
+            "type": "contain",
+            "url": "/tilda/form748420572/submitted"
+          },
+          {
+            "type": "contain",
+            "url": "/tilda/form749232961/submitted"
+          },
+          {
+            "type": "contain",
+            "url": "/tilda/form722789172/submitted/"
+          },
+          {
+            "type": "contain",
+            "url": "/tilda/form722785960/submitted/"
+          }
+        ],
+        "prev_goal_id": 0,
+        "price_locations": []
+      },
+      {
+        "id": 501386049,
+        "name": "Автоцель Jivo: офлайн-сообщение",
+        "type": "action",
+        "default_price": 0.0,
+        "is_retargeting": 0,
+        "goal_source": "auto",
+        "is_favorite": 0,
+        "status": "Active",
+        "conditions": [
+          {
+            "type": "exact",
+            "url": "Jivo_Offline_message_sent"
+          }
+        ],
+        "prev_goal_id": 0
+      }
+    ]
+  },
   "goal_stats": {},
   "period": {
-    "from": "?",
-    "to": "?",
+    "from": "2025-12-15",
+    "to": "2026-03-15",
     "days": "90"
   }
 }
