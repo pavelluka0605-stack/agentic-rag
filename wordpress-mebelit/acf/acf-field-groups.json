@@ -96,8 +96,8 @@
         "label": "Телефон (для ссылки)",
         "name": "site_phone_raw",
         "type": "text",
-        "default_value": "+73912169759",
-        "instructions": "Для href=tel: без пробелов и скобок"
+        "default_value": "+73912164540",
+        "instructions": "Для href=tel: без пробелов и скобок. ВАЖНО: проверьте что совпадает с реальным номером"
       },
       {
         "key": "field_work_hours",
@@ -118,22 +118,22 @@
         "label": "Мин. цена прямых кухонь",
         "name": "min_price_straight",
         "type": "number",
-        "default_value": 63700,
-        "instructions": "Отображается на главной в блоке каталога"
+        "default_value": 94500,
+        "instructions": "Отображается на главной в блоке каталога. Должна совпадать с мин. ценой в каталоге."
       },
       {
         "key": "field_min_price_corner",
         "label": "Мин. цена угловых кухонь",
         "name": "min_price_corner",
         "type": "number",
-        "default_value": 96300
+        "default_value": 129000
       },
       {
         "key": "field_min_price_pshape",
         "label": "Мин. цена П-образных кухонь",
         "name": "min_price_pshape",
         "type": "number",
-        "default_value": 98600
+        "default_value": 147900
       }
     ],
     "location": [
