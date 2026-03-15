@@ -33,7 +33,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Investigate and fix
+      - name: Fix - disable systemd, use PM2 only
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -43,60 +43,22 @@ jobs:
           OUT="diag-output.txt"
 
           $SSH 'bash -s' <<'REMOTE' 2>&1 | tee $OUT
-          echo "=== WHO IS ON PORT 3847 ==="
-          PID=$(lsof -t -i:3847 2>/dev/null | head -1)
-          if [ -n "$PID" ]; then
-            echo "PID: $PID"
-            echo "CMD: $(cat /proc/$PID/cmdline 2>/dev/null | tr '\0' ' ')"
-            echo "CWD: $(readlink /proc/$PID/cwd 2>/dev/null)"
-            echo "PPID: $(grep PPid /proc/$PID/status 2>/dev/null)"
-            PPID=$(grep PPid /proc/$PID/status 2>/dev/null | awk '{print $2}')
-            echo "PARENT CMD: $(cat /proc/$PPID/cmdline 2>/dev/null | tr '\0' ' ')"
-            echo "PARENT NAME: $(cat /proc/$PPID/comm 2>/dev/null)"
-            echo ""
-            echo "=== PROCESS TREE ==="
-            pstree -ap $PID 2>/dev/null || ps -ef | grep $PID
-          fi
-
-          echo ""
-          echo "=== ALL NODE PROCESSES ==="
-          ps aux | grep node | grep -v grep
-
-          echo ""
-          echo "=== ALL SYSTEMD UNITS WITH 'chat' ==="
-          systemctl list-units --all | grep -i chat
-
-          echo ""
-          echo "=== CRONTAB ==="
-          crontab -l 2>/dev/null || echo "no crontab"
-
-          echo ""
-          echo "=== PM2 ==="
-          pm2 list 2>/dev/null || echo "no pm2"
-
-          echo ""
-          echo "=== MASK + KILL + START ==="
-          systemctl mask claude-chat
+          echo "=== STEP 1: Disable systemd for claude-chat ==="
           systemctl stop claude-chat 2>/dev/null || true
-          sleep 2
-          for p in $(lsof -t -i:3847 2>/dev/null); do kill -9 $p; done
-          sleep 2
-          for p in $(lsof -t -i:3847 2>/dev/null); do kill -9 $p; done
-          sleep 2
-
-          echo "Port check:"
-          lsof -i:3847 2>/dev/null && echo "STILL BUSY" || echo "PORT FREE"
-
-          systemctl unmask claude-chat
-          systemctl daemon-reload
-          systemctl start claude-chat
-          sleep 5
+          systemctl disable claude-chat 2>/dev/null || true
+          echo "systemd disabled"
 
           echo ""
-          echo "=== FINAL STATUS ==="
-          systemctl is-active claude-chat && echo "SERVICE OK" || echo "SERVICE FAIL"
-          curl -s --max-time 5 http://localhost:3847/api/health || echo "health fail"
-          journalctl -u claude-chat -n 5 --no-pager
+          echo "=== STEP 2: Restart PM2 claude-chat ==="
+          pm2 restart claude-chat 2>&1
+          sleep 3
+
+          echo ""
+          echo "=== STEP 3: Check ==="
+          pm2 list
+          curl -s --max-time 5 http://localhost:3847/api/health
+          echo ""
+          echo "DONE"
           REMOTE
 
       - name: Save output
@@ -106,6 +68,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet && echo "No changes" || {
-            git commit -m "diag: investigate + fix [skip ci]"
+            git commit -m "diag: fix - disable systemd, pm2 restart [skip ci]"
             git push origin main
           }
