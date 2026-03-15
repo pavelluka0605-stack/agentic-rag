@@ -1,5 +1,5 @@
 ========================================
-=== VPS FULL DIAGNOSTIC Sun Mar 15 09:26:42 UTC 2026 ===
+=== VPS FULL DIAGNOSTIC Sun Mar 15 09:29:46 UTC 2026 ===
 ========================================
 
 === 1. Service worker files in /opt/claude-chat/public/ ===
@@ -49,7 +49,7 @@ af8b3449a4f1334866c06e08e0acade5  /opt/claude-chat/public/uploads/0a2193dc-5ee3-
 af8b3449a4f1334866c06e08e0acade5  /opt/claude-chat/public/uploads/d6923b8f-ebe6-4cb5-a9e6-8900455e40a9.jpeg
 ade5115d0c52503a7c708dbc0ff92446  /opt/claude-chat/public/uploads/6f26c725-4d9c-498c-9f2e-9d0e7acfec59.png
 6faac3a98b43007508aeba523fc15c62  /opt/claude-chat/public/manifest.json
-f69499b91889d4bbe8d1c1e958826903  /opt/claude-chat/public/index.html
+145b78b804e5c55035d81a480848e4e8  /opt/claude-chat/public/index.html
 1f85245eb5a6f24e87bb0e5e073bf1ea  /opt/claude-chat/public/icon-512.png
 
 === 3. MD5 hash of /opt/claude-chat/server.js ===
@@ -752,8 +752,8 @@ app.listen(PORT, '0.0.0.0', () => {
 │ name              │ claude-chat                           │
 │ namespace         │ default                               │
 │ version           │ 1.0.0                                 │
-│ restarts          │ 1                                     │
-│ uptime            │ 14m                                   │
+│ restarts          │ 3                                     │
+│ uptime            │ 13s                                   │
 │ script path       │ /opt/claude-chat/server.js            │
 │ script args       │ N/A                                   │
 │ error log path    │ /root/.pm2/logs/claude-chat-error.log │
@@ -768,7 +768,7 @@ app.listen(PORT, '0.0.0.0', () => {
 │ node env          │ N/A                                   │
 │ watch & reload    │ ✘                                     │
 │ unstable restarts │ 0                                     │
-│ created at        │ 2026-03-15T09:11:54.983Z              │
+│ created at        │ 2026-03-15T09:29:33.577Z              │
 └───────────────────┴───────────────────────────────────────┘
  Actions available 
 ┌────────────────────────┐
@@ -782,16 +782,16 @@ app.listen(PORT, '0.0.0.0', () => {
 
  Code metrics value 
 ┌────────────────────────┬──────────────┐
-│ Used Heap Size         │ 9.84 MiB     │
-│ Heap Usage             │ 87.67 %      │
-│ Heap Size              │ 11.23 MiB    │
-│ Event Loop Latency p95 │ 1.43 ms      │
-│ Event Loop Latency     │ 0.54 ms      │
+│ HTTP                   │ 0.06 req/min │
+│ HTTP P95 Latency       │ 7 ms         │
+│ HTTP Mean Latency      │ 3 ms         │
+│ Used Heap Size         │ 8.61 MiB     │
+│ Heap Usage             │ 88.51 %      │
+│ Heap Size              │ 9.73 MiB     │
+│ Event Loop Latency p95 │ 0.70 ms      │
+│ Event Loop Latency     │ 0.03 ms      │
 │ Active handles         │ 4            │
 │ Active requests        │ 0            │
-│ HTTP                   │ 0.01 req/min │
-│ HTTP P95 Latency       │ 5173 ms      │
-│ HTTP Mean Latency      │ 2 ms         │
 └────────────────────────┴──────────────┘
  Divergent env variables from local env 
 ┌────────────────┬────────────────────────────────────┐
@@ -838,7 +838,7 @@ a99e00dabc0d   n8nio/n8n                     "tini -- /docker-ent…"   12 days 
 --- ss output ---
 LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
 LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
-LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=817809,fd=20))                                                                                                                      
+LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=819412,fd=20))                                                                                                                      
 LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
 LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=577310,fd=7))                                                                                                                          
 --- netstat output ---
@@ -907,14 +907,14 @@ Traefik container: 581a07387d54
 < access-control-allow-origin: *
 < cache-control: no-cache, no-store, must-revalidate
 < content-type: text/html; charset=utf-8
-< date: Sun, 15 Mar 2026 09:26:43 GMT
-< etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
+< date: Sun, 15 Mar 2026 09:29:47 GMT
+< etag: W/"73b6-PRF2RSxiX0L7qHGzHznSJqKIzuA"
 < expires: 0
 < pragma: no-cache
 < x-powered-by: Express
-< content-length: 29629
+< content-length: 29622
 < 
-{ [5 bytes data]
+{ [29622 bytes data]
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -930,8 +930,8 @@ Traefik container: 581a07387d54
   --surface: #12121e;
 
 === 12. Compare HTML: localhost:3847 vs https://chat.marbomebel.ru/ ===
-localhost:3847  => 09ff1f0bfff113be37857974857fe30e  -
-chat.marbomebel => 09ff1f0bfff113be37857974857fe30e  -
+localhost:3847  => 5174e730a8901ea3b45d892b4f231950  -
+chat.marbomebel => 5174e730a8901ea3b45d892b4f231950  -
 MATCH: Same content
 
 === 13. DNS resolution from VPS ===
@@ -941,7 +941,7 @@ MATCH: Same content
 ; <<>> DiG 9.18.39-0ubuntu0.24.04.2-Ubuntu <<>> chat.marbomebel.ru
 ;; global options: +cmd
 ;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 25342
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 428
 ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
 
 ;; OPT PSEUDOSECTION:
@@ -950,11 +950,11 @@ MATCH: Same content
 ;chat.marbomebel.ru.		IN	A
 
 ;; ANSWER SECTION:
-chat.marbomebel.ru.	7199	IN	A	72.56.127.126
+chat.marbomebel.ru.	7016	IN	A	72.56.127.126
 
 ;; Query time: 0 msec
 ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
-;; WHEN: Sun Mar 15 09:26:43 UTC 2026
+;; WHEN: Sun Mar 15 09:29:47 UTC 2026
 ;; MSG SIZE  rcvd: 63
 
 
@@ -969,12 +969,12 @@ access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
 content-type: text/html; charset=utf-8
-date: Sun, 15 Mar 2026 09:26:44 GMT
-etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
+date: Sun, 15 Mar 2026 09:29:47 GMT
+etag: W/"73b6-PRF2RSxiX0L7qHGzHznSJqKIzuA"
 expires: 0
 pragma: no-cache
 x-powered-by: Express
-content-length: 29629
+content-length: 29622
 
 
 ========================================
