@@ -33,93 +33,94 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Force redeploy and verify
+      - name: Investigate Traefik routing for chat.marbomebel.ru
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           OUT="diag-output.txt"
 
-          echo "=== STEP 1: Copy fresh files to VPS ===" | tee $OUT
+          $SSH 'bash -s' <<'REMOTE' 2>&1 | tee $OUT
 
-          # Полная перезаливка claude-chat на VPS
-          $SCP -r claude-chat/ $VPS_USER@$VPS_HOST:/opt/ 2>&1 | tee -a $OUT
-          echo "Files copied" | tee -a $OUT
-
-          $SSH 'bash -s' <<'REMOTE' 2>&1 | tee -a $OUT
+          echo "=== 1. Traefik container name ==="
+          TRAEFIK_ID=$(docker ps -q --filter "name=traefik")
+          echo "Traefik container: $TRAEFIK_ID"
 
           echo ""
-          echo "=== STEP 2: Stop and delete old PM2 process ==="
-          pm2 stop claude-chat 2>/dev/null || true
-          pm2 delete claude-chat 2>/dev/null || true
-          echo "Old process removed"
+          echo "=== 2. Traefik static config ==="
+          docker exec $TRAEFIK_ID cat /etc/traefik/traefik.yml 2>/dev/null || \
+          docker exec $TRAEFIK_ID cat /traefik.yml 2>/dev/null || \
+          docker exec $TRAEFIK_ID traefik version 2>/dev/null || \
+          echo "cannot read traefik config"
 
           echo ""
-          echo "=== STEP 3: Install deps ==="
-          cd /opt/claude-chat
-          npm install --omit=dev 2>&1 | tail -5
-          mkdir -p data
+          echo "=== 3. Traefik dynamic config files ==="
+          docker exec $TRAEFIK_ID ls -la /etc/traefik/ 2>/dev/null
+          docker exec $TRAEFIK_ID find / -name "*.yml" -path "*/traefik/*" 2>/dev/null | head -10
+          docker exec $TRAEFIK_ID find / -name "*.toml" -path "*/traefik/*" 2>/dev/null | head -10
 
           echo ""
-          echo "=== STEP 4: Start fresh PM2 process ==="
-          pm2 start server.js --name claude-chat
-          sleep 4
-          pm2 list
-
-          echo ""
-          echo "=== STEP 5: Health check ==="
-          HEALTH=$(curl -s --max-time 5 http://localhost:3847/api/health)
-          echo "$HEALTH"
-
-          echo ""
-          echo "=== STEP 6: Verify index.html on disk ==="
-          md5sum /opt/claude-chat/public/index.html /opt/claude-chat/server.js
-          ls -la /opt/claude-chat/public/index.html /opt/claude-chat/server.js
-
-          echo ""
-          echo "=== STEP 7: What browser actually gets ==="
-          RESPONSE=$(curl -s --max-time 5 http://localhost:3847/)
-          echo "$RESPONSE" | head -10
-          echo "..."
-          echo "$RESPONSE" | grep -o '<title>[^<]*</title>'
-          echo "Response length: $(echo "$RESPONSE" | wc -c) bytes"
-          echo "Has double-tap protection: $(echo "$RESPONSE" | grep -c 'lastSendTime')"
-          echo "Has PWA manifest: $(echo "$RESPONSE" | grep -c 'manifest')"
-          echo "Avatar type: $(echo "$RESPONSE" | grep -o '&#[0-9]*;' | head -1)"
-
-          echo ""
-          echo "=== STEP 8: Docker containers ==="
-          docker ps --format 'table {{.ID}}\t{{.Names}}\t{{.Ports}}\t{{.Image}}' 2>/dev/null
-
-          echo ""
-          echo "=== STEP 9: Docker reverse proxy config ==="
-          # Check Caddy
-          docker exec $(docker ps -q --filter "ancestor=caddy" 2>/dev/null || docker ps -q --filter "name=caddy" 2>/dev/null) cat /etc/caddy/Caddyfile 2>/dev/null || echo "no caddy"
-          # Check Traefik
-          docker exec $(docker ps -q --filter "name=traefik" 2>/dev/null) cat /etc/traefik/traefik.yml 2>/dev/null || echo "no traefik"
-          # Check nginx-proxy
-          docker exec $(docker ps -q --filter "name=nginx" 2>/dev/null) cat /etc/nginx/conf.d/default.conf 2>/dev/null || echo "no docker nginx"
-
-          echo ""
-          echo "=== STEP 10: Docker compose files ==="
-          find /opt /root -name 'docker-compose.yml' -o -name 'docker-compose.yaml' -o -name 'Caddyfile' 2>/dev/null | head -10
-          for f in $(find /opt /root -name 'docker-compose.yml' -o -name 'Caddyfile' 2>/dev/null | head -5); do
+          echo "=== 4. Traefik dynamic config content ==="
+          for f in $(docker exec $TRAEFIK_ID find /etc/traefik/ -name "*.yml" -o -name "*.toml" 2>/dev/null); do
             echo "--- $f ---"
-            cat "$f" 2>/dev/null | head -40
+            docker exec $TRAEFIK_ID cat "$f" 2>/dev/null
             echo ""
           done
 
           echo ""
-          echo "=== STEP 11: Test direct curl vs domain ==="
-          echo "Direct localhost:3847:"
-          curl -s --max-time 5 http://localhost:3847/ | grep '<title>' || echo "no title"
-          echo "Via domain (host header):"
-          curl -s --max-time 5 -H "Host: chat.marbomebel.ru" http://localhost:80/ | grep '<title>' 2>/dev/null || echo "port 80 blocked or different"
-          echo "External HTTPS:"
-          curl -sL --max-time 5 https://chat.marbomebel.ru/ | grep '<title>' 2>/dev/null || echo "HTTPS failed"
+          echo "=== 5. Traefik routers via API ==="
+          # Check if Traefik API is enabled
+          curl -s --max-time 5 http://localhost:8080/api/http/routers 2>/dev/null | python3 -c "
+          import json,sys
+          try:
+            data=json.load(sys.stdin)
+            for r in data:
+              print(f'{r.get(\"name\",\"?\")} rule={r.get(\"rule\",\"?\")} service={r.get(\"service\",\"?\")} status={r.get(\"status\",\"?\")}')
+          except: print('Traefik API not available or error')
+          " 2>/dev/null || echo "Traefik API not accessible"
+
+          echo ""
+          echo "=== 6. Traefik docker-compose (n8n) ==="
+          cat /opt/n8n/docker-compose.yml 2>/dev/null
+
+          echo ""
+          echo "=== 7. All Traefik labels on running containers ==="
+          docker inspect --format '{{.Name}}: {{json .Config.Labels}}' $(docker ps -q) 2>/dev/null | python3 -c "
+          import json,sys
+          for line in sys.stdin:
+            name, labels_json = line.split(': ', 1)
+            labels = json.loads(labels_json)
+            traefik_labels = {k:v for k,v in labels.items() if 'traefik' in k.lower()}
+            if traefik_labels:
+              print(f'\n{name}:')
+              for k,v in sorted(traefik_labels.items()):
+                print(f'  {k} = {v}')
+          " 2>/dev/null || echo "Failed to read labels"
+
+          echo ""
+          echo "=== 8. What does HTTPS return (full response headers) ==="
+          curl -sI --max-time 5 https://chat.marbomebel.ru/ 2>/dev/null
+          echo "---"
+          curl -s --max-time 5 https://chat.marbomebel.ru/ 2>/dev/null | head -15
+
+          echo ""
+          echo "=== 9. Compare: direct PM2 vs HTTPS ==="
+          echo "PM2 direct md5:"
+          curl -s --max-time 5 http://localhost:3847/ | md5sum
+          echo "HTTPS md5:"
+          curl -s --max-time 5 https://chat.marbomebel.ru/ | md5sum
+          echo "PM2 file on disk md5:"
+          md5sum /opt/claude-chat/public/index.html
+
+          echo ""
+          echo "=== 10. Nginx status ==="
+          systemctl is-active nginx 2>/dev/null || echo "nginx not a systemd service"
+          nginx -t 2>&1 || echo "nginx not installed or error"
+          # What process listens on what
+          echo "Processes on key ports:"
+          ss -tlnp | grep -E ':80|:443|:3847|:8080' 2>/dev/null
 
           echo ""
           echo "DONE"
@@ -132,6 +133,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet && echo "No changes" || {
-            git commit -m "diag: force redeploy march 14 version [skip ci]"
+            git commit -m "diag: traefik routing investigation [skip ci]"
             git push origin main
           }
