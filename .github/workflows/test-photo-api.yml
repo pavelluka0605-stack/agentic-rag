@@ -1,4 +1,4 @@
-name: "VPS Full Diagnostic — chat.marbomebel.ru"
+name: Deploy chat rollback to March 14
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - "claude/*"
     paths:
       - ".github/workflows/test-photo-api.yml"
+      - "claude-chat/**"
   workflow_dispatch:
 
 permissions:
@@ -17,11 +18,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  diagnose:
-    name: "Full VPS diagnostic"
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,155 +34,67 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Run comprehensive diagnostics
+      - name: Deploy March 14 rollback
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           OUT="diag-output.txt"
 
-          $SSH 'bash -s' <<'REMOTE' 2>&1 | tee "$OUT"
+          echo "=== 1. Copy fresh files to VPS ===" | tee $OUT
+          $SCP claude-chat/server.js $VPS_USER@$VPS_HOST:/opt/claude-chat/server.js 2>&1 | tee -a $OUT
+          $SCP claude-chat/public/index.html $VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html 2>&1 | tee -a $OUT
 
-          echo "========================================"
-          echo "=== VPS FULL DIAGNOSTIC $(date -u) ==="
-          echo "========================================"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 1. Service worker files in /opt/claude-chat/public/ ==="
-          echo "--- Looking for sw.js, service-worker.js, or similar ---"
-          find /opt/claude-chat/public/ -type f -iname '*service*worker*' -o -iname 'sw.js' -o -iname 'sw.*.js' 2>/dev/null || echo "(none found)"
-          echo "--- All JS files in public/ ---"
-          find /opt/claude-chat/public/ -type f -name '*.js' 2>/dev/null || echo "(no JS files)"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 2. MD5 hashes of ALL files in /opt/claude-chat/public/ ==="
-          find /opt/claude-chat/public/ -type f -exec md5sum {} \; 2>/dev/null || echo "(public dir empty or missing)"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 3. MD5 hash of /opt/claude-chat/server.js ==="
-          md5sum /opt/claude-chat/server.js 2>/dev/null || echo "(server.js not found)"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 4. FULL server.js content ==="
-          echo "--- BEGIN server.js ---"
-          cat /opt/claude-chat/server.js 2>/dev/null || echo "(server.js not found)"
-          echo "--- END server.js ---"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 5. PM2 show claude-chat (env vars + restart count) ==="
-          pm2 show claude-chat 2>/dev/null || echo "(claude-chat not in pm2)"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 6. Other web servers (nginx, apache, caddy, httpd) ==="
-          systemctl list-units --type=service 2>/dev/null | grep -iE 'nginx|apache|caddy|httpd' || echo "(none found)"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 7. ALL Docker containers ==="
-          docker ps -a 2>/dev/null || echo "(docker not available or no containers)"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 8. Docker containers serving chat.marbomebel.ru ==="
-          for CID in $(docker ps -aq 2>/dev/null); do
-            INSPECT=$(docker inspect "$CID" 2>/dev/null)
-            if echo "$INSPECT" | grep -qi "chat"; then
-              echo "--- Container $CID references 'chat' ---"
-              echo "$INSPECT" | grep -i "chat" | head -20
-              echo ""
-            fi
-          done
-          echo "(inspection complete)"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 9. Ports listening on 80, 443, 3847 ==="
-          echo "--- ss output ---"
-          ss -tlnp 2>/dev/null | grep -E ':80\b|:443\b|:3847\b' || echo "(nothing on those ports via ss)"
-          echo "--- netstat output ---"
-          netstat -tlnp 2>/dev/null | grep -E ':80\b|:443\b|:3847\b' || echo "(nothing on those ports via netstat)"
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 10. Traefik logs for chat.marbomebel.ru ==="
-          TRAEFIK_CID=$(docker ps --filter "name=traefik" -q 2>/dev/null | head -1)
-          if [ -n "$TRAEFIK_CID" ]; then
-            echo "Traefik container: $TRAEFIK_CID"
-            docker logs "$TRAEFIK_CID" --tail 100 2>&1 | grep -i "chat" | tail -50 || echo "(no 'chat' entries in traefik logs)"
-          else
-            echo "No traefik container found by name. Checking all containers..."
-            for CID in $(docker ps -q 2>/dev/null); do
-              CNAME=$(docker inspect --format '{{.Name}}' "$CID" 2>/dev/null)
-              CIMG=$(docker inspect --format '{{.Config.Image}}' "$CID" 2>/dev/null)
-              if echo "$CNAME $CIMG" | grep -qi "traefik\|proxy\|reverse"; then
-                echo "Found proxy container: $CNAME ($CIMG) — ID $CID"
-                docker logs "$CID" --tail 100 2>&1 | grep -i "chat" | tail -50 || echo "(no 'chat' entries)"
-              fi
-            done
-          fi
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 11. curl -vLk https://chat.marbomebel.ru/ ==="
-          curl -vLk --max-time 10 https://chat.marbomebel.ru/ 2>&1 | head -80
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 12. Compare HTML: localhost:3847 vs https://chat.marbomebel.ru/ ==="
-          LOCAL_MD5=$(curl -sL --max-time 5 http://localhost:3847/ 2>/dev/null | md5sum)
-          REMOTE_MD5=$(curl -skL --max-time 10 https://chat.marbomebel.ru/ 2>/dev/null | md5sum)
-          echo "localhost:3847  => $LOCAL_MD5"
-          echo "chat.marbomebel => $REMOTE_MD5"
-          if [ "$LOCAL_MD5" = "$REMOTE_MD5" ]; then
-            echo "MATCH: Same content"
-          else
-            echo "MISMATCH: Content differs — possible proxy cache or different backend"
-            echo ""
-            echo "--- First 30 lines from localhost:3847 ---"
-            curl -sL --max-time 5 http://localhost:3847/ 2>/dev/null | head -30
-            echo ""
-            echo "--- First 30 lines from https://chat.marbomebel.ru/ ---"
-            curl -skL --max-time 10 https://chat.marbomebel.ru/ 2>/dev/null | head -30
-          fi
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 13. DNS resolution from VPS ==="
-          dig chat.marbomebel.ru +short 2>/dev/null || nslookup chat.marbomebel.ru 2>/dev/null || echo "(dig/nslookup not available)"
-          echo "--- Full dig ---"
-          dig chat.marbomebel.ru 2>/dev/null | head -30 || true
-
-          # -----------------------------------------------
-          echo ""
-          echo "=== 14. CDN/Cloudflare detection ==="
-          echo "--- Response headers from https://chat.marbomebel.ru/ ---"
-          curl -skI --max-time 10 https://chat.marbomebel.ru/ 2>/dev/null | grep -iE 'cf-|cloudflare|x-cache|x-cdn|server:|cache-control|age:|via:|x-served-by' || echo "(no CDN headers detected)"
-          echo ""
-          echo "--- ALL response headers ---"
-          curl -skI --max-time 10 https://chat.marbomebel.ru/ 2>/dev/null
+          $SSH 'bash -s' <<'REMOTE' 2>&1 | tee -a $OUT
 
           echo ""
-          echo "========================================"
-          echo "=== DIAGNOSTIC COMPLETE ==="
-          echo "========================================"
+          echo "=== 2. Restart PM2 ==="
+          cd /opt/claude-chat
+          pm2 stop claude-chat 2>/dev/null || true
+          pm2 delete claude-chat 2>/dev/null || true
+          pm2 start server.js --name claude-chat
+          sleep 3
+          pm2 list
 
+          echo ""
+          echo "=== 3. Test — no more redirect, direct 200 ==="
+          echo "HTTP Status:"
+          curl -sI --max-time 5 http://localhost:3847/ | head -5
+          echo ""
+          echo "First 10 lines of HTML:"
+          curl -s --max-time 5 http://localhost:3847/ | head -10
+
+          echo ""
+          echo "=== 4. HTTPS test ==="
+          echo "HTTPS Status (should be 200, NOT 302):"
+          curl -skI --max-time 5 https://chat.marbomebel.ru/ | head -5
+          echo ""
+          echo "HTTPS first 10 lines:"
+          curl -sk --max-time 5 https://chat.marbomebel.ru/ | head -10
+
+          echo ""
+          echo "=== 5. Verify NO version stamp in status line ==="
+          curl -sk --max-time 5 https://chat.marbomebel.ru/ | grep -o 'id="statusLine">[^<]*<' || echo "(statusLine not found)"
+
+          echo ""
+          echo "=== 6. MD5 comparison ==="
+          echo "server.js: $(md5sum /opt/claude-chat/server.js)"
+          echo "index.html: $(md5sum /opt/claude-chat/public/index.html)"
+
+          echo ""
+          echo "DONE — March 14 version restored"
           REMOTE
 
-      - name: Commit diagnostic output
+      - name: Save output
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
-          git diff --cached --quiet && echo "No changes to commit" || {
-            git commit -m "diag: full VPS diagnostic for chat.marbomebel.ru [skip ci]"
+          git diff --cached --quiet && echo "No changes" || {
+            git commit -m "deploy: rollback to March 14 version [skip ci]"
             git push origin HEAD
           }

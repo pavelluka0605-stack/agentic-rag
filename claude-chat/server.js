@@ -72,13 +72,8 @@ app.use((req, res, next) => {
   }
   next();
 });
-// Force cache bust: redirect to URL with version query param
-const APP_VERSION = '20260315v3';
+// Serve index.html dynamically with injected config
 app.get('/', (req, res) => {
-  // If no version param or old version — redirect to bust cache
-  if (req.query.v !== APP_VERSION) {
-    return res.redirect(302, `/?v=${APP_VERSION}`);
-  }
   const htmlPath = path.join(__dirname, 'public', 'index.html');
   let html = fs.readFileSync(htmlPath, 'utf-8');
   // Inject auto-config script before </head>
