@@ -45,7 +45,7 @@ jobs:
 
       - name: Export VK market photos
         env:
-          VK_TOKEN: ${{ secrets.VK_USER_TOKEN }}
+          VK_TOKEN: ${{ secrets.VK_MEBELIT_TOKEN }}
           ACTION: ${{ inputs.action || 'scan' }}
           VK_SCREEN_NAME: mebelit_krsk
         run: |
