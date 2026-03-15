@@ -7,7 +7,6 @@ on:
       - "claude/*"
     paths:
       - ".github/workflows/test-photo-api.yml"
-      - "claude-chat/**"
   workflow_dispatch:
 
 concurrency:
@@ -28,7 +27,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Full verification
+      - name: Full VPS diagnostics
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -36,33 +35,42 @@ jobs:
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
 
-          echo "=== 1. HEALTH CHECK ==="
-          $SSH "curl -s http://localhost:3847/api/health"
+          echo "=== SERVICE STATUS ==="
+          $SSH "systemctl status claude-chat --no-pager 2>/dev/null || echo 'service not found'"
           echo ""
 
-          echo "=== 2. SERVER.JS VERSION CHECK ==="
-          $SSH "grep -n 'heartbeat\|TIMEOUT_MS\|5000\|clearInterval\|clearTimeout\|processTimeout' /opt/claude-chat/server.js"
+          echo "=== JOURNAL (last 40 lines) ==="
+          $SSH "journalctl -u claude-chat -n 40 --no-pager 2>/dev/null || echo 'no journal'"
           echo ""
 
-          echo "=== 3. NGINX CONFIG ==="
-          $SSH "cat /etc/nginx/sites-enabled/* 2>/dev/null"
+          echo "=== PORT 3847 ==="
+          $SSH "lsof -i:3847 2>/dev/null || ss -tlnp | grep 3847 || echo 'port free'"
           echo ""
 
-          echo "=== 4. SERVICE STATUS ==="
-          $SSH "systemctl status claude-chat --no-pager 2>/dev/null | head -15 || echo 'no systemd'"
+          echo "=== NODE VERSION ==="
+          $SSH "node --version 2>/dev/null || echo 'no node'"
           echo ""
 
-          echo "=== 5. SSE TEST ==="
-          TOKEN=$($SSH "grep BEARER_TOKEN /opt/claude-chat/.env | cut -d= -f2")
-          $SSH "timeout 15 curl -sN -X POST http://localhost:3847/api/chat \
-            -H 'Content-Type: application/json' \
-            -H 'Authorization: Bearer $TOKEN' \
-            -d '{\"message\":\"echo test-ok\"}' 2>&1" || echo "SSE test completed"
+          echo "=== SERVER.JS head ==="
+          $SSH "head -5 /opt/claude-chat/server.js 2>/dev/null || echo 'no server.js'"
           echo ""
 
-          echo "=== 6. EXTERNAL CURL (through Traefik+nginx) ==="
-          $SSH "curl -sI https://chat.marbomebel.ru/ 2>/dev/null | head -10 || echo 'external test failed'"
+          echo "=== SYSTEMD UNIT FILE ==="
+          $SSH "cat /etc/systemd/system/claude-chat.service 2>/dev/null || echo 'no unit file'"
           echo ""
 
-          echo "=== 7. INDEX.HTML ERROR LINES ==="
-          $SSH "grep -n 'Соединение прервано\|recoverBackground\|savePendingRequest\|reconnect\|getReader' /opt/claude-chat/public/index.html | head -20"
+          echo "=== .ENV (masked) ==="
+          $SSH "test -f /opt/claude-chat/.env && echo '.env exists, PORT=' && grep PORT /opt/claude-chat/.env || echo 'no .env'"
+          echo ""
+
+          echo "=== NPM LS ==="
+          $SSH "cd /opt/claude-chat && npm ls --depth=0 2>&1 | tail -10 || echo 'npm ls failed'"
+          echo ""
+
+          echo "=== HEALTH CHECK ==="
+          $SSH "curl -s --max-time 5 http://localhost:3847/api/health 2>/dev/null || echo 'health check failed'"
+          echo ""
+
+          echo "=== TRY MANUAL START ==="
+          $SSH "systemctl stop claude-chat 2>/dev/null; sleep 2; kill \$(lsof -t -i:3847) 2>/dev/null; sleep 1; cd /opt/claude-chat && timeout 5 node server.js 2>&1 || echo 'manual start exit code: '\$?"
+          echo ""
