@@ -125,7 +125,35 @@ volumes:
   traefik.http.services.openclaw.loadbalancer.server.port = 18789
 
 === 8. What does HTTPS return (full response headers) ===
+HTTP/2 200 
+access-control-allow-headers: Content-Type, Authorization
+access-control-allow-methods: GET, POST, OPTIONS
+access-control-allow-origin: *
+cache-control: no-cache, no-store, must-revalidate
+content-type: text/html; charset=utf-8
+date: Sun, 15 Mar 2026 07:19:53 GMT
+etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
+expires: 0
+pragma: no-cache
+x-powered-by: Express
+content-length: 29629
+
 ---
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AI Ассистент</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a14;
+  --surface: #12121e;
+  --surface2: #1a1a2e;
+  --border: #2a2a3e;
 
 === 9. Compare: direct PM2 vs HTTPS ===
 PM2 direct md5:
