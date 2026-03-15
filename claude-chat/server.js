@@ -14,6 +14,38 @@ const PORT = process.env.PORT || 3847;
 const BEARER_TOKEN = process.env.BEARER_TOKEN;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+// --- RAG Memory Search ---
+const RAG_SCRIPT = path.join(__dirname, 'rag_search.py');
+
+function ragSearch(query) {
+  return new Promise((resolve) => {
+    // Skip RAG for very short or command-like queries
+    if (!query || query.length < 5) {
+      return resolve(null);
+    }
+    try {
+      const child = spawn('python3', [RAG_SCRIPT, query], {
+        env: { ...process.env },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 10000, // 10s max
+      });
+      let stdout = '';
+      child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+      child.on('close', (code) => {
+        if (code !== 0 || !stdout.trim()) return resolve(null);
+        try {
+          const result = JSON.parse(stdout.trim());
+          if (result.found > 0 && result.context) return resolve(result);
+        } catch (_) {}
+        resolve(null);
+      });
+      child.on('error', () => resolve(null));
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
+
 if (!BEARER_TOKEN) {
   console.error('BEARER_TOKEN not set in .env');
   process.exit(1);
@@ -224,7 +256,7 @@ app.get('/api/vps-status', auth, (_req, res) => {
 });
 
 // Chat — SSE streaming
-app.post('/api/chat', auth, (req, res) => {
+app.post('/api/chat', auth, async (req, res) => {
   const { message, history, sessionId: clientSessionId } = req.body;
 
   if (!message || typeof message !== 'string') {
@@ -269,14 +301,27 @@ app.post('/api/chat', auth, (req, res) => {
   // Send request ID and session ID
   res.write(`data: ${JSON.stringify({ type: 'start', id: requestId, sessionId })}\n\n`);
 
-  // Build prompt with history context
-  let prompt = message;
+  // RAG: search memory for relevant context
+  let ragContext = null;
+  try {
+    ragContext = await ragSearch(message);
+  } catch (_) {}
+
+  // Build prompt with RAG context + history
+  let prompt = '';
+
+  if (ragContext) {
+    prompt += `=== Релевантный контекст из памяти проекта (${ragContext.found} записей) ===\n${ragContext.context}\n=== Конец контекста ===\n\n`;
+  }
+
   if (history && Array.isArray(history) && history.length > 0) {
-    const context = history
+    const historyText = history
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
       .join('\n');
-    prompt = `Previous conversation:\n${context}\n\nUser: ${message}`;
+    prompt += `Previous conversation:\n${historyText}\n\n`;
   }
+
+  prompt += `User: ${message}`;
 
   const startTime = Date.now();
 
