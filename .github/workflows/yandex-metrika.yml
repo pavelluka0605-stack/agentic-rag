@@ -126,7 +126,20 @@ jobs:
               "https://api-metrika.yandex.net/stat/v1/data?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=$GOAL_METRICS&dimensions=&accuracy=full") || echo "{}"
           fi
 
+          # Save raw data to temp files for Python
+          echo "$COUNTERS" > /tmp/ym_counters.json
+          echo "$SUMMARY" > /tmp/ym_summary.json
+          echo "$SOURCES" > /tmp/ym_sources.json
+          echo "$SEARCH" > /tmp/ym_search.json
+          echo "$GEO" > /tmp/ym_geo.json
+          echo "$PAGES" > /tmp/ym_pages.json
+          echo "$DEVICES" > /tmp/ym_devices.json
+          echo "$DAILY" > /tmp/ym_daily.json
+          echo "$GOALS" > /tmp/ym_goals.json
+          echo "$GOAL_STATS" > /tmp/ym_goal_stats.json
+
           # Generate report
+          export DATE_FROM DATE_TO PERIOD_DAYS
           python3 << 'PYEOF'
           import json, sys, os
           from datetime import datetime
@@ -135,20 +148,23 @@ jobs:
           date_to = os.environ.get('DATE_TO', '?')
           period = os.environ.get('PERIOD_DAYS', '90')
 
-          def load(s):
-              try: return json.loads(s)
-              except: return {}
+          def load_file(path):
+              try:
+                  with open(path) as f:
+                      return json.load(f)
+              except:
+                  return {}
 
-          summary = load(os.environ.get('SUMMARY','{}'))
-          sources = load(os.environ.get('SOURCES','{}'))
-          search = load(os.environ.get('SEARCH','{}'))
-          geo = load(os.environ.get('GEO','{}'))
-          pages = load(os.environ.get('PAGES','{}'))
-          devices = load(os.environ.get('DEVICES','{}'))
-          daily = load(os.environ.get('DAILY','{}'))
-          goals = load(os.environ.get('GOALS','{}'))
-          goal_stats = load(os.environ.get('GOAL_STATS','{}'))
-          counters = load(os.environ.get('COUNTERS','{}'))
+          summary = load_file('/tmp/ym_summary.json')
+          sources = load_file('/tmp/ym_sources.json')
+          search = load_file('/tmp/ym_search.json')
+          geo = load_file('/tmp/ym_geo.json')
+          pages = load_file('/tmp/ym_pages.json')
+          devices = load_file('/tmp/ym_devices.json')
+          daily = load_file('/tmp/ym_daily.json')
+          goals = load_file('/tmp/ym_goals.json')
+          goal_stats = load_file('/tmp/ym_goal_stats.json')
+          counters = load_file('/tmp/ym_counters.json')
 
           report = []
           report.append(f"# Яндекс Метрика — MEBELIT\n")
