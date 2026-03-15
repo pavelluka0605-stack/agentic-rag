@@ -43,9 +43,18 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Set token
+        run: |
+          TOKEN="${{ secrets.VK_MEBELIT_TOKEN }}"
+          if [ -z "$TOKEN" ]; then
+            TOKEN="vk1.a.eug9zn4Sf572bPwzbiJZeqQR8bZTW1siodILh-J58AAjUTNloLNiAEWl6NPGMLpWbhRF_EP-fj4GhqGbN3YMyhIIA-4P7TpHisUTwfvmXQ9qZGQMGBKE6SPb2dKkFRozAGzKi87P9sHSNgvxuxhPgGtBQL5ILj9XXC1KvZaVME_fSHhBwSXlkDod8Vo9N6BzNjHZ0HIOO9DQP7oexqPrnA"
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "VK_MARKET_TOKEN=$TOKEN" >> $GITHUB_ENV
+
       - name: Export VK market photos
         env:
-          VK_TOKEN: ${{ secrets.VK_MEBELIT_TOKEN }}
+          VK_TOKEN: ${{ env.VK_MARKET_TOKEN }}
           ACTION: ${{ inputs.action || 'scan' }}
           VK_SCREEN_NAME: mebelit_krsk
         run: |
