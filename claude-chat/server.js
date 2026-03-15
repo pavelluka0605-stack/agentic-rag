@@ -454,8 +454,8 @@ app.post('/api/chat', auth, async (req, res) => {
     return;
   }
 
-  // Spawn claude CLI with system prompt
-  const child = spawn(CLAUDE_PATH, ['--print', prompt], {
+  // Spawn claude CLI with stream-json for thinking/tool visibility
+  const child = spawn(CLAUDE_PATH, ['-p', '--output-format', 'stream-json', prompt], {
     env: { ...process.env, NO_COLOR: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -512,13 +512,61 @@ app.post('/api/chat', auth, async (req, res) => {
     }
   }
 
+  // Parse stream-json output line by line
+  let stdoutBuffer = '';
   child.stdout.on('data', (chunk) => {
-    const text = chunk.toString();
     lastDataAt = Date.now();
     gotFirstByte = true;
-    bgResult.fullText += text;
-    bgResult.chunks.push({ type: 'chunk', text });
-    safeSend({ type: 'chunk', text });
+    stdoutBuffer += chunk.toString();
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop(); // keep incomplete line in buffer
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        // Map stream-json events to SSE events
+        if (event.type === 'assistant') {
+          if (event.subtype === 'thinking') {
+            safeSend({ type: 'thinking', text: event.text || '' });
+          } else if (event.subtype === 'text') {
+            const text = event.text || '';
+            bgResult.fullText += text;
+            bgResult.chunks.push({ type: 'chunk', text });
+            safeSend({ type: 'chunk', text });
+          }
+        } else if (event.type === 'tool_use') {
+          safeSend({
+            type: 'tool_use',
+            tool: event.tool || event.name || 'tool',
+            input: event.input || '',
+          });
+        } else if (event.type === 'tool_result') {
+          safeSend({
+            type: 'tool_result',
+            output: typeof event.output === 'string' ? event.output.slice(0, 2000) : JSON.stringify(event.output).slice(0, 2000),
+          });
+        } else if (event.type === 'result') {
+          // Final result event — extract text if present
+          if (event.result && !bgResult.fullText) {
+            bgResult.fullText = event.result;
+            safeSend({ type: 'chunk', text: event.result });
+          }
+        } else {
+          // Unknown event type — try to extract text
+          if (event.text) {
+            bgResult.fullText += event.text;
+            safeSend({ type: 'chunk', text: event.text });
+          }
+        }
+      } catch (_) {
+        // Not valid JSON — treat as raw text (fallback)
+        const text = line;
+        bgResult.fullText += text + '\n';
+        bgResult.chunks.push({ type: 'chunk', text: text + '\n' });
+        safeSend({ type: 'chunk', text: text + '\n' });
+      }
+    }
   });
 
   child.stderr.on('data', (chunk) => {
