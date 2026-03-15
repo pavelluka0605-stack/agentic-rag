@@ -1,159 +1,174 @@
-# WordPress Architecture — mebelit.site
+# WordPress Architecture — mebelit.site v2.0
 
 ## Стек
 
 | Компонент | Решение | Почему |
 |-----------|---------|--------|
 | CMS | WordPress 6.x | Требование заказчика |
-| Page Builder | Elementor Pro | Основной конструктор, управляемость без программиста |
-| Custom Fields | ACF Pro | Динамические данные (кухни, отзывы, команда) |
-| Тема | Hello Elementor (child) | Чистая тема без мусора, идеально под Elementor |
-| Формы | WPForms Lite или Elementor Forms | Webhook-ready, SMTP, защита от спама |
-| SEO | Yoast SEO | Стандарт рынка, мета-теги, sitemap |
-| Кеш | LiteSpeed Cache или WP Super Cache | Скорость без сложности |
+| Page Builder | Elementor Pro | Управляемость без программиста, широкая экосистема |
+| Custom Fields | ACF Pro | Динамические данные (кухни, отзывы, команда, настройки) |
+| Тема | Hello Elementor (child: mebelit-child) | Чистая тема без мусора |
+| Формы | Custom AJAX (functions.php + main.js) | Webhook-ready, honeypot, без плагинов |
+| SEO | Yoast SEO | Стандарт рынка |
+| Кеш | LiteSpeed Cache / WP Super Cache | Скорость без сложности |
 | SMTP | WP Mail SMTP | Надёжная доставка email |
-| Безопасность | Wordfence (free) | Базовая защита |
-| Аналитика | Yandex Metrika (код в header) | Уже используется, ID: 103970425 |
+| Аналитика | Yandex Metrika (код в header, ID: 103970425) | Уже используется |
 
 ## Решение: Elementor vs Bricks
 
-Elementor — правильный выбор для этого проекта:
-- **Заказчик** сможет редактировать без разработчика
-- **Экосистема** плагинов и виджетов шире
-- **Порог входа** ниже для непрограммиста
-- **Bricks** мощнее технически, но требует знаний CSS/HTML для тонкой настройки
+**Elementor — правильный выбор:**
+- Заказчик редактирует без разработчика
+- Экосистема шире, порог входа ниже
+- Bricks мощнее технически, но требует CSS/HTML для тонкой настройки
+- Для этого проекта Bricks не даёт существенных преимуществ
 
-## Структура страниц
+## Структура URL
 
 ```
 mebelit.site/
-├── / (главная)
-├── /straight/ (прямые кухни)
-├── /corner/ (угловые кухни)
-├── /pshape/ (П-образные кухни)
-├── /quiz/ (квиз-калькулятор)
-└── /politics/ (политика конфиденциальности)
+├── /               (главная)
+├── /straight/      (прямые кухни)
+├── /corner/        (угловые кухни)
+├── /pshape/        (П-образные кухни)
+├── /quiz/          (квиз-калькулятор)
+└── /politics/      (политика конфиденциальности)
 ```
 
-## ACF Field Groups
+## Файлы дочерней темы
 
-### 1. Kitchen Model (CPT: kitchen)
-- `kitchen_name` (text) — название кухни
-- `kitchen_price` (number) — цена
-- `kitchen_image` (image) — фото
-- `kitchen_type` (taxonomy: kitchen_type) — прямая / угловая / п-образная
-- `kitchen_features` (repeater) — характеристики
-  - `feature_text` (text)
-
-### 2. Review (CPT: review)
-- `review_author` (text) — имя
-- `review_text` (textarea) — текст отзыва
-- `review_rating` (number, 1-5) — рейтинг
-
-### 3. Team Member (ACF options page)
-- `team_members` (repeater)
-  - `member_name` (text)
-  - `member_role` (text)
-  - `member_quote` (textarea)
-  - `member_photo` (image)
-
-### 4. Site Settings (ACF options page)
-- `phone` (text)
-- `phone_raw` (text) — для href=tel
-- `work_hours` (text)
-- `address` (text)
-- `city` (text)
-- `metrika_id` (text)
-- `min_price_straight` (number)
-- `min_price_corner` (number)
-- `min_price_pshape` (number)
+```
+mebelit-child/
+├── style.css                  — глобальные стили, design tokens, компоненты
+├── functions.php              — CPT, ACF, AJAX-обработчики, шорткоды, безопасность
+├── screenshot.png             — скриншот темы
+├── assets/
+│   ├── js/
+│   │   ├── main.js            — header, меню, формы, попапы, before/after slider
+│   │   └── quiz.js            — 4-шаговый квиз-калькулятор
+│   └── img/
+│       ├── straight.svg       — иконка прямой кухни
+│       ├── corner.svg         — иконка угловой кухни
+│       ├── pshape.svg         — иконка П-образной кухни
+│       └── project-icon.svg   — иконка "есть проект"
+└── templates/
+    ├── page-quiz.php          — шаблон квиза
+    ├── page-privacy.php       — шаблон политики конфиденциальности
+    └── popups.php             — HTML попапов (подключается в wp_footer)
+```
 
 ## Custom Post Types
 
 ### Kitchen (kitchen)
-- Архив: нет (используем страницы-каталоги)
-- Таксономия: kitchen_type (прямая, угловая, п-образная)
-- Шаблон карточки — Elementor Loop Item
+- Архив: нет
+- Таксономия: `kitchen_type` (straight, corner, pshape)
+- Поля ACF: price, features (repeater)
+- Шаблон карточки: Elementor Loop Item
 
-## Global Styles (CSS Variables)
+### Review (review)
+- Архив: нет
+- Поля ACF: author, text, rating
+- Вывод: Elementor Loop или Carousel
 
-```css
-:root {
-  /* Цвета (из текущего сайта) */
-  --color-primary: #1a1a2e;      /* тёмный фон */
-  --color-accent: #e8c547;       /* жёлтый акцент */
-  --color-accent-hover: #d4b13e;
-  --color-white: #ffffff;
-  --color-light-bg: #f5f5f5;
-  --color-text: #333333;
-  --color-text-light: #666666;
+## ACF Field Groups
 
-  /* Типографика */
-  --font-heading: 'Montserrat', sans-serif;
-  --font-body: 'Open Sans', sans-serif;
+### 1. Поля кухни (CPT: kitchen)
+- `kitchen_price` (number) — цена
+- `kitchen_features` (repeater) → `feature_text` (text)
 
-  /* Размеры */
-  --container-width: 1200px;
-  --section-padding: 80px;
-  --section-padding-mobile: 40px;
-  --border-radius: 8px;
-  --border-radius-lg: 16px;
-}
-```
+### 2. Поля отзыва (CPT: review)
+- `review_author` (text)
+- `review_text` (textarea)
+- `review_rating` (number, 1-5)
 
-## Elementor Templates
+### 3. Настройки сайта (Options Page: mebelit-settings)
+- `site_phone` — телефон отображение
+- `site_phone_raw` — телефон для href=tel
+- `site_work_hours` — часы работы
+- `site_address` — адрес
+- `webhook_url` — URL для webhook (n8n/Telegram)
+- `min_price_straight` — мин. цена прямых
+- `min_price_corner` — мин. цена угловых
+- `min_price_pshape` — мин. цена П-образных
+- `metrika_id` — ID Яндекс.Метрики
 
-### Global
-1. **Header** — логотип, меню (3 пункта), телефон, CTA «Вызвать на замер»
-2. **Footer** — логотип, копирайт, ссылка на политику, контакты, адрес, CTA
-3. **Popup: Заявка** — имя + телефон + согласие
-4. **Popup: Вызов дизайнера** — имя + телефон + согласие
-5. **Popup: Скидка новоселам** — имя + телефон + согласие
+### 4. Команда (Options Sub Page)
+- `team_members` (repeater)
+  - `member_name`, `member_role`, `member_quote`, `member_photo`
 
-### Страницы
-1. **Главная** — Hero → Каталог (3 категории) → Преимущества → Форма → Дизайнер → Гарантии → До/После → Калькулятор CTA → Команда → Отзывы → Квиз CTA → Форма (footer)
-2. **Каталог кухонь** (шаблон для 3 страниц) — Hero → Гарантия цены → Карточки кухонь (loop) → Удобства → Дизайнер CTA → Формы
-3. **Квиз** — Пошаговый квиз (планировка → размеры → контакт → отправка)
-4. **Политика** — текстовая страница
+## Шорткоды
+
+| Шорткод | Описание |
+|---------|----------|
+| `[mebelit_phone]` | Телефон из ACF с ссылкой tel: |
+| `[mebelit_hours]` | Часы работы из ACF |
+| `[mebelit_address]` | Адрес из ACF |
+| `[mebelit_form type="general" title="..." btn="..."]` | Форма заявки |
+| `[mebelit_quiz]` | Встроенный квиз |
 
 ## Формы и интеграции
 
-### Типы форм
-1. **Быстрая заявка** (имя + телефон) — popup и inline
-2. **Вызов дизайнера** (имя + телефон) — popup
-3. **Расчёт стоимости** — redirect на /quiz/
+### AJAX-обработчики
+- `mebelit_quiz_submit` — квиз (4 шага)
+- `mebelit_contact` — общая форма (имя + телефон)
 
-### Webhook-интеграция
-Все формы → webhook URL → n8n/Telegram:
-- POST JSON: `{name, phone, form_type, page_url, timestamp}`
-- Резервно: email на admin
-
-### Квиз
-Шаги:
-1. Выбор планировки (прямая / угловая / п-образная / есть проект)
-2. Если «есть проект» → загрузка файла
-3. Размеры (зависят от типа: 1-3 стороны)
-4. Способ связи (WhatsApp / Viber / SMS / Звонок)
-5. Имя + телефон → отправка
+### Webhook
+POST JSON → n8n/Telegram:
+```json
+{
+  "name": "Имя",
+  "phone": "+7...",
+  "form_type": "quiz|general|designer|discount|callback|catalog",
+  "layout": "straight|corner|pshape|project",
+  "side_a": "300",
+  "side_b": "",
+  "side_c": "",
+  "contact_method": "whatsapp|viber|sms|call",
+  "page_url": "https://mebelit.site/...",
+  "timestamp": "2025-01-01 12:00:00"
+}
+```
 
 ### Защита от спама
-- reCAPTCHA v3 (invisible)
-- Honeypot fields
-- Rate limiting
+- Honeypot (скрытое поле `website_url`)
+- Rate limiting (5 заявок/IP/час)
+- AJAX nonce verification
+
+## Попапы
+
+| ID | Назначение | Тип формы |
+|----|------------|-----------|
+| `popup-form` | Общая заявка | general |
+| `popup-designer` | Вызов дизайнера | designer |
+| `popup-discount` | Скидка новоселам | discount |
+| `popup-callback` | Обратный звонок | callback |
+
+Вызов: `data-popup="popup-designer"` на любой кнопке.
 
 ## SEO
 
-- Title templates: «Кухни [тип] на заказ в Красноярске | Mebelit»
+- Title templates через Yoast
+- Schema.org LocalBusiness на главной (автоматически)
 - Meta description для каждой страницы
-- Schema.org: LocalBusiness, Product, Review
-- OpenGraph tags
-- Sitemap.xml
-- Robots.txt
+- Yandex Metrika с webvisor
 
-## Производительность
+## Безопасность
 
-- Lazy loading изображений
-- WebP автоконвертация
-- CSS/JS минификация через Elementor
-- Кеширование страниц
-- CDN (опционально)
+- Security headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy)
+- Отключены: XML-RPC, emoji, oEmbed, wp_generator
+- REST API: скрыт endpoint users для неавторизованных
+- Honeypot + rate limiting на формах
+
+## Design Tokens (CSS Variables)
+
+```css
+--color-primary: #1a1a2e;
+--color-accent: #e8c547;
+--font-heading: 'Montserrat';
+--font-body: 'Open Sans';
+--container-max: 1200px;
+--section-py: 80px;
+--radius-md: 8px;
+--shadow-card: 0 4px 20px rgba(0,0,0,0.08);
+```
+
+Полный список — в style.css `:root`.

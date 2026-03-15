@@ -17,6 +17,7 @@
         "label": "Характеристики",
         "name": "kitchen_features",
         "type": "repeater",
+        "layout": "table",
         "sub_fields": [
           {
             "key": "field_feature_text",
@@ -87,14 +88,16 @@
         "label": "Телефон (отображение)",
         "name": "site_phone",
         "type": "text",
-        "default_value": "+7 (391) 216-97-59"
+        "default_value": "+7 (391) 216-97-59",
+        "instructions": "Как показывать на сайте"
       },
       {
         "key": "field_phone_raw",
         "label": "Телефон (для ссылки)",
         "name": "site_phone_raw",
         "type": "text",
-        "default_value": "+73912169759"
+        "default_value": "+73912169759",
+        "instructions": "Для href=tel: без пробелов и скобок"
       },
       {
         "key": "field_work_hours",
@@ -111,18 +114,12 @@
         "default_value": "Красноярск, ул. 2 Огородная 26"
       },
       {
-        "key": "field_webhook_url",
-        "label": "Webhook URL (n8n / Telegram)",
-        "name": "webhook_url",
-        "type": "url",
-        "instructions": "URL для отправки заявок (JSON POST)"
-      },
-      {
         "key": "field_min_price_straight",
         "label": "Мин. цена прямых кухонь",
         "name": "min_price_straight",
         "type": "number",
-        "default_value": 63700
+        "default_value": 63700,
+        "instructions": "Отображается на главной в блоке каталога"
       },
       {
         "key": "field_min_price_corner",
@@ -150,6 +147,36 @@
     ]
   },
   {
+    "key": "group_integrations",
+    "title": "Интеграции",
+    "fields": [
+      {
+        "key": "field_webhook_url",
+        "label": "Webhook URL (n8n / Telegram)",
+        "name": "webhook_url",
+        "type": "url",
+        "instructions": "URL для отправки заявок (JSON POST). Все формы и квиз отправляют данные сюда."
+      },
+      {
+        "key": "field_metrika_id",
+        "label": "ID Яндекс.Метрики",
+        "name": "metrika_id",
+        "type": "text",
+        "default_value": "103970425",
+        "instructions": "Числовой ID счётчика Яндекс.Метрики"
+      }
+    ],
+    "location": [
+      [
+        {
+          "param": "options_page",
+          "operator": "==",
+          "value": "acf-options-интеграции"
+        }
+      ]
+    ]
+  },
+  {
     "key": "group_team_members",
     "title": "Команда",
     "fields": [
@@ -159,12 +186,14 @@
         "name": "team_members",
         "type": "repeater",
         "layout": "block",
+        "button_label": "Добавить сотрудника",
         "sub_fields": [
           {
             "key": "field_member_name",
             "label": "Имя",
             "name": "member_name",
-            "type": "text"
+            "type": "text",
+            "required": 1
           },
           {
             "key": "field_member_role",
@@ -184,7 +213,8 @@
             "label": "Фото",
             "name": "member_photo",
             "type": "image",
-            "return_format": "url"
+            "return_format": "url",
+            "preview_size": "medium"
           }
         ]
       }
