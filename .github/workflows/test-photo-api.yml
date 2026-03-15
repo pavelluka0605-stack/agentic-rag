@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Setup SSH
         run: |
@@ -27,50 +29,66 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Full VPS diagnostics
+      - name: Run diagnostics
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          OUT="diag-output.txt"
+          echo "=== VPS Diagnostics $(date -u) ===" > $OUT
 
-          echo "=== SERVICE STATUS ==="
-          $SSH "systemctl status claude-chat --no-pager 2>/dev/null || echo 'service not found'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== SERVICE STATUS ===" >> $OUT
+          $SSH "systemctl status claude-chat --no-pager 2>&1 || echo 'not found'" >> $OUT 2>&1
 
-          echo "=== JOURNAL (last 40 lines) ==="
-          $SSH "journalctl -u claude-chat -n 40 --no-pager 2>/dev/null || echo 'no journal'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== JOURNAL (last 40) ===" >> $OUT
+          $SSH "journalctl -u claude-chat -n 40 --no-pager 2>&1 || echo 'no journal'" >> $OUT 2>&1
 
-          echo "=== PORT 3847 ==="
-          $SSH "lsof -i:3847 2>/dev/null || ss -tlnp | grep 3847 || echo 'port free'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== PORT 3847 ===" >> $OUT
+          $SSH "lsof -i:3847 2>/dev/null || ss -tlnp | grep 3847 || echo 'port 3847 is free'" >> $OUT 2>&1
 
-          echo "=== NODE VERSION ==="
-          $SSH "node --version 2>/dev/null || echo 'no node'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== NODE VERSION ===" >> $OUT
+          $SSH "node --version 2>&1" >> $OUT 2>&1
 
-          echo "=== SERVER.JS head ==="
-          $SSH "head -5 /opt/claude-chat/server.js 2>/dev/null || echo 'no server.js'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== SYSTEMD UNIT ===" >> $OUT
+          $SSH "cat /etc/systemd/system/claude-chat.service 2>&1 || echo 'no unit'" >> $OUT 2>&1
 
-          echo "=== SYSTEMD UNIT FILE ==="
-          $SSH "cat /etc/systemd/system/claude-chat.service 2>/dev/null || echo 'no unit file'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== .ENV check ===" >> $OUT
+          $SSH "test -f /opt/claude-chat/.env && grep PORT /opt/claude-chat/.env || echo 'no .env'" >> $OUT 2>&1
 
-          echo "=== .ENV (masked) ==="
-          $SSH "test -f /opt/claude-chat/.env && echo '.env exists, PORT=' && grep PORT /opt/claude-chat/.env || echo 'no .env'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== SERVER.JS first 3 lines ===" >> $OUT
+          $SSH "head -3 /opt/claude-chat/server.js 2>&1 || echo 'no server.js'" >> $OUT 2>&1
 
-          echo "=== NPM LS ==="
-          $SSH "cd /opt/claude-chat && npm ls --depth=0 2>&1 | tail -10 || echo 'npm ls failed'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== NPM LS ===" >> $OUT
+          $SSH "cd /opt/claude-chat && npm ls --depth=0 2>&1 | tail -10" >> $OUT 2>&1
 
-          echo "=== HEALTH CHECK ==="
-          $SSH "curl -s --max-time 5 http://localhost:3847/api/health 2>/dev/null || echo 'health check failed'"
-          echo ""
+          echo "" >> $OUT
+          echo "=== HEALTH ===" >> $OUT
+          $SSH "curl -s --max-time 5 http://localhost:3847/api/health 2>&1 || echo 'health failed'" >> $OUT 2>&1
 
-          echo "=== TRY MANUAL START ==="
-          $SSH "systemctl stop claude-chat 2>/dev/null; sleep 2; kill \$(lsof -t -i:3847) 2>/dev/null; sleep 1; cd /opt/claude-chat && timeout 5 node server.js 2>&1 || echo 'manual start exit code: '\$?"
-          echo ""
+          echo "" >> $OUT
+          echo "=== TRY STOP + MANUAL START ===" >> $OUT
+          $SSH "systemctl stop claude-chat 2>/dev/null; sleep 2; kill \$(lsof -t -i:3847) 2>/dev/null; sleep 1; cd /opt/claude-chat && timeout 6 node server.js 2>&1; echo exit_code=\$?" >> $OUT 2>&1
+
+          echo "" >> $OUT
+          echo "=== RESTART SERVICE ===" >> $OUT
+          $SSH "kill \$(lsof -t -i:3847) 2>/dev/null; sleep 1; systemctl start claude-chat 2>&1; sleep 3; systemctl is-active claude-chat 2>&1 && echo SERVICE_OK || echo SERVICE_FAIL" >> $OUT 2>&1
+
+          cat $OUT
+
+      - name: Commit diagnostics output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add diag-output.txt
+          git commit -m "diag: VPS diagnostics output [skip ci]" || echo "nothing to commit"
+          git push || echo "push failed"
