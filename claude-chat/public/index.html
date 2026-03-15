@@ -432,7 +432,11 @@ async function sendMessage() {
   pendingPhotos = [];
   $attachments.innerHTML = '';
 
-  let uploadedUrls = [];
+  // Загрузка и анализ фото через Vision API
+  let photoDescriptions = [];
+  if (photos.length > 0) {
+    showTyping('Анализирую фото');
+  }
   for (const p of photos) {
     try {
       const fd = new FormData();
@@ -444,14 +448,19 @@ async function sendMessage() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        uploadedUrls.push(data.url);
+        if (data.description) {
+          photoDescriptions.push(data.description);
+        }
       }
     } catch (_) {}
   }
 
   let fullMessage = text;
-  if (uploadedUrls.length > 0) {
-    fullMessage += (text ? '\n\n' : '') + 'Прикреплённые фото:\n' + uploadedUrls.join('\n');
+  if (photoDescriptions.length > 0) {
+    const photoSection = photoDescriptions.map((desc, i) =>
+      photos.length > 1 ? `Фото ${i + 1}:\n${desc}` : desc
+    ).join('\n\n');
+    fullMessage += (text ? '\n\n' : '') + `[Пользователь прикрепил ${photoDescriptions.length} фото. Описание:]\n${photoSection}`;
   }
 
   showTyping();

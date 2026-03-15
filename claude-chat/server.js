@@ -798,12 +798,66 @@ app.post('/api/transcribe', auth, audioUpload.single('audio'), async (req, res) 
   }
 });
 
-app.post('/api/upload', auth, upload.single('image'), (req, res) => {
+app.post('/api/upload', auth, upload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image provided' });
   }
   const url = `/uploads/${req.file.filename}`;
-  res.json({ url, filename: req.file.filename });
+  const filePath = path.join(uploadsDir, req.file.filename);
+
+  // Анализ фото через OpenAI GPT-4o Vision
+  let description = '';
+  if (OPENAI_API_KEY) {
+    try {
+      const imageBuffer = fs.readFileSync(filePath);
+      const base64 = imageBuffer.toString('base64');
+      const mimeType = req.file.mimetype || 'image/jpeg';
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+
+      const https = require('https');
+      const payload = JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Опиши подробно что ты видишь на этом изображении. Если есть текст — прочитай его. Если это товар/мебель — опиши характеристики. Если это скриншот — опиши содержимое.' },
+            { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+          ],
+        }],
+        max_tokens: 1000,
+      });
+
+      const result = await new Promise((resolve, reject) => {
+        const request = https.request('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }, (response) => {
+          let data = '';
+          response.on('data', chunk => data += chunk);
+          response.on('end', () => {
+            if (response.statusCode >= 400) {
+              reject(new Error(`Vision API error ${response.statusCode}: ${data}`));
+            } else {
+              resolve(JSON.parse(data));
+            }
+          });
+        });
+        request.on('error', reject);
+        request.write(payload);
+        request.end();
+      });
+
+      description = result.choices?.[0]?.message?.content || '';
+      console.log(`[vision] Analyzed ${req.file.filename}: ${description.length} chars`);
+    } catch (err) {
+      console.error('[vision] Error:', err.message);
+    }
+  }
+
+  res.json({ url, filename: req.file.filename, description });
 });
 
 // --- Helpers ---
