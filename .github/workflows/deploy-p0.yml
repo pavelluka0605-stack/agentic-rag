@@ -491,17 +491,33 @@ jobs:
             claude-chat/ \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/
 
+          # Copy RAG Python modules (needed by rag_search.py and rag_save.py)
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            memory_store.py retriever.py \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/
+
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
 
           cd /opt/claude-chat
 
-          # Install dependencies
+          # Install Node.js dependencies
           if ! command -v node &>/dev/null; then
             echo "Node.js not found — skipping claude-chat deploy"
             exit 0
           fi
           npm install --omit=dev 2>&1 | tail -5
+
+          # Install Python dependencies for RAG
+          if command -v python3 &>/dev/null; then
+            pip3 install --quiet numpy openai 2>&1 | tail -3
+            echo "✓ Python RAG dependencies installed"
+          else
+            echo "⚠ Python3 not found — RAG will use keyword fallback"
+          fi
+
+          # Create data directory for persistent conversations
+          mkdir -p /opt/claude-chat/data
 
           # Create .env if it doesn't exist (use existing tokens)
           if [ ! -f .env ]; then
@@ -527,6 +543,9 @@ EnvironmentFile=/opt/claude-chat/.env
 ExecStart=/usr/bin/node /opt/claude-chat/server.js
 Restart=always
 RestartSec=10
+# Graceful shutdown — save conversations
+KillSignal=SIGTERM
+TimeoutStopSec=15
 
 [Install]
 WantedBy=multi-user.target
@@ -540,7 +559,7 @@ UNIT
           if systemctl is-active --quiet claude-chat; then
             echo "✓ Claude Chat running on :3847"
             # Quick health check
-            curl -s --max-time 5 http://localhost:3847/api/health | head -c 200
+            curl -s --max-time 5 http://localhost:3847/api/health | head -c 300
             echo ""
           else
             echo "✗ Claude Chat failed to start"
