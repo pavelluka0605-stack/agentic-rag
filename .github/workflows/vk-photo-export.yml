@@ -1,11 +1,6 @@
 name: "VK Photo Export — mebelit_krsk"
 
 on:
-  push:
-    branches:
-      - 'claude/mebelit-discovery-audit-*'
-    paths:
-      - '.github/workflows/vk-photo-export.yml'
   workflow_dispatch:
     inputs:
       action:
