@@ -33,7 +33,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Fix service (disable watchdog, kill port, restart)
+      - name: Fix EADDRINUSE crash loop
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -42,43 +42,55 @@ jobs:
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
           OUT="diag-output.txt"
 
-          echo "=== FIX $(date -u) ===" > $OUT
+          # Do everything in ONE SSH session to avoid race conditions
+          $SSH 'bash -s' <<'REMOTE' 2>&1 | tee $OUT
+          set -x
 
-          # Step 1: Pause watchdog cron
-          echo "=== Pause watchdog ===" >> $OUT
-          $SSH "crontab -l > /tmp/cron_backup.txt 2>/dev/null; crontab -l 2>/dev/null | grep -v watchdog | crontab - 2>/dev/null; echo 'watchdog paused'" >> $OUT 2>&1
+          # 1. Disable restart in systemd unit
+          sed -i 's/^Restart=always/Restart=no/' /etc/systemd/system/claude-chat.service
+          systemctl daemon-reload
 
-          # Step 2: Stop service completely
-          echo "=== Stop service ===" >> $OUT
-          $SSH "systemctl stop claude-chat 2>/dev/null; echo 'stopped'" >> $OUT 2>&1
-          sleep 2
+          # 2. Stop service (now it won't auto-restart)
+          systemctl stop claude-chat
+          sleep 3
 
-          # Step 3: Kill EVERYTHING on port 3847 repeatedly
-          echo "=== Kill port 3847 ===" >> $OUT
-          $SSH "for i in 1 2 3 4 5; do for p in \$(lsof -t -i:3847 2>/dev/null); do kill -9 \$p 2>/dev/null && echo \"killed \$p (attempt \$i)\"; done; sleep 2; done" >> $OUT 2>&1
+          # 3. Kill everything on port 3847
+          for i in 1 2 3; do
+            pids=$(lsof -t -i:3847 2>/dev/null || true)
+            if [ -z "$pids" ]; then
+              echo "Port 3847 is free"
+              break
+            fi
+            echo "Killing PIDs: $pids"
+            echo "$pids" | xargs kill -9 2>/dev/null || true
+            sleep 2
+          done
 
-          # Step 4: Final check port is free
-          echo "=== Verify port ===" >> $OUT
-          $SSH "lsof -i:3847 2>/dev/null && echo 'STILL BUSY' || echo 'PORT FREE'" >> $OUT 2>&1
+          # 4. Final verify
+          if lsof -i:3847 >/dev/null 2>&1; then
+            echo "FATAL: Port still busy after 3 kill rounds"
+            lsof -i:3847
+            exit 1
+          fi
 
-          # Step 5: Start service
-          echo "=== Start service ===" >> $OUT
-          $SSH "systemctl daemon-reload; systemctl enable claude-chat; systemctl start claude-chat" >> $OUT 2>&1
+          # 5. Restore Restart=always and start
+          sed -i 's/^Restart=no/Restart=always/' /etc/systemd/system/claude-chat.service
+          systemctl daemon-reload
+          systemctl start claude-chat
           sleep 5
 
-          # Step 6: Check
-          echo "=== Check ===" >> $OUT
-          $SSH "systemctl is-active claude-chat && echo 'SERVICE_OK' || echo 'SERVICE_FAIL'" >> $OUT 2>&1
-          $SSH "curl -s --max-time 5 http://localhost:3847/api/health || echo 'health fail'" >> $OUT 2>&1
-          $SSH "journalctl -u claude-chat -n 10 --no-pager" >> $OUT 2>&1
-
-          # Step 7: Restore watchdog
-          echo "=== Restore watchdog ===" >> $OUT
-          $SSH "crontab /tmp/cron_backup.txt 2>/dev/null; echo 'watchdog restored'" >> $OUT 2>&1
-
-          cat $OUT
+          # 6. Check
+          if systemctl is-active --quiet claude-chat; then
+            echo "=== SUCCESS ==="
+            curl -s --max-time 5 http://localhost:3847/api/health
+          else
+            echo "=== STILL FAILING ==="
+            journalctl -u claude-chat -n 20 --no-pager
+          fi
+          REMOTE
 
       - name: Save output
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
