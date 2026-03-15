@@ -33,7 +33,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Fix EADDRINUSE crash loop
+      - name: Investigate and fix
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -42,51 +42,61 @@ jobs:
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
           OUT="diag-output.txt"
 
-          # Do everything in ONE SSH session to avoid race conditions
           $SSH 'bash -s' <<'REMOTE' 2>&1 | tee $OUT
-          set -x
-
-          # 1. Disable restart in systemd unit
-          sed -i 's/^Restart=always/Restart=no/' /etc/systemd/system/claude-chat.service
-          systemctl daemon-reload
-
-          # 2. Stop service (now it won't auto-restart)
-          systemctl stop claude-chat
-          sleep 3
-
-          # 3. Kill everything on port 3847
-          for i in 1 2 3; do
-            pids=$(lsof -t -i:3847 2>/dev/null || true)
-            if [ -z "$pids" ]; then
-              echo "Port 3847 is free"
-              break
-            fi
-            echo "Killing PIDs: $pids"
-            echo "$pids" | xargs kill -9 2>/dev/null || true
-            sleep 2
-          done
-
-          # 4. Final verify
-          if lsof -i:3847 >/dev/null 2>&1; then
-            echo "FATAL: Port still busy after 3 kill rounds"
-            lsof -i:3847
-            exit 1
+          echo "=== WHO IS ON PORT 3847 ==="
+          PID=$(lsof -t -i:3847 2>/dev/null | head -1)
+          if [ -n "$PID" ]; then
+            echo "PID: $PID"
+            echo "CMD: $(cat /proc/$PID/cmdline 2>/dev/null | tr '\0' ' ')"
+            echo "CWD: $(readlink /proc/$PID/cwd 2>/dev/null)"
+            echo "PPID: $(grep PPid /proc/$PID/status 2>/dev/null)"
+            PPID=$(grep PPid /proc/$PID/status 2>/dev/null | awk '{print $2}')
+            echo "PARENT CMD: $(cat /proc/$PPID/cmdline 2>/dev/null | tr '\0' ' ')"
+            echo "PARENT NAME: $(cat /proc/$PPID/comm 2>/dev/null)"
+            echo ""
+            echo "=== PROCESS TREE ==="
+            pstree -ap $PID 2>/dev/null || ps -ef | grep $PID
           fi
 
-          # 5. Restore Restart=always and start
-          sed -i 's/^Restart=no/Restart=always/' /etc/systemd/system/claude-chat.service
+          echo ""
+          echo "=== ALL NODE PROCESSES ==="
+          ps aux | grep node | grep -v grep
+
+          echo ""
+          echo "=== ALL SYSTEMD UNITS WITH 'chat' ==="
+          systemctl list-units --all | grep -i chat
+
+          echo ""
+          echo "=== CRONTAB ==="
+          crontab -l 2>/dev/null || echo "no crontab"
+
+          echo ""
+          echo "=== PM2 ==="
+          pm2 list 2>/dev/null || echo "no pm2"
+
+          echo ""
+          echo "=== MASK + KILL + START ==="
+          systemctl mask claude-chat
+          systemctl stop claude-chat 2>/dev/null || true
+          sleep 2
+          for p in $(lsof -t -i:3847 2>/dev/null); do kill -9 $p; done
+          sleep 2
+          for p in $(lsof -t -i:3847 2>/dev/null); do kill -9 $p; done
+          sleep 2
+
+          echo "Port check:"
+          lsof -i:3847 2>/dev/null && echo "STILL BUSY" || echo "PORT FREE"
+
+          systemctl unmask claude-chat
           systemctl daemon-reload
           systemctl start claude-chat
           sleep 5
 
-          # 6. Check
-          if systemctl is-active --quiet claude-chat; then
-            echo "=== SUCCESS ==="
-            curl -s --max-time 5 http://localhost:3847/api/health
-          else
-            echo "=== STILL FAILING ==="
-            journalctl -u claude-chat -n 20 --no-pager
-          fi
+          echo ""
+          echo "=== FINAL STATUS ==="
+          systemctl is-active claude-chat && echo "SERVICE OK" || echo "SERVICE FAIL"
+          curl -s --max-time 5 http://localhost:3847/api/health || echo "health fail"
+          journalctl -u claude-chat -n 5 --no-pager
           REMOTE
 
       - name: Save output
@@ -96,6 +106,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet && echo "No changes" || {
-            git commit -m "diag: fix result [skip ci]"
+            git commit -m "diag: investigate + fix [skip ci]"
             git push origin main
           }
