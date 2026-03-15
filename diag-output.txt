@@ -1,36 +1,31 @@
-=== FIX SERVICE Sun Mar 15 05:19:38 UTC 2026 ===
-
-=== STEP 1: Disable auto-restart ===
-stopped and disabled
-
-=== STEP 2: Kill ALL on port 3847 ===
-killing 801876
-done
-
-=== STEP 3: Verify port free ===
+=== FIX Sun Mar 15 05:22:22 UTC 2026 ===
+=== Pause watchdog ===
+watchdog paused
+=== Stop service ===
+stopped
+=== Kill port 3847 ===
+killed 802256 (attempt 1)
+killed 803449 (attempt 2)
+killed 803532 (attempt 3)
+killed 803564 (attempt 4)
+killed 803596 (attempt 5)
+=== Verify port ===
 COMMAND      PID USER   FD   TYPE  DEVICE SIZE/OFF NODE NAME
-node\x20/ 802256 root   20u  IPv4 6724523      0t0  TCP *:3847 (LISTEN)
-PORT STILL BUSY
-
-=== STEP 4: Re-enable and start ===
-
-=== STEP 5: Check result ===
+node\x20/ 803647 root   20u  IPv4 6729569      0t0  TCP *:3847 (LISTEN)
+STILL BUSY
+=== Start service ===
+=== Check ===
 activating
 SERVICE_FAIL
-{"status":"ok","uptime":17.471997413,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T05:20:01.955Z"}
-=== JOURNAL (last 15) ===
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at listenInCluster (node:net:1965:12)
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at doListen (node:net:2139:7)
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]: Emitted 'error' event on Server instance at:
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at emitErrorNT (node:net:1944:8)
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   code: 'EADDRINUSE',
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   errno: -98,
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   syscall: 'listen',
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   address: '0.0.0.0',
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   port: 3847
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]: }
-Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]: Node.js v20.20.1
-Mar 15 05:20:01 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
-Mar 15 05:20:01 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
+{"status":"ok","uptime":12.62733629,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T05:22:54.236Z"}Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   code: 'EADDRINUSE',
+Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   errno: -98,
+Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   syscall: 'listen',
+Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   address: '0.0.0.0',
+Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   port: 3847
+Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]: }
+Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]: Node.js v20.20.1
+Mar 15 05:22:55 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
+Mar 15 05:22:55 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
+=== Restore watchdog ===
+watchdog restored
