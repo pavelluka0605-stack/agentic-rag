@@ -91,10 +91,21 @@ jobs:
           echo "Avatar type: $(echo "$RESPONSE" | grep -o '&#[0-9]*;' | head -1)"
 
           echo ""
-          echo "=== STEP 8: Check nginx/proxy config ==="
-          nginx -T 2>/dev/null | grep -A5 'chat.marbomebel' || echo "no nginx config found for chat"
-          cat /etc/nginx/sites-enabled/*chat* 2>/dev/null || echo "no sites-enabled chat config"
-          cat /etc/nginx/conf.d/*chat* 2>/dev/null || echo "no conf.d chat config"
+          echo "=== STEP 8: Full nginx config for chat ==="
+          cat /etc/nginx/sites-enabled/*chat* 2>/dev/null || echo "no sites-enabled"
+          echo ""
+          echo "=== SSL certs ==="
+          ls -la /etc/letsencrypt/live/chat.marbomebel.ru/ 2>/dev/null || echo "no SSL certs for chat.marbomebel.ru"
+          ls -la /etc/letsencrypt/live/ 2>/dev/null || echo "no letsencrypt at all"
+          echo ""
+          echo "=== All nginx sites ==="
+          ls /etc/nginx/sites-enabled/ 2>/dev/null
+          echo ""
+          echo "=== Nginx listen ports ==="
+          grep -r 'listen' /etc/nginx/sites-enabled/ 2>/dev/null
+          echo ""
+          echo "=== Port 443 check ==="
+          ss -tlnp | grep ':443\|:80' 2>/dev/null || netstat -tlnp | grep ':443\|:80' 2>/dev/null
 
           echo ""
           echo "DONE"
