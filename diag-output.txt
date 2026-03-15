@@ -1,12 +1,77 @@
-=== EXTERNAL VERIFY Sun Mar 15 10:35:09 UTC 2026 ===
+=== STEP 1: What is on VPS RIGHT NOW? Sun Mar 15 10:39:04 UTC 2026 ===
 Title: <title>AI Ассистент</title>
-RAG: 16
-Manifest: 0
+RAG in HTML: 0
 0
-StatusLine: id="statusLine">онлайн<
-Health: {"status":"ok","uptime":12.411035262,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:35:13.099Z"}
-HTTP: HTTP/2 200 
-Size: 29629
-Systemd: not-found
-disabled
-PM2: │ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 825453   │ 18s    │ 0    │ online    │ 0%       │ 54.4mb   │ root     │ disabled │
+Manifest link: 0
+0
+File modified: 2026-03-15 10:34:50.448818443 +0000
+MD5: f69499b91889d4bbe8d1c1e958826903
+Process on 3847: LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=825453,fd=20))                                                                                                                      
+PM2: │ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 825453   │ 4m     │ 0    │ online    │ 0%       │ 53.4mb   │ root     │ disabled │
+Systemd: failed
+inactive
+
+--- First 15 lines of HTML ---
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AI Ассистент</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a14;
+  --surface: #12121e;
+  --surface2: #1a1a2e;
+  --border: #2a2a3e;
+
+=== STEP 2: FORCE DEPLOY from this checkout ===
+Local title: <title>AI Ассистент</title>
+[PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
+[PM2] [claude-chat](0) ✓
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+found 0 vulnerabilities
+[PM2] Starting /opt/claude-chat/server.js in fork_mode (1 instance)
+[PM2] Done.
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 827763   │ 0s     │ 0    │ online    │ 0%       │ 18.8mb   │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Saving current process list...
+[PM2] Successfully saved in /root/.pm2/dump.pm2
+
+After deploy:
+Title: <title>AI Ассистент</title>
+MD5: f69499b91889d4bbe8d1c1e958826903
+Health: {"status":"ok","uptime":3.261943873,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:39:32.085Z"}
+
+=== STEP 3: Wait 60s and check if overwritten ===
+After 60s wait:
+Title: <title>AI Ассистент</title>
+MD5: f69499b91889d4bbe8d1c1e958826903
+File modified: 2026-03-15 10:39:13.148797006 +0000
+Process: LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=827763,fd=20))                                                                                                                      
+
+=== STEP 4: External check ===
+HTTPS title: <title>AI Ассистент</title>
+HTTPS health: {"status":"ok","uptime":67.908086189,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:40:36.731Z"}
+HTTPS first 10 lines:
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AI Ассистент</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+DONE Sun Mar 15 10:40:37 UTC 2026
