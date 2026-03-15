@@ -29,22 +29,22 @@ found 0 vulnerabilities
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 809498   │ 0s     │ 0    │ online    │ 0%       │ 18.5mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 810041   │ 0s     │ 0    │ online    │ 0%       │ 18.1mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 809498   │ 4s     │ 0    │ online    │ 0%       │ 58.4mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 810041   │ 4s     │ 0    │ online    │ 0%       │ 58.2mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
 === STEP 5: Health check ===
-{"status":"ok","uptime":4.24513401,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T06:54:41.770Z"}
+{"status":"ok","uptime":4.23878514,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T06:56:32.764Z"}
 
 === STEP 6: Verify index.html on disk ===
 f69499b91889d4bbe8d1c1e958826903  /opt/claude-chat/public/index.html
 4b6d0688d389934b4d3e07f083a39525  /opt/claude-chat/server.js
--rw-r--r-- 1 root root 29503 Mar 15 06:54 /opt/claude-chat/public/index.html
--rw-r--r-- 1 root root 22368 Mar 15 06:54 /opt/claude-chat/server.js
+-rw-r--r-- 1 root root 29503 Mar 15 06:56 /opt/claude-chat/public/index.html
+-rw-r--r-- 1 root root 22368 Mar 15 06:56 /opt/claude-chat/server.js
 
 === STEP 7: What browser actually gets ===
 <!DOCTYPE html>
@@ -64,42 +64,153 @@ Has double-tap protection: 3
 Has PWA manifest: 0
 Avatar type: &#9670;
 
-=== STEP 8: Full nginx config for chat ===
-server {
-    listen 80;
-    server_name chat.marbomebel.ru;
+=== STEP 8: Docker containers ===
+CONTAINER ID   NAMES                    PORTS                                                                          IMAGE
+e292f6cbdd5a   mebelit-wp-wordpress-1   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp                                        wordpress:6.7-php8.2-apache
+ef1604097c60   mebelit-wp-db-1          0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp                         mysql:8.0
+581a07387d54   n8n-traefik-traefik-1    0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp   traefik
+b77d63637705   n8n-postgres-1           5432/tcp                                                                       pgvector/pgvector:pg16
+43bc332d60fe   n8n-voice-app-1          80/tcp                                                                         nginx:alpine
+f22e23598ce9   n8n-n8n-1                5678/tcp                                                                       n8nio/n8n:latest
+a2ffa3a5ed71   openclaw                                                                                                alpine/openclaw:latest
 
-    location / {
-        proxy_pass http://127.0.0.1:3847;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;
-        proxy_send_timeout 300s;
-    }
-}
+=== STEP 9: Docker reverse proxy config ===
+no caddy
+no traefik
+no docker nginx
 
-=== SSL certs ===
-no SSL certs for chat.marbomebel.ru
-no letsencrypt at all
+=== STEP 10: Docker compose files ===
+/opt/n8n/docker-compose.yml
+/opt/openclaw/docker-compose.yml
+/opt/claude-chat/mebelit-wp/docker-compose.yml
+/opt/clawtest/docker-compose.yml
+--- /opt/n8n/docker-compose.yml ---
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    networks:
+      - n8n-traefik_default
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
-=== All nginx sites ===
-chat-marbomebel
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    networks:
+      - n8n-traefik_default
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      N8N_HOST: n8n.marbomebel.ru
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://n8n.marbomebel.ru/
+      N8N_EDITOR_BASE_URL: https://n8n.marbomebel.ru/
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE}
+      N8N_BASIC_AUTH_ACTIVE: ${N8N_BASIC_AUTH_ACTIVE}
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+      AMOCRM_DOMAIN: marbomebel
+      AMOCRM_TOKEN: "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6IjQ3OTljY2UwYjkxYzgzMDJhM2Y0YTEzZGI3OGVkOTM0OTdlOTdkMTljZTA0MWUyNjM0ZTZjOTViMDFhYTk2ZTVhZjI3YmU2ODNkZTk5MTIwIn0.eyJhdWQiOiJkMTRlYWJjNi1mMDNlLTQ4ODEtYTg5MS02NThmYzMyOGFmNWIiLCJqdGkiOiI0Nzk5Y2NlMGI5MWM4MzAyYTNmNGExM2RiNzhlZDkzNDk3ZTk3ZDE5Y2UwNDFlMjYzNGU2Yzk1YjAxYWE5NmU1YWYyN2JlNjgzZGU5OTEyMCIsImlhdCI6MTc3MjkwOTA3MiwibmJmIjoxNzcyOTA5MDcyLCJleHAiOjE5MTc0NzUyMDAsInN1YiI6Ijc3Nzc5ODQiLCJncmFudF90eXBlIjoiIiwiYWNjb3VudF9pZCI6Mjk5MDIxNzcsImJhc2VfZG9tYWluIjoiYW1vY3JtLnJ1IiwidmVyc2lvbiI6Miwic2NvcGVzIjpbInB1c2hfbm90aWZpY2F0aW9ucyIsImZpbGVzIiwiY3JtIiwiZmlsZXNfZGVsZXRlIiwibm90aWZpY2F0aW9ucyJdLCJoYXNoX3V1aWQiOiI3MWFlZjkwYS1iMTRiLTQ5MjEtYjY0Zi05NDMwODAxMjY0NmMiLCJ1c2VyX2ZsYWdzIjowLCJhcGlfZG9tYWluIjoiYXBpLWIuYW1vY3JtLnJ1In0.X7PISrIuuZ-NV_9pr8XKCAwuxyGgP6c5_2TVKH5naq-rFjjbA3GQhE4MYvWfKVMOv2J9rGUmr-93HQBN-6g3_0XR_mSIo5C28X5BQ9WiO2wriFY7UDVz5O5xLPIk1s-TRYYOFNqK-hid-XVQOsabTEDiGhA_LnGc3ceS_s4xkcVddgQxb5vam1yiEjEYTGr3tJzJz8glDEkC2L-3ID9AVl3uo4xQ8A-B5iphl1_IJST1aK9OoCwbgbvcMybm997ynwPynk9qA4atxnEahWwoWbVga2N5rbxD3UJES-W0SRP2Jqobi5QZ13ez8t5jzXNAT7fh51LAo54TRDq_6iB5IQ"
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
+      TZ: ${TZ}
+      N8N_PROXY_HOPS: "1"
 
-=== Nginx listen ports ===
-/etc/nginx/sites-enabled/chat-marbomebel:    listen 80;
+--- /opt/openclaw/docker-compose.yml ---
+services:
+  openclaw:
+    image: alpine/openclaw:latest
+    container_name: openclaw
+    restart: unless-stopped
+    networks:
+      - n8n-traefik_default
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.openclaw.rule=Host("claw.marbomebel.ru")
+      - traefik.http.routers.openclaw.entrypoints=websecure
+      - traefik.http.routers.openclaw.tls=true
+      - traefik.http.routers.openclaw.tls.certresolver=mytlschallenge
+      - traefik.http.services.openclaw.loadbalancer.server.port=18789
 
-=== Port 443 check ===
-LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
-LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
-LISTEN 0      4096         0.0.0.0:8080       0.0.0.0:*    users:(("docker-proxy",pid=753007,fd=7))                                                                                                                          
-LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*    users:(("uvicorn",pid=706575,fd=6))                                                                                                                               
-LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
-LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=577310,fd=7))                                                                                                                          
-LISTEN 0      4096            [::]:8080          [::]:*    users:(("docker-proxy",pid=753015,fd=7))                                                                                                                          
+networks:
+  n8n-traefik_default:
+    external: true
+
+--- /opt/claude-chat/mebelit-wp/docker-compose.yml ---
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: mebelit
+      MYSQL_USER: mebelit
+      MYSQL_PASSWORD: mebelit_pass_2024
+      MYSQL_ROOT_PASSWORD: root_pass_2024
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  wordpress:
+    image: wordpress:6.7-php8.2-apache
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: mebelit
+      WORDPRESS_DB_USER: mebelit
+      WORDPRESS_DB_PASSWORD: mebelit_pass_2024
+      WORDPRESS_TABLE_PREFIX: ml_
+    volumes:
+      - wp_data:/var/www/html
+      - ./theme/mebelit:/var/www/html/wp-content/themes/mebelit
+
+volumes:
+  db_data:
+  wp_data:
+
+--- /opt/clawtest/docker-compose.yml ---
+services:
+  whoami:
+    image: traefik/whoami
+    container_name: clawtest-whoami
+    restart: unless-stopped
+    networks:
+      - n8n-traefik_default
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.clawtest.rule=Host("claw.marbomebel.ru")
+      - traefik.http.routers.clawtest.entrypoints=websecure
+      - traefik.http.routers.clawtest.tls=true
+      - traefik.http.routers.clawtest.tls.certresolver=mytlschallenge
+      - traefik.http.services.clawtest.loadbalancer.server.port=80
+
+networks:
+  n8n-traefik_default:
+    external: true
+
+
+=== STEP 11: Test direct curl vs domain ===
+Direct localhost:3847:
+<title>AI Ассистент</title>
+Via domain (host header):
+port 80 blocked or different
+External HTTPS:
+<title>AI Ассистент</title>
 
 DONE
