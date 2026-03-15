@@ -1,6 +1,6 @@
 {
   "name": "claude-chat",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Mobile PWA chat for VPS management via Claude Code CLI",
   "main": "server.js",
   "scripts": {
