@@ -12,19 +12,37 @@
 для ребрендинга в «Кухни Рема» (кухнирема.рф).
 
 ### Что сделано
-- [x] Скачаны и проанализированы все страницы mebelit.site (6 живых + 4 мёртвых дубля)
-- [x] Полный аудит: структура, UX, контент, SEO, конкуренты — `site-analysis/DISCOVERY-AUDIT.md`
-- [x] Экспорт 205 фото из VK Market (43 товара) — `site-analysis/vk-photos-index.json`
-- [x] Анализ 6 конкурентов кухонь в Красноярске
-- [x] Создан workflow `yandex-metrika.yml` для выгрузки статистики
-- [x] Токен Яндекс Метрики создан и добавлен в GitHub Secrets как `YANDEX_METRIKA_TOKEN`
-- [x] Workflow запущен автоматически через push-триггер
+
+**Этап 1: Discovery/Аудит**
+- [x] Полный аудит mebelit.site — `site-analysis/DISCOVERY-AUDIT.md`
+- [x] Экспорт 205 фото VK Market — `site-analysis/vk-photos-index.json`
+- [x] Анализ 6 конкурентов, Яндекс Метрика — `site-analysis/yandex-metrika-report.md`
+- [x] План ребрендинга (10 разделов) — `site-analysis/REBRAND-PLAN.md`
+
+**Фундамент (workflows, WordPress, дизайн, SEO)**
+- [x] VK Photo Export workflow — `.github/workflows/vk-photo-export.yml`
+- [x] CPT Kitchen (JSON + PHP) — `site-build/wordpress/`
+- [x] Дизайн-токены + бренд-гайд — `site-build/design/`
+- [x] Wireframes 9 страниц — `site-build/wireframes/WIREFRAMES.md`
+- [x] SEO-конфиг (5 файлов) — `site-build/seo/`
+
+**Этап 2: Архитектура**
+- [x] Сравнение 4 стеков → Bricks Builder — `site-build/architecture/01-stack-comparison.md`
+- [x] Архитектура + контентная модель + IA — `site-build/architecture/02-site-architecture.md`
+- [x] SEO + лидогенерация + аналитика — `site-build/architecture/03-seo-leadgen-analytics.md`
+- [x] Риски + переход в этап 3 — `site-build/architecture/04-risks-and-handoff.md`
+
+**Этап 3: Дизайн-система**
+- [x] Визуальное ДНК MEBELIT + направление «Dark Hero + Light Content» — `site-build/design/01-visual-direction.md`
+- [x] Полная дизайн-система (14 компонентов) + UX-принципы — `site-build/design/02-design-system.md`
+- [x] Структура 10 блоков главной + 7 шаблонов + контентная логика — `site-build/design/03-page-structures.md`
+- [x] Фото/визуал + риски + переход в этап 4 — `site-build/design/04-visual-content-risks-handoff.md`
 
 ### Что в процессе
-- (всё завершено)
+- (всё завершено, готовы к этапу 4)
 
 ### Что дальше
-- [ ] Реализация REBRAND-PLAN.md — сборка нового сайта кухнирема.рф
+- [ ] Этап 4: Реализация — сборка сайта кухнирема.рф на WordPress + Bricks Builder
 
 ### Ключевые данные Яндекс Метрики (90 дней: 2025-12-15 — 2026-03-15)
 - 7 287 визитов, 5 286 уников
