@@ -1,38 +1,46 @@
-+ sed -i 's/^Restart=always/Restart=no/' /etc/systemd/system/claude-chat.service
-+ systemctl daemon-reload
-+ systemctl stop claude-chat
-+ sleep 3
-+ for i in 1 2 3
-++ lsof -t -i:3847
-Killing PIDs: 805009
-+ pids=805009
-+ '[' -z 805009 ']'
-+ echo 'Killing PIDs: 805009'
-+ echo 805009
-+ xargs kill -9
-+ sleep 2
-+ for i in 1 2 3
-++ lsof -t -i:3847
-+ pids=805028
-+ '[' -z 805028 ']'
-+ echo 'Killing PIDs: 805028'
-Killing PIDs: 805028
-+ echo 805028
-+ xargs kill -9
-+ sleep 2
-+ for i in 1 2 3
-++ lsof -t -i:3847
-Killing PIDs: 805050
-+ pids=805050
-+ '[' -z 805050 ']'
-+ echo 'Killing PIDs: 805050'
-+ echo 805050
-+ xargs kill -9
-+ sleep 2
-+ lsof -i:3847
-FATAL: Port still busy after 3 kill rounds
-+ echo 'FATAL: Port still busy after 3 kill rounds'
-+ lsof -i:3847
+=== WHO IS ON PORT 3847 ===
+PID: 805271
+CMD: node /opt/claude-chat/server.js                            
+CWD: /opt/claude-chat
+PPID: PPid:	545324
+
+=== ALL NODE PROCESSES ===
+bash: line 8: PPID: readonly variable
+1000      332320  0.2  7.6 18833388 308128 ?     Sl   Mar10  20:12 node /usr/local/bin/n8n
+1000      332335  0.1  1.8 9527332 72848 ?       Sl   Mar10   9:29 node --disallow-code-generation-from-strings --disable-proto=delete /usr/local/lib/node_modules/n8n/node_modules/.pnpm/@n8n+task-runner@file+packages+@n8n+task-runner_@opentelemetry+api@1.9.0_@opentelemetry_abc4e288c7f66f0b9b114d073d3c169d/node_modules/@n8n/task-runner/dist/start.js
+root      510445  0.0  0.4 992520 19664 ?        Ssl  Mar12   0:02 /usr/bin/node /opt/vk-callback/server.js
+root      702078  0.0  1.1 1291432 47028 ?       Ssl  Mar14   0:06 /usr/bin/node /opt/vk-longpoll/listener.js
+root      702257  0.0  1.5 1304276 61060 ?       Ssl  Mar14   0:17 /usr/bin/node /opt/vk-user-longpoll/listener.js
+root      748329  0.2  5.5 23082372 221360 ?     Ssl  00:55   0:44 node /usr/bin/n8n start
+root      748411  0.1  1.5 22001008 60640 ?      Sl   00:55   0:20 node --disallow-code-generation-from-strings --disable-proto=delete /usr/lib/node_modules/n8n/node_modules/@n8n/task-runner/dist/start.js
+root      805271 11.9  1.4 1037448 59836 ?       Ssl  05:28   0:00 node /opt/claude-chat/server.js
+
+=== ALL SYSTEMD UNITS WITH 'chat' ===
+  claude-chat.service                                                                                   loaded    active   running   Claude Chat (chat.marbomebel.ru)
+  webapp.service                                                                                        loaded    active   running   FastAPI Webapp (chat.marbomebel.ru)
+
+=== CRONTAB ===
+0 3 * * * cd /opt/mcp-memory && /usr/bin/node src/backup.js >> /var/log/mcp-memory-backup.log 2>&1
+
+=== PM2 ===
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 805271   │ 3s     │ 71   │ online    │ 0%       │ 58.3mb   │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+=== MASK + KILL + START ===
+Failed to mask unit: File /etc/systemd/system/claude-chat.service already exists.
+Port check:
 COMMAND      PID USER   FD   TYPE  DEVICE SIZE/OFF NODE NAME
-node\x20/ 805069 root   20u  IPv4 6734660      0t0  TCP *:3847 (LISTEN)
-+ exit 1
+node\x20/ 805491 root   20u  IPv4 6737229      0t0  TCP *:3847 (LISTEN)
+STILL BUSY
+
+=== FINAL STATUS ===
+failed
+SERVICE FAIL
+{"status":"ok","uptime":7.829967473,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T05:28:47.217Z"}Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]:   port: 3847
+Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]: }
+Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]: Node.js v20.20.1
+Mar 15 05:28:42 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
+Mar 15 05:28:42 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
