@@ -19,49 +19,9 @@ if (!BEARER_TOKEN) {
   process.exit(1);
 }
 
-// --- RAG Memory Search ---
-const RAG_SCRIPT = path.join(__dirname, 'rag_search.py');
-const RAG_SAVE_SCRIPT = path.join(__dirname, 'rag_save.py');
-
-function ragSearch(query) {
-  return new Promise((resolve) => {
-    if (!query || query.length < 5) return resolve(null);
-    try {
-      const child = spawn('python3', [RAG_SCRIPT, query], {
-        env: { ...process.env },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 10000,
-      });
-      let stdout = '';
-      child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-      child.on('close', (code) => {
-        if (code !== 0 || !stdout.trim()) return resolve(null);
-        try {
-          const result = JSON.parse(stdout.trim());
-          if (result.found > 0 && result.context) return resolve(result);
-        } catch (_) {}
-        resolve(null);
-      });
-      child.on('error', () => resolve(null));
-    } catch (_) {
-      resolve(null);
-    }
-  });
-}
-
-function ragSave(action, result, category, tags) {
-  try {
-    const child = spawn('python3', [RAG_SAVE_SCRIPT, action, result, category, JSON.stringify(tags)], {
-      env: { ...process.env },
-      stdio: ['ignore', 'ignore', 'ignore'],
-      timeout: 5000,
-    });
-    child.unref();
-  } catch (_) {}
-}
-
 // --- Find claude CLI ---
 function findClaude() {
+  // Common locations for claude CLI
   const candidates = [
     'claude',
     '/usr/local/bin/claude',
@@ -70,16 +30,21 @@ function findClaude() {
     path.join(os.homedir(), '.local', 'bin', 'claude'),
     path.join(os.homedir(), '.npm-global', 'bin', 'claude'),
   ];
+
+  // Try which first
   try {
     const found = execSync('which claude 2>/dev/null || command -v claude 2>/dev/null', { encoding: 'utf-8' }).trim();
     if (found) return found;
   } catch (_) {}
+
+  // Check candidate paths
   for (const c of candidates) {
     try {
-      if (c === 'claude') continue;
+      if (c === 'claude') continue; // already tried via which
       if (fs.existsSync(c)) return c;
     } catch (_) {}
   }
+
   return null;
 }
 
@@ -87,47 +52,6 @@ const CLAUDE_PATH = findClaude();
 console.log(`Claude CLI: ${CLAUDE_PATH || 'NOT FOUND'}`);
 if (!CLAUDE_PATH) {
   console.warn('WARNING: claude CLI not found. Chat will use fallback shell mode.');
-}
-
-// --- Persistent conversations on disk ---
-const CONV_DIR = path.join(__dirname, 'data');
-const CONV_FILE = path.join(CONV_DIR, 'conversations.json');
-if (!fs.existsSync(CONV_DIR)) fs.mkdirSync(CONV_DIR, { recursive: true });
-
-function loadConversations() {
-  try {
-    if (fs.existsSync(CONV_FILE)) {
-      const data = JSON.parse(fs.readFileSync(CONV_FILE, 'utf-8'));
-      const map = new Map();
-      for (const [k, v] of Object.entries(data)) {
-        map.set(k, v);
-      }
-      console.log(`Loaded ${map.size} conversations from disk`);
-      return map;
-    }
-  } catch (e) {
-    console.error('Failed to load conversations:', e.message);
-  }
-  return new Map();
-}
-
-function saveConversations() {
-  try {
-    const obj = {};
-    for (const [k, v] of conversations) {
-      obj[k] = v;
-    }
-    fs.writeFileSync(CONV_FILE, JSON.stringify(obj), 'utf-8');
-  } catch (e) {
-    console.error('Failed to save conversations:', e.message);
-  }
-}
-
-// Debounced save
-let saveTimer = null;
-function debouncedSave() {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveConversations, 5000);
 }
 
 // --- Middleware ---
@@ -139,6 +63,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '10mb' }));
+// No-cache for HTML to prevent stale versions
 app.use((req, res, next) => {
   if (req.path === '/' || req.path.endsWith('.html')) {
     res.header('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -147,19 +72,21 @@ app.use((req, res, next) => {
   }
   next();
 });
+// Serve index.html dynamically with injected config
 app.get('/', (req, res) => {
   const htmlPath = path.join(__dirname, 'public', 'index.html');
   let html = fs.readFileSync(htmlPath, 'utf-8');
+  // Inject auto-config script before </head>
   const configScript = `<script>window.__CHAT_CONFIG__=${JSON.stringify({ token: BEARER_TOKEN, url: '' })};</script>`;
   html = html.replace('</head>', configScript + '</head>');
   res.type('html').send(html);
 });
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rate limit: 15 req/min (increased for better UX)
+// Rate limit: 10 req/min
 const limiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 15,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, try again later' },
@@ -178,16 +105,18 @@ function auth(req, res, next) {
 // --- Concurrency control ---
 let activeRequests = 0;
 const MAX_CONCURRENT = 2;
-const runningProcesses = new Map();
+const runningProcesses = new Map(); // id -> child_process
 
 // --- Background results store ---
-const backgroundResults = new Map();
-const BG_RESULT_TTL = 10 * 60 * 1000;
+// Keeps results for disconnected clients to poll
+const backgroundResults = new Map(); // id -> { chunks: [], done: boolean, elapsed, code, startTime }
+const BG_RESULT_TTL = 10 * 60 * 1000; // 10 min TTL
 
-// --- Conversation history store (persistent) ---
-const conversations = loadConversations();
-const CONV_TTL = 24 * 60 * 60 * 1000; // 24 hours TTL
-const pendingRequests = new Map();
+// --- Conversation history store ---
+// Persists messages so client can recover after disconnect/app restart
+const conversations = new Map(); // sessionId -> { messages: [...], lastActivity: Date }
+const CONV_TTL = 60 * 60 * 1000; // 1 hour TTL
+const pendingRequests = new Map(); // sessionId -> requestId (active request mapping)
 
 // Cleanup old results, conversations, and fix counter drift
 setInterval(() => {
@@ -197,53 +126,24 @@ setInterval(() => {
       backgroundResults.delete(id);
     }
   }
-  let cleaned = false;
   for (const [sid, conv] of conversations) {
     if (now - conv.lastActivity > CONV_TTL) {
       conversations.delete(sid);
       pendingRequests.delete(sid);
-      cleaned = true;
     }
   }
-  if (cleaned) debouncedSave();
+  // Fix activeRequests counter drift: should equal runningProcesses.size
   if (activeRequests !== runningProcesses.size) {
     console.warn(`[cleanup] activeRequests drift: counter=${activeRequests}, actual=${runningProcesses.size}. Correcting.`);
     activeRequests = runningProcesses.size;
   }
 }, 60000);
 
-// --- RAG memory stats ---
-function ragStats() {
-  return new Promise((resolve) => {
-    try {
-      const child = spawn('python3', ['-c', `
-import sys, os, json
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath("${RAG_SCRIPT}"))))
-os.environ.setdefault("RAG_DB", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath("${RAG_SCRIPT}"))), "rag_memory.db"))
-import memory_store
-s = memory_store.stats()
-print(json.dumps(s))
-`], {
-        env: { ...process.env },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 5000,
-      });
-      let stdout = '';
-      child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-      child.on('close', () => {
-        try { resolve(JSON.parse(stdout.trim())); } catch (_) { resolve(null); }
-      });
-      child.on('error', () => resolve(null));
-    } catch (_) {
-      resolve(null);
-    }
-  });
-}
-
 // --- Routes ---
 
-// Health check (no auth)
-app.get('/api/health', async (_req, res) => {
+// Health check (no auth) — also cleans up stale processes
+app.get('/api/health', (_req, res) => {
+  // Auto-cleanup: kill processes running longer than 6 minutes (should never happen)
   const now = Date.now();
   const MAX_AGE = 6 * 60 * 1000;
   let cleaned = 0;
@@ -264,9 +164,6 @@ app.get('/api/health', async (_req, res) => {
     }
   }
 
-  let rag = null;
-  try { rag = await ragStats(); } catch (_) {}
-
   res.json({
     status: 'ok',
     uptime: process.uptime(),
@@ -276,7 +173,6 @@ app.get('/api/health', async (_req, res) => {
     conversations: conversations.size,
     cleaned,
     claudeCli: CLAUDE_PATH || 'not found (fallback: bash)',
-    rag: rag || { status: 'unavailable' },
     timestamp: new Date().toISOString(),
   });
 });
@@ -294,7 +190,7 @@ app.get('/api/vps-status', auth, (_req, res) => {
     try {
       const df = execSync("df -h / | tail -1", { encoding: 'utf-8' }).trim().split(/\s+/);
       diskInfo = { total: df[1], used: df[2], available: df[3], percent: df[4] };
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
 
     let dockerContainers = [];
     try {
@@ -303,7 +199,7 @@ app.get('/api/vps-status', auth, (_req, res) => {
         const [name, status, ports] = line.split('|');
         return { name, status, ports };
       });
-    } catch (_) {}
+    } catch (_) { /* docker may not be available */ }
 
     res.json({
       uptime: formatUptime(uptime),
@@ -328,7 +224,7 @@ app.get('/api/vps-status', auth, (_req, res) => {
 });
 
 // Chat — SSE streaming
-app.post('/api/chat', auth, async (req, res) => {
+app.post('/api/chat', auth, (req, res) => {
   const { message, history, sessionId: clientSessionId } = req.body;
 
   if (!message || typeof message !== 'string') {
@@ -352,7 +248,6 @@ app.post('/api/chat', auth, async (req, res) => {
 
   // Save user message
   conv.messages.push({ role: 'user', content: message, timestamp: Date.now() });
-  debouncedSave();
 
   // Track pending request for this session
   pendingRequests.set(sessionId, requestId);
@@ -366,7 +261,7 @@ app.post('/api/chat', auth, async (req, res) => {
     'X-Request-Id': requestId,
   });
 
-  // Heartbeat
+  // Heartbeat to keep connection alive through proxies (every 5s)
   const heartbeat = setInterval(() => {
     try { res.write(': heartbeat\n\n'); } catch (_) { clearInterval(heartbeat); }
   }, 5000);
@@ -374,39 +269,20 @@ app.post('/api/chat', auth, async (req, res) => {
   // Send request ID and session ID
   res.write(`data: ${JSON.stringify({ type: 'start', id: requestId, sessionId })}\n\n`);
 
-  // RAG: search memory for relevant context
-  let ragContext = null;
-  try {
-    ragContext = await ragSearch(message);
-    // Notify client about RAG status
-    if (ragContext) {
-      res.write(`data: ${JSON.stringify({ type: 'rag', found: ragContext.found })}\n\n`);
-    }
-  } catch (_) {}
-
-  // Build prompt with system prompt + RAG context + full conversation history
-  let prompt = '';
-
-  // Add RAG context if found
-  if (ragContext) {
-    prompt += `=== Контекст из памяти проекта (${ragContext.found} записей) ===\n${ragContext.context}\n=== Конец контекста ===\n\n`;
-  }
-
-  // Use server-side conversation history (full, not limited)
-  if (conv.messages.length > 1) {
-    const historyMsgs = conv.messages.slice(0, -1); // all except current message
-    const historyText = historyMsgs
+  // Build prompt with history context
+  let prompt = message;
+  if (history && Array.isArray(history) && history.length > 0) {
+    const context = history
+      .slice(-6) // last 6 messages for context
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
       .join('\n');
-    prompt += `Previous conversation:\n${historyText}\n\n`;
+    prompt = `Previous conversation:\n${context}\n\nUser: ${message}`;
   }
-
-  prompt += `User: ${message}`;
 
   const startTime = Date.now();
 
   if (!CLAUDE_PATH) {
-    // Fallback: run command directly via bash
+    // Fallback: run command directly via bash if it looks like a shell command
     const child = spawn('bash', ['-lc', message], {
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -454,15 +330,17 @@ app.post('/api/chat', auth, async (req, res) => {
     return;
   }
 
-  // Spawn claude CLI with stream-json for thinking/tool visibility
-  const child = spawn(CLAUDE_PATH, ['-p', '--output-format', 'stream-json', prompt], {
+  // Spawn claude CLI
+  const child = spawn(CLAUDE_PATH, ['--print', prompt], {
     env: { ...process.env, NO_COLOR: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  // Timeouts
+  // Total timeout: 5 minutes
   const TIMEOUT_MS = 5 * 60 * 1000;
+  // Stale timeout: kill if no output for 90 seconds (claude CLI likely hung)
   const STALE_TIMEOUT_MS = 90 * 1000;
+  // First byte timeout: if no output at all within 30s, something is wrong
   const FIRST_BYTE_TIMEOUT_MS = 30 * 1000;
 
   let lastDataAt = Date.now();
@@ -474,13 +352,15 @@ app.post('/api/chat', auth, async (req, res) => {
       safeSend({ type: 'chunk', text: '\n\n[Превышено время ожидания (5 мин). Запрос отменён.]' });
       safeSend({ type: 'done', elapsed, code: 124 });
       child.kill('SIGTERM');
-      setTimeout(() => child.kill('SIGKILL'), 5000);
+      setTimeout(() => child.kill('SIGKILL'), 5000); // force kill if SIGTERM doesn't work
     }
   }, TIMEOUT_MS);
 
+  // Stale detection: check every 15s if data stopped flowing
   const staleChecker = setInterval(() => {
     const silentMs = Date.now() - lastDataAt;
     if (!gotFirstByte && silentMs > FIRST_BYTE_TIMEOUT_MS) {
+      // No output at all for 30s — claude CLI is likely broken
       console.error(`[${requestId}] No first byte in ${FIRST_BYTE_TIMEOUT_MS/1000}s — killing`);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       safeSend({ type: 'chunk', text: '\n\n[Claude CLI не отвечает. Попробуйте снова.]' });
@@ -489,6 +369,7 @@ app.post('/api/chat', auth, async (req, res) => {
       setTimeout(() => child.kill('SIGKILL'), 3000);
       clearInterval(staleChecker);
     } else if (gotFirstByte && silentMs > STALE_TIMEOUT_MS) {
+      // Had output but stopped for 90s — likely hung
       console.error(`[${requestId}] Stale for ${STALE_TIMEOUT_MS/1000}s — killing`);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       safeSend({ type: 'chunk', text: '\n\n[Ответ прервался. Попробуйте снова.]' });
@@ -501,6 +382,7 @@ app.post('/api/chat', auth, async (req, res) => {
 
   runningProcesses.set(requestId, child);
 
+  // Background buffer — always accumulate so client can poll if disconnected
   const bgResult = { chunks: [], fullText: '', done: false, elapsed: null, code: null, doneAt: null, startTime };
   backgroundResults.set(requestId, bgResult);
 
@@ -512,61 +394,13 @@ app.post('/api/chat', auth, async (req, res) => {
     }
   }
 
-  // Parse stream-json output line by line
-  let stdoutBuffer = '';
   child.stdout.on('data', (chunk) => {
+    const text = chunk.toString();
     lastDataAt = Date.now();
     gotFirstByte = true;
-    stdoutBuffer += chunk.toString();
-    const lines = stdoutBuffer.split('\n');
-    stdoutBuffer = lines.pop(); // keep incomplete line in buffer
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const event = JSON.parse(line);
-        // Map stream-json events to SSE events
-        if (event.type === 'assistant') {
-          if (event.subtype === 'thinking') {
-            safeSend({ type: 'thinking', text: event.text || '' });
-          } else if (event.subtype === 'text') {
-            const text = event.text || '';
-            bgResult.fullText += text;
-            bgResult.chunks.push({ type: 'chunk', text });
-            safeSend({ type: 'chunk', text });
-          }
-        } else if (event.type === 'tool_use') {
-          safeSend({
-            type: 'tool_use',
-            tool: event.tool || event.name || 'tool',
-            input: event.input || '',
-          });
-        } else if (event.type === 'tool_result') {
-          safeSend({
-            type: 'tool_result',
-            output: typeof event.output === 'string' ? event.output.slice(0, 2000) : JSON.stringify(event.output).slice(0, 2000),
-          });
-        } else if (event.type === 'result') {
-          // Final result event — extract text if present
-          if (event.result && !bgResult.fullText) {
-            bgResult.fullText = event.result;
-            safeSend({ type: 'chunk', text: event.result });
-          }
-        } else {
-          // Unknown event type — try to extract text
-          if (event.text) {
-            bgResult.fullText += event.text;
-            safeSend({ type: 'chunk', text: event.text });
-          }
-        }
-      } catch (_) {
-        // Not valid JSON — treat as raw text (fallback)
-        const text = line;
-        bgResult.fullText += text + '\n';
-        bgResult.chunks.push({ type: 'chunk', text: text + '\n' });
-        safeSend({ type: 'chunk', text: text + '\n' });
-      }
-    }
+    bgResult.fullText += text;
+    bgResult.chunks.push({ type: 'chunk', text });
+    safeSend({ type: 'chunk', text });
   });
 
   child.stderr.on('data', (chunk) => {
@@ -597,26 +431,9 @@ app.post('/api/chat', auth, async (req, res) => {
         requestId,
       });
       conv.lastActivity = Date.now();
-      debouncedSave();
     }
 
-    // Auto-save meaningful interactions to RAG memory
-    if (bgResult.fullText && message.length > 20 && bgResult.fullText.length > 100) {
-      const tags = ['chat', 'ai-response'];
-      if (message.toLowerCase().match(/vps|docker|сервер|deploy|nginx/)) tags.push('devops');
-      if (message.toLowerCase().match(/n8n|workflow|автоматиз/)) tags.push('n8n');
-      if (message.toLowerCase().match(/vk|комментар|сообщен/)) tags.push('vk');
-      if (message.toLowerCase().match(/bluesales|crm|клиент|заказ/)) tags.push('crm');
-      if (message.toLowerCase().match(/ошибк|error|fix|баг|bug/)) tags.push('incident');
-      ragSave(
-        `Вопрос: ${message.slice(0, 200)}`,
-        `Ответ: ${bgResult.fullText.slice(0, 500)}`,
-        tags.includes('devops') ? 'devops' : tags.includes('crm') ? 'crm' : 'knowledge',
-        tags
-      );
-    }
-
-    // Clear pending request
+    // Clear pending request for this session
     if (pendingRequests.get(sessionId) === requestId) {
       pendingRequests.delete(sessionId);
     }
@@ -643,13 +460,15 @@ app.post('/api/chat', auth, async (req, res) => {
     runningProcesses.delete(requestId);
   });
 
+  // Client disconnect — DO NOT kill the process, let it finish in background
   req.on('close', () => {
     clientConnected = false;
     clearInterval(heartbeat);
+    // Process continues running, results buffered in backgroundResults
   });
 });
 
-// Poll for result
+// Poll for result of a background request
 app.get('/api/result/:id', auth, (req, res) => {
   const { id } = req.params;
   const bg = backgroundResults.get(id);
@@ -664,13 +483,16 @@ app.get('/api/result/:id', auth, (req, res) => {
   });
 });
 
-// Recover after disconnect
+// Recover after disconnect — get pending/completed result for session
 app.get('/api/recover/:sessionId', auth, (req, res) => {
   const { sessionId } = req.params;
+
+  // Check if there's a pending request for this session
   const pendingRequestId = pendingRequests.get(sessionId);
   const conv = conversations.get(sessionId);
 
   if (pendingRequestId) {
+    // There's still a running request — return its current state
     const bg = backgroundResults.get(pendingRequestId);
     if (bg) {
       const ageMs = Date.now() - (bg.startTime || Date.now());
@@ -686,6 +508,7 @@ app.get('/api/recover/:sessionId', auth, (req, res) => {
     }
   }
 
+  // No pending request — return last assistant message if available
   if (conv && conv.messages.length > 0) {
     const lastMsg = [...conv.messages].reverse().find(m => m.role === 'assistant');
     if (lastMsg) {
@@ -702,14 +525,15 @@ app.get('/api/recover/:sessionId', auth, (req, res) => {
   res.json({ status: 'none' });
 });
 
-// Get conversation history
+// Get conversation history for session
 app.get('/api/history/:sessionId', auth, (req, res) => {
   const { sessionId } = req.params;
   const conv = conversations.get(sessionId);
   if (!conv) {
     return res.json({ messages: [] });
   }
-  const messages = conv.messages.map(m => ({
+  // Return last 50 messages
+  const messages = conv.messages.slice(-50).map(m => ({
     role: m.role,
     content: m.content,
     timestamp: m.timestamp,
@@ -718,19 +542,7 @@ app.get('/api/history/:sessionId', auth, (req, res) => {
   res.json({ messages, sessionId });
 });
 
-// Clear session history
-app.post('/api/clear-history', auth, (req, res) => {
-  const { sessionId: sid } = req.body;
-  if (sid && conversations.has(sid)) {
-    conversations.delete(sid);
-    debouncedSave();
-    res.json({ status: 'cleared', sessionId: sid });
-  } else {
-    res.json({ status: 'not_found' });
-  }
-});
-
-// Force reset
+// Force reset — kill all running processes (emergency)
 app.post('/api/reset', auth, (_req, res) => {
   let killed = 0;
   for (const [id, child] of runningProcesses) {
@@ -776,7 +588,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -792,7 +604,7 @@ const audioUpload = multer({
     destination: os.tmpdir(),
     filename: (_req, _file, cb) => cb(null, `voice-${uuidv4()}.webm`),
   }),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB (OpenAI limit)
 });
 
 app.post('/api/transcribe', auth, audioUpload.single('audio'), async (req, res) => {
@@ -846,66 +658,12 @@ app.post('/api/transcribe', auth, audioUpload.single('audio'), async (req, res) 
   }
 });
 
-app.post('/api/upload', auth, upload.single('image'), async (req, res) => {
+app.post('/api/upload', auth, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image provided' });
   }
   const url = `/uploads/${req.file.filename}`;
-  const filePath = path.join(uploadsDir, req.file.filename);
-
-  // Анализ фото через OpenAI GPT-4o Vision
-  let description = '';
-  if (OPENAI_API_KEY) {
-    try {
-      const imageBuffer = fs.readFileSync(filePath);
-      const base64 = imageBuffer.toString('base64');
-      const mimeType = req.file.mimetype || 'image/jpeg';
-      const dataUrl = `data:${mimeType};base64,${base64}`;
-
-      const https = require('https');
-      const payload = JSON.stringify({
-        model: 'gpt-4o',
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: 'Опиши подробно что ты видишь на этом изображении. Если есть текст — прочитай его. Если это товар/мебель — опиши характеристики. Если это скриншот — опиши содержимое.' },
-            { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
-          ],
-        }],
-        max_tokens: 1000,
-      });
-
-      const result = await new Promise((resolve, reject) => {
-        const request = https.request('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }, (response) => {
-          let data = '';
-          response.on('data', chunk => data += chunk);
-          response.on('end', () => {
-            if (response.statusCode >= 400) {
-              reject(new Error(`Vision API error ${response.statusCode}: ${data}`));
-            } else {
-              resolve(JSON.parse(data));
-            }
-          });
-        });
-        request.on('error', reject);
-        request.write(payload);
-        request.end();
-      });
-
-      description = result.choices?.[0]?.message?.content || '';
-      console.log(`[vision] Analyzed ${req.file.filename}: ${description.length} chars`);
-    } catch (err) {
-      console.error('[vision] Error:', err.message);
-    }
-  }
-
-  res.json({ url, filename: req.file.filename, description });
+  res.json({ url, filename: req.file.filename });
 });
 
 // --- Helpers ---
@@ -922,18 +680,7 @@ function formatUptime(seconds) {
   return `${d}d ${h}h ${m}m`;
 }
 
-// --- Graceful shutdown ---
-function shutdown(signal) {
-  console.log(`\n[${signal}] Saving conversations...`);
-  saveConversations();
-  process.exit(0);
-}
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
-
 // --- Start ---
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Claude Chat server running on port ${PORT}`);
-  console.log(`Conversations loaded: ${conversations.size}`);
-  console.log(`RAG script: ${RAG_SCRIPT}`);
 });
