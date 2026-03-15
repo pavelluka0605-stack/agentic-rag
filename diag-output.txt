@@ -1,184 +1,109 @@
-=== 1. Traefik dynamic config directory ===
-Files in /opt/n8n-traefik/dynamic/:
-total 12
-drwxr-xr-x 2 root root 4096 Mar 13 14:08 .
-drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root  310 Mar 13 14:08 chat.yml
+=== 1. Copy fresh files ===
 
-Content of ALL files in dynamic dir:
---- /opt/n8n-traefik/dynamic/chat.yml ---
-http:
-  routers:
-    chat-marbomebel:
-      rule: "Host(`chat.marbomebel.ru`)"
-      entryPoints:
-        - websecure
-      service: chat-marbomebel
-      tls:
-        certResolver: mytlschallenge
+=== 2. Restart PM2 ===
+  run `npm fund` for details
 
-  services:
-    chat-marbomebel:
-      loadBalancer:
-        servers:
-          - url: "http://172.17.0.1:3847"
+found 0 vulnerabilities
+[PM2] Applying action stopProcessId on app [claude-chat](ids: [ 0 ])
+[PM2] [claude-chat](0) ✓
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 0    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
+[PM2] [claude-chat](0) ✓
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Starting /opt/claude-chat/server.js in fork_mode (1 instance)
+[PM2] Done.
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 815322   │ 0s     │ 0    │ online    │ 0%       │ 17.1mb   │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 815406   │ 0s     │ 1    │ online    │ 0%       │ 58.0mb   │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+=== 3. Test redirect (no version param) ===
+curl -sI http://localhost:3847/ :
+HTTP/1.1 302 Found
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Content-Type, Authorization
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Cache-Control: no-cache, no-store, must-revalidate
+Pragma: no-cache
+Expires: 0
+Location: /?v=20260315v3
+Vary: Accept
+Content-Type: text/plain; charset=utf-8
+Content-Length: 36
+Date: Sun, 15 Mar 2026 08:27:56 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
 
 
-=== 2. Traefik API — all routers ===
-80/tcp -> 0.0.0.0:80
-80/tcp -> [::]:80
-443/tcp -> 0.0.0.0:443
-443/tcp -> [::]:443
+curl -sI http://localhost:3847/?v=20260315v3 :
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Headers: Content-Type, Authorization
+Access-Control-Allow-Methods: GET, POST, OPTIONS
+Cache-Control: no-cache, no-store, must-revalidate
+Pragma: no-cache
+Expires: 0
+Content-Type: text/html; charset=utf-8
+Content-Length: 30473
+ETag: W/"7709-qdCYKpK4/+mBpakQl8XICZgC4rU"
+Date: Sun, 15 Mar 2026 08:27:56 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
 
-  api@internal: rule="PathPrefix(`/api`)" service=api@internal status=enabled provider=internal
-  chat-marbomebel@file: rule="Host(`chat.marbomebel.ru`)" service=chat-marbomebel status=enabled provider=file
-  dashboard@internal: rule="PathPrefix(`/`)" service=dashboard@internal status=enabled provider=internal
-  n8n@docker: rule="Host("n8n.marbomebel.ru")" service=n8n status=enabled provider=docker
-  openclaw@docker: rule="Host("claw.marbomebel.ru")" service=openclaw status=enabled provider=docker
-  voice@docker: rule="Host("n8n.marbomebel.ru") && PathPrefix("/voice")" service=voice status=enabled provider=docker
-  web-to-websecure@internal: rule="HostRegexp(`^.+$`)" service=noop@internal status=enabled provider=internal
 
-=== 3. Traefik API — all services ===
-  api@internal: servers=[] status=enabled provider=internal
-  chat-marbomebel@file: servers=[{'url': 'http://172.17.0.1:3847'}] status=enabled provider=file
-  dashboard@internal: servers=[] status=enabled provider=internal
-  n8n@docker: servers=[{'url': 'http://172.19.0.5:5678'}] status=enabled provider=docker
-  noop@internal: servers=[] status=enabled provider=internal
-  openclaw@docker: servers=[{'url': 'http://172.19.0.3:18789'}] status=enabled provider=docker
-  voice@docker: servers=[{'url': 'http://172.19.0.6:80'}] status=enabled provider=docker
+=== 4. Test HTTPS redirect ===
+HTTPS without param (should redirect):
+HTTP/2 302 
+access-control-allow-headers: Content-Type, Authorization
+access-control-allow-methods: GET, POST, OPTIONS
+access-control-allow-origin: *
+cache-control: no-cache, no-store, must-revalidate
+content-type: text/plain; charset=utf-8
+date: Sun, 15 Mar 2026 08:27:56 GMT
+expires: 0
+location: /?v=20260315v3
+pragma: no-cache
+vary: Accept
+x-powered-by: Express
+content-length: 36
 
-=== 4. Full external HTTPS response ===
-Headers:
-* Host chat.marbomebel.ru:443 was resolved.
-* IPv6: (none)
-* IPv4: 72.56.127.126
-*   Trying 72.56.127.126:443...
-* Connected to chat.marbomebel.ru (72.56.127.126) port 443
-* ALPN: curl offers h2,http/1.1
-* TLSv1.3 (OUT), TLS handshake, Client hello (1):
-* TLSv1.3 (IN), TLS handshake, Server hello (2):
-* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
-* TLSv1.3 (IN), TLS handshake, Certificate (11):
-* TLSv1.3 (IN), TLS handshake, CERT verify (15):
-* TLSv1.3 (IN), TLS handshake, Finished (20):
-* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
-* TLSv1.3 (OUT), TLS handshake, Finished (20):
-* SSL connection using TLSv1.3 / TLS_AES_128_GCM_SHA256 / X25519 / RSASSA-PSS
-* ALPN: server accepted h2
-* Server certificate:
-*  subject: CN=chat.marbomebel.ru
-*  start date: Mar 13 13:15:25 2026 GMT
-*  expire date: Jun 11 13:15:24 2026 GMT
-*  issuer: C=US; O=Let's Encrypt; CN=R13
-*  SSL certificate verify result: unable to get local issuer certificate (20), continuing anyway.
-*   Certificate level 0: Public key type RSA (4096/152 Bits/secBits), signed using sha256WithRSAEncryption
-*   Certificate level 1: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
-* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
-* using HTTP/2
-* [HTTP/2] [1] OPENED stream for https://chat.marbomebel.ru/
-* [HTTP/2] [1] [:method: GET]
-* [HTTP/2] [1] [:scheme: https]
-* [HTTP/2] [1] [:authority: chat.marbomebel.ru]
 
-Body first 20 lines:
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+HTTPS with correct param (should 200):
+HTTP/2 200 
+access-control-allow-headers: Content-Type, Authorization
+access-control-allow-methods: GET, POST, OPTIONS
+access-control-allow-origin: *
+cache-control: no-cache, no-store, must-revalidate
+content-type: text/html; charset=utf-8
+date: Sun, 15 Mar 2026 08:27:56 GMT
+etag: W/"7709-qdCYKpK4/+mBpakQl8XICZgC4rU"
+expires: 0
+pragma: no-cache
+x-powered-by: Express
+content-length: 30473
+
+
+=== 5. Full follow redirect test ===
 <title>AI Ассистент</title>
-<meta name="version" content="2026-03-15-v2">
-<script>
-// Force cache bust — unregister any service workers and clear caches
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    registrations.forEach(function(reg) { reg.unregister(); });
-  });
-}
-if ('caches' in window) {
-  caches.keys().then(function(names) {
-    names.forEach(function(name) { caches.delete(name); });
-  });
-
-Body version check:
-<title>AI Ассистент</title>
-version
-2026-03-15
-version
-2026-03-15
-version
-version
-version
+2026-03-15-v2
+2026-03-15-v2
 v15.03
+Size: 30473
 
-=== 5. PM2 direct vs HTTPS full comparison ===
---- PM2 first 5 lines ---
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
---- HTTPS first 5 lines ---
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-PM2 size: 30473
-HTTPS size: 30473
-
-=== 6. Check if there are multiple processes on 3847 ===
-LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=814208,fd=20))                                                                                                                      
-
-=== 7. PM2 logs (last 20 lines) ===
-[TAILING] Tailing last 20 lines for [claude-chat] process (change the value with --lines option)
-/root/.pm2/logs/claude-chat-error.log last 20 lines:
-0|claude-c |     at Object.keyGenerator (/opt/claude-chat/node_modules/express-rate-limit/dist/index.cjs:658:20)
-0|claude-c |     at /opt/claude-chat/node_modules/express-rate-limit/dist/index.cjs:710:32
-0|claude-c |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-0|claude-c |     at async /opt/claude-chat/node_modules/express-rate-limit/dist/index.cjs:691:5 {
-0|claude-c |   code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR',
-0|claude-c |   help: 'https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/'
-0|claude-c | }
-0|claude-c | Transcription error: Invalid character in header content ["Authorization"]
-0|claude-c | Transcription error: OpenAI API error 400: {
-0|claude-c |   "error": {
-0|claude-c |     "message": "audio duration 0.0725 seconds is shorter than 0.1 seconds which is the minimum for this model",
-0|claude-c |     "type": "invalid_request_error",
-0|claude-c |     "param": null,
-0|claude-c |     "code": "invalid_value"
-0|claude-c |   }
-0|claude-c | }
-0|claude-c | Transcription error: getaddrinfo EAI_AGAIN api.openai.com
-0|claude-c | Transcription error: getaddrinfo EAI_AGAIN api.openai.com
-0|claude-c | Transcription error: getaddrinfo EAI_AGAIN api.openai.com
-0|claude-c | Transcription error: getaddrinfo EAI_AGAIN api.openai.com
-
-/root/.pm2/logs/claude-chat-out.log last 20 lines:
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-0|claude-c | Claude CLI: /usr/bin/claude
-0|claude-c | Claude Chat server running on port 3847
-
-
+=== 6. PM2 health ===
+{"status":"ok","uptime":1.225796771,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T08:27:56.812Z"}
 DONE
