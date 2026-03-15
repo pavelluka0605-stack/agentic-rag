@@ -9,7 +9,7 @@ on:
     paths:
       - "p0-foundation/**"
       - ".github/workflows/deploy-p0.yml"
-      - "claude-chat/**"
+      # claude-chat деплоится отдельным workflow deploy-chat.yml
       - "*.py"
       - "requirements.txt"
   workflow_dispatch:
