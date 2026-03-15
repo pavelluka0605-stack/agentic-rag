@@ -1,30 +1,28 @@
-name: Find the real problem
+name: "Deploy & Verify Chat (March 14)"
 
 on:
   push:
-    branches:
-      - main
-      - "claude/*"
+    branches: [main, "claude/*"]
     paths:
       - ".github/workflows/test-photo-api.yml"
+      - "claude-chat/**"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: vps-diag-${{ github.ref }}
+  group: deploy-chat-final
   cancel-in-progress: true
 
 jobs:
-  check:
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup SSH
         run: |
@@ -33,71 +31,71 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Check systemd vs PM2 conflict
+      - name: Deploy and start
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
-          OUT="diag-output.txt"
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
 
-          $SSH 'bash -s' <<'REMOTE' 2>&1 | tee $OUT
+          echo "=== 1. Pre-deploy: verify repo has correct version ==="
+          echo "Local title: $(grep -oP '<title>[^<]+</title>' claude-chat/public/index.html)"
+          echo "Local RAG count: $(grep -c 'RAG\|rag' claude-chat/public/index.html || echo 0)"
 
-          echo "=== 1. Systemd claude-chat service ==="
-          systemctl status claude-chat 2>&1 || echo "systemd service not found"
           echo ""
-          echo "=== 2. PM2 status ==="
-          pm2 list 2>/dev/null || echo "PM2 not found"
+          echo "=== 2. Copy files ==="
+          $SCP -r claude-chat/ $VPS_USER@$VPS_HOST:/opt/
+
+          $SSH 'bash -s' <<'REMOTE'
+          set -e
+
           echo ""
-          echo "=== 3. What process is ACTUALLY on port 3847? ==="
-          ss -tlnp | grep 3847
-          echo ""
-          echo "=== 4. ALL node processes ==="
-          ps aux | grep '[n]ode.*claude-chat' || echo "none"
-          echo ""
-          echo "=== 5. Current index.html — does it have #cc0000 (red) or RAG/manifest? ==="
-          echo "Has #cc0000: $(grep -c '#cc0000' /opt/claude-chat/public/index.html)"
-          echo "Has manifest: $(grep -c 'manifest' /opt/claude-chat/public/index.html)"
-          echo "Has RAG: $(grep -c 'rag\|RAG' /opt/claude-chat/public/index.html)"
-          echo "Has photo/Vision: $(grep -c 'vision\|Vision\|photo-analysis\|GPT-4o' /opt/claude-chat/public/index.html)"
-          echo "Title: $(grep -oP '<title>[^<]+</title>' /opt/claude-chat/public/index.html)"
-          echo ""
-          echo "=== 6. Systemd service file ==="
-          cat /etc/systemd/system/claude-chat.service 2>/dev/null || echo "No systemd service file"
-          echo ""
-          echo "=== 7. Recent deploy-p0 runs (check systemd journal) ==="
-          journalctl -u claude-chat --since "2026-03-15 08:00" --no-pager 2>/dev/null | tail -20
-          echo ""
-          echo "=== 8. File modification times ==="
-          stat -c "%n %y" /opt/claude-chat/server.js /opt/claude-chat/public/index.html
-          echo ""
-          echo "=== 9. Stop systemd, verify PM2 takes over ==="
-          echo "Stopping systemd..."
-          systemctl stop claude-chat 2>/dev/null || echo "systemctl stop failed"
-          systemctl disable claude-chat 2>/dev/null || echo "systemctl disable failed"
-          sleep 1
-          echo "After stop — what's on 3847:"
-          ss -tlnp | grep 3847 || echo "Nothing on 3847"
-          echo ""
-          echo "=== 10. Kill ALL node claude-chat processes ==="
-          pkill -f 'node.*claude-chat/server' 2>/dev/null || true
+          echo "=== 3. Stop ALL previous processes ==="
+          systemctl stop claude-chat 2>/dev/null || true
+          systemctl disable claude-chat 2>/dev/null || true
           pm2 delete claude-chat 2>/dev/null || true
-          sleep 1
-          echo "After kill all — port 3847:"
-          ss -tlnp | grep 3847 || echo "Port 3847 is FREE"
-          echo ""
+          pkill -f 'node.*claude-chat' 2>/dev/null || true
+          sleep 2
 
-          echo "DONE"
+          echo ""
+          echo "=== 4. Verify files on VPS ==="
+          echo "VPS title: $(grep -oP '<title>[^<]+</title>' /opt/claude-chat/public/index.html)"
+          echo "VPS RAG count: $(grep -c 'RAG\|rag' /opt/claude-chat/public/index.html || echo 0)"
+          echo "VPS statusLine: $(grep -oP 'id=\"statusLine\">[^<]+<' /opt/claude-chat/public/index.html)"
+
+          echo ""
+          echo "=== 5. Install & Start ==="
+          cd /opt/claude-chat
+          npm install --omit=dev 2>&1 | tail -3
+          mkdir -p data
+          pm2 start server.js --name claude-chat
+          sleep 3
+          pm2 list | grep claude-chat
+          pm2 save --force
+
+          echo ""
+          echo "=== 6. Test localhost ==="
+          echo "Health: $(curl -s --max-time 5 http://localhost:3847/api/health | head -1)"
+          echo "Title from HTTP: $(curl -s --max-time 5 http://localhost:3847/ | grep -oP '<title>[^<]+</title>')"
+          echo "RAG from HTTP: $(curl -s --max-time 5 http://localhost:3847/ | grep -c 'RAG\|rag' || echo 0)"
           REMOTE
 
-      - name: Save output
-        if: always()
+      - name: External verification
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f diag-output.txt
-          git diff --cached --quiet && echo "No changes" || {
-            git commit -m "diag: systemd vs PM2 conflict check [skip ci]"
-            git push origin HEAD
-          }
+          echo "=== EXTERNAL CHECK from GitHub runner ==="
+          sleep 5
+          echo "Title: $(curl -sk https://chat.marbomebel.ru/ | grep -oP '<title>[^<]+</title>')"
+          echo "RAG: $(curl -sk https://chat.marbomebel.ru/ | grep -c 'RAG\|rag' || echo 0)"
+          echo "StatusLine: $(curl -sk https://chat.marbomebel.ru/ | grep -oP 'id=\"statusLine\">[^<]+<')"
+          echo "Health: $(curl -sk https://chat.marbomebel.ru/api/health | head -1)"
+          echo ""
+          RESULT_TITLE=$(curl -sk https://chat.marbomebel.ru/ | grep -oP '<title>[^<]+</title>')
+          RESULT_RAG=$(curl -sk https://chat.marbomebel.ru/ | grep -c 'RAG\|rag' || echo 0)
+          if [ "$RESULT_TITLE" = "<title>AI Ассистент</title>" ] && [ "$RESULT_RAG" = "0" ]; then
+            echo "SUCCESS: March 14 version confirmed!"
+          else
+            echo "FAIL: title=$RESULT_TITLE rag=$RESULT_RAG"
+            exit 1
+          fi

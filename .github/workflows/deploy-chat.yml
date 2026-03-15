@@ -1,11 +1,13 @@
 name: "Deploy Claude Chat"
 
 on:
-  push:
-    branches: [main, "claude/*"]
-    paths:
-      - "claude-chat/**"
-      - ".github/workflows/deploy-chat.yml"
+  # DISABLED: was overwriting VPS with wrong version from main
+  # Re-enable after main branch has correct claude-chat version
+  # push:
+  #   branches: [main, "claude/*"]
+  #   paths:
+  #     - "claude-chat/**"
+  #     - ".github/workflows/deploy-chat.yml"
   workflow_dispatch:
 
 concurrency:
