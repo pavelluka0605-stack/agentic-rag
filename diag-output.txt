@@ -1,31 +1,38 @@
-=== FIX Sun Mar 15 05:22:22 UTC 2026 ===
-=== Pause watchdog ===
-watchdog paused
-=== Stop service ===
-stopped
-=== Kill port 3847 ===
-killed 802256 (attempt 1)
-killed 803449 (attempt 2)
-killed 803532 (attempt 3)
-killed 803564 (attempt 4)
-killed 803596 (attempt 5)
-=== Verify port ===
++ sed -i 's/^Restart=always/Restart=no/' /etc/systemd/system/claude-chat.service
++ systemctl daemon-reload
++ systemctl stop claude-chat
++ sleep 3
++ for i in 1 2 3
+++ lsof -t -i:3847
+Killing PIDs: 805009
++ pids=805009
++ '[' -z 805009 ']'
++ echo 'Killing PIDs: 805009'
++ echo 805009
++ xargs kill -9
++ sleep 2
++ for i in 1 2 3
+++ lsof -t -i:3847
++ pids=805028
++ '[' -z 805028 ']'
++ echo 'Killing PIDs: 805028'
+Killing PIDs: 805028
++ echo 805028
++ xargs kill -9
++ sleep 2
++ for i in 1 2 3
+++ lsof -t -i:3847
+Killing PIDs: 805050
++ pids=805050
++ '[' -z 805050 ']'
++ echo 'Killing PIDs: 805050'
++ echo 805050
++ xargs kill -9
++ sleep 2
++ lsof -i:3847
+FATAL: Port still busy after 3 kill rounds
++ echo 'FATAL: Port still busy after 3 kill rounds'
++ lsof -i:3847
 COMMAND      PID USER   FD   TYPE  DEVICE SIZE/OFF NODE NAME
-node\x20/ 803647 root   20u  IPv4 6729569      0t0  TCP *:3847 (LISTEN)
-STILL BUSY
-=== Start service ===
-=== Check ===
-activating
-SERVICE_FAIL
-{"status":"ok","uptime":12.62733629,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T05:22:54.236Z"}Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
-Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   code: 'EADDRINUSE',
-Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   errno: -98,
-Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   syscall: 'listen',
-Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   address: '0.0.0.0',
-Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]:   port: 3847
-Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]: }
-Mar 15 05:22:55 fra-1-vm-ckr7 node[804168]: Node.js v20.20.1
-Mar 15 05:22:55 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
-Mar 15 05:22:55 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
-=== Restore watchdog ===
-watchdog restored
+node\x20/ 805069 root   20u  IPv4 6734660      0t0  TCP *:3847 (LISTEN)
++ exit 1
