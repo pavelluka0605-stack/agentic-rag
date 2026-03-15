@@ -82,10 +82,15 @@ jobs:
             echo "created .env"
           fi
 
-          # Restart
+          # Restart (stop first to free port)
           systemctl daemon-reload
           systemctl enable claude-chat
-          systemctl restart claude-chat
+          systemctl stop claude-chat || true
+          sleep 2
+          # Kill any leftover process on port 3847
+          fuser -k 3847/tcp 2>/dev/null || true
+          sleep 1
+          systemctl start claude-chat
           sleep 3
 
           if systemctl is-active --quiet claude-chat; then
