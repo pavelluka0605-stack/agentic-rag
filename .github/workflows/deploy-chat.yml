@@ -1,0 +1,106 @@
+name: "Deploy Claude Chat"
+
+on:
+  push:
+    branches: [main, "claude/*"]
+    paths:
+      - "claude-chat/**"
+      - ".github/workflows/deploy-chat.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy-chat:
+    name: "Deploy chat.marbomebel.ru"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy Claude Chat to VPS
+        run: |
+          # Копируем файлы чата
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
+            claude-chat/ \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/
+
+          # Копируем RAG-модули
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            memory_store.py retriever.py \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/
+
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+
+          cd /opt/claude-chat
+
+          # Node.js
+          if ! command -v node &>/dev/null; then
+            echo "Node.js not found"
+            exit 1
+          fi
+          npm install --omit=dev 2>&1 | tail -5
+
+          # Python для RAG
+          if command -v python3 &>/dev/null; then
+            pip3 install --quiet numpy openai 2>&1 | tail -3
+            echo "✓ Python RAG deps installed"
+          fi
+
+          # Директория для данных
+          mkdir -p /opt/claude-chat/data
+
+          # .env (не перезаписываем если есть)
+          if [ ! -f .env ]; then
+            source /opt/p0-foundation/.env 2>/dev/null || true
+            cat > .env << ENVEOF
+          BEARER_TOKEN=$(openssl rand -hex 32)
+          OPENAI_API_KEY=${OPENAI_API_KEY:-}
+          PORT=3847
+          ENVEOF
+            echo "✓ .env created"
+          fi
+
+          # Systemd
+          cat > /etc/systemd/system/claude-chat.service << 'UNIT'
+          [Unit]
+          Description=Claude Chat (chat.marbomebel.ru)
+          After=network.target
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/claude-chat
+          EnvironmentFile=/opt/claude-chat/.env
+          ExecStart=/usr/bin/node /opt/claude-chat/server.js
+          Restart=always
+          RestartSec=10
+          KillSignal=SIGTERM
+          TimeoutStopSec=15
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          systemctl daemon-reload
+          systemctl enable claude-chat
+          systemctl restart claude-chat
+          sleep 3
+
+          if systemctl is-active --quiet claude-chat; then
+            echo "✓ Claude Chat running on :3847"
+            curl -s --max-time 5 http://localhost:3847/api/health | head -c 300
+            echo ""
+          else
+            echo "✗ Failed to start"
+            journalctl -u claude-chat -n 20 --no-pager
+            exit 1
+          fi
+          REMOTE
