@@ -19,32 +19,6 @@ if (!BEARER_TOKEN) {
   process.exit(1);
 }
 
-// --- System Prompt ---
-const SYSTEM_PROMPT = `Ты — AI-ассистент для управления CRM-системой мебельного бизнеса marbomebel.ru.
-
-Твои возможности:
-- Управление VPS-сервером (Frankfurt): Docker, systemd, nginx, мониторинг
-- N8N workflows (n8n.marbomebel.ru): 8 активных workflows (P0-01..P0-08)
-- Google Sheets CRM: листы Товары, Спрос, Заказы, BlueSales_Клиенты, Сводка_спроса
-- VK интеграция: Long Poll, парсинг комментариев, AI автоответы (P0-07)
-- BlueSales CRM: синхронизация клиентов/заказов каждый час (P0-05)
-- Telegram уведомления менеджеру
-- Мониторинг: watchdog каждые 5 мин, P0-08 error monitor каждые 15 мин
-
-Инфраструктура:
-- VPS: N8N, VK Long Poll (community + user), watchdog
-- Домены: n8n.marbomebel.ru, chat.marbomebel.ru
-- Google SA: n8n-sheets@botn8n-468710.iam.gserviceaccount.com
-- Spreadsheet ID: 1i4R4GJuNJTTh1-KijKLToWFDASaHGgpqgirgyrl0iLY
-
-Правила:
-- Отвечай на русском языке
-- Будь конкретным и давай практические ответы
-- При выполнении команд показывай вывод
-- Если видишь контекст из памяти проекта — используй его для точных ответов
-- Для опасных операций (удаление, рестарт production) — предупреждай
-- Форматируй ответы с markdown: заголовки, списки, блоки кода`;
-
 // --- RAG Memory Search ---
 const RAG_SCRIPT = path.join(__dirname, 'rag_search.py');
 const RAG_SAVE_SCRIPT = path.join(__dirname, 'rag_save.py');
@@ -481,7 +455,7 @@ app.post('/api/chat', auth, async (req, res) => {
   }
 
   // Spawn claude CLI with system prompt
-  const child = spawn(CLAUDE_PATH, ['--print', '--system-prompt', SYSTEM_PROMPT, prompt], {
+  const child = spawn(CLAUDE_PATH, ['--print', prompt], {
     env: { ...process.env, NO_COLOR: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -858,7 +832,6 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // --- Start ---
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Claude Chat server running on port ${PORT}`);
-  console.log(`System prompt: ${SYSTEM_PROMPT.length} chars`);
   console.log(`Conversations loaded: ${conversations.size}`);
   console.log(`RAG script: ${RAG_SCRIPT}`);
 });
