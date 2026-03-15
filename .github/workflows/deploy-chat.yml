@@ -38,15 +38,13 @@ jobs:
             memory_store.py retriever.py \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/
 
-      - name: Deploy and restart
+      - name: Install deps and restart via PM2
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' <<'SCRIPT'
-          set -ex
-
+          set -e
           cd /opt/claude-chat
           npm install --omit=dev 2>&1 | tail -5
-          command -v python3 &>/dev/null && pip3 install --quiet numpy openai 2>&1 | tail -3 || true
           mkdir -p data
 
           test -f .env || {
@@ -56,36 +54,12 @@ jobs:
             echo "created .env"
           }
 
-          # === STOP ===
-          systemctl stop claude-chat 2>/dev/null || true
-          sleep 2
-          # Force-kill anything on port 3847
-          for pid in $(lsof -t -i:3847 2>/dev/null); do
-            echo "Killing PID $pid on port 3847"
-            kill -9 "$pid" 2>/dev/null || true
-          done
-          sleep 1
-          # Verify port is free
-          if lsof -i:3847 >/dev/null 2>&1; then
-            echo "ERROR: Port 3847 still in use!"
-            lsof -i:3847
-            exit 1
-          fi
-          echo "Port 3847 is free"
+          # Restart via PM2 (not systemd)
+          pm2 restart claude-chat 2>/dev/null || pm2 start server.js --name claude-chat
+          sleep 3
 
-          # === START ===
-          systemctl daemon-reload
-          systemctl enable claude-chat
-          systemctl start claude-chat
-          sleep 4
-
-          if systemctl is-active --quiet claude-chat; then
-            echo "OK: Claude Chat running"
-            curl -s --max-time 5 http://localhost:3847/api/health | head -c 300 || true
-            echo ""
-          else
-            echo "FAIL — journal:"
-            journalctl -u claude-chat -n 30 --no-pager
-            exit 1
-          fi
+          pm2 list | grep claude-chat
+          curl -s --max-time 5 http://localhost:3847/api/health || { echo "FAIL"; pm2 logs claude-chat --lines 20 --nostream; exit 1; }
+          echo ""
+          echo "Deploy OK"
           SCRIPT
