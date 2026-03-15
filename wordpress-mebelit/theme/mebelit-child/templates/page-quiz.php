@@ -1,16 +1,18 @@
 <?php
 /**
- * Template Name: Квиз — Калькулятор стоимости
- * Description: Пошаговый квиз для расчёта стоимости кухни
+ * Template Name: Квиз — Калькулятор
+ * Description: Страница квиза-калькулятора стоимости кухни
  */
+
+if (!defined('ABSPATH')) exit;
 
 get_header();
 ?>
 
-<main class="quiz-page" style="padding-top: 100px; min-height: 100vh; background: var(--color-light-bg);">
-  <div style="max-width: 900px; margin: 0 auto; padding: 40px 16px;">
+<div class="quiz-page-bg">
+  <div class="mebelit-container mebelit-container--narrow">
     <div id="mebelit-quiz"></div>
   </div>
-</main>
+</div>
 
 <?php get_footer(); ?>
