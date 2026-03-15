@@ -33,7 +33,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Fix and restart service
+      - name: Fix service (disable watchdog, kill port, restart)
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -42,35 +42,39 @@ jobs:
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
           OUT="diag-output.txt"
 
-          echo "=== FIX SERVICE $(date -u) ===" > $OUT
+          echo "=== FIX $(date -u) ===" > $OUT
 
-          echo "" >> $OUT
-          echo "=== STEP 1: Disable auto-restart ===" >> $OUT
-          $SSH "systemctl stop claude-chat 2>/dev/null; systemctl disable claude-chat 2>/dev/null; echo 'stopped and disabled'" >> $OUT 2>&1
-          sleep 3
+          # Step 1: Pause watchdog cron
+          echo "=== Pause watchdog ===" >> $OUT
+          $SSH "crontab -l > /tmp/cron_backup.txt 2>/dev/null; crontab -l 2>/dev/null | grep -v watchdog | crontab - 2>/dev/null; echo 'watchdog paused'" >> $OUT 2>&1
 
-          echo "" >> $OUT
-          echo "=== STEP 2: Kill ALL on port 3847 ===" >> $OUT
-          $SSH "for p in \$(lsof -t -i:3847 2>/dev/null); do echo \"killing \$p\"; kill -9 \$p; done; echo done" >> $OUT 2>&1
-          sleep 3
+          # Step 2: Stop service completely
+          echo "=== Stop service ===" >> $OUT
+          $SSH "systemctl stop claude-chat 2>/dev/null; echo 'stopped'" >> $OUT 2>&1
+          sleep 2
 
-          echo "" >> $OUT
-          echo "=== STEP 3: Verify port free ===" >> $OUT
-          $SSH "lsof -i:3847 2>/dev/null && echo 'PORT STILL BUSY' || echo 'PORT IS FREE'" >> $OUT 2>&1
+          # Step 3: Kill EVERYTHING on port 3847 repeatedly
+          echo "=== Kill port 3847 ===" >> $OUT
+          $SSH "for i in 1 2 3 4 5; do for p in \$(lsof -t -i:3847 2>/dev/null); do kill -9 \$p 2>/dev/null && echo \"killed \$p (attempt \$i)\"; done; sleep 2; done" >> $OUT 2>&1
 
-          echo "" >> $OUT
-          echo "=== STEP 4: Re-enable and start ===" >> $OUT
+          # Step 4: Final check port is free
+          echo "=== Verify port ===" >> $OUT
+          $SSH "lsof -i:3847 2>/dev/null && echo 'STILL BUSY' || echo 'PORT FREE'" >> $OUT 2>&1
+
+          # Step 5: Start service
+          echo "=== Start service ===" >> $OUT
           $SSH "systemctl daemon-reload; systemctl enable claude-chat; systemctl start claude-chat" >> $OUT 2>&1
           sleep 5
 
-          echo "" >> $OUT
-          echo "=== STEP 5: Check result ===" >> $OUT
+          # Step 6: Check
+          echo "=== Check ===" >> $OUT
           $SSH "systemctl is-active claude-chat && echo 'SERVICE_OK' || echo 'SERVICE_FAIL'" >> $OUT 2>&1
-          $SSH "curl -s --max-time 5 http://localhost:3847/api/health || echo 'health failed'" >> $OUT 2>&1
+          $SSH "curl -s --max-time 5 http://localhost:3847/api/health || echo 'health fail'" >> $OUT 2>&1
+          $SSH "journalctl -u claude-chat -n 10 --no-pager" >> $OUT 2>&1
 
-          echo "" >> $OUT
-          echo "=== JOURNAL (last 15) ===" >> $OUT
-          $SSH "journalctl -u claude-chat -n 15 --no-pager" >> $OUT 2>&1
+          # Step 7: Restore watchdog
+          echo "=== Restore watchdog ===" >> $OUT
+          $SSH "crontab /tmp/cron_backup.txt 2>/dev/null; echo 'watchdog restored'" >> $OUT 2>&1
 
           cat $OUT
 
@@ -80,6 +84,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet && echo "No changes" || {
-            git commit -m "diag: fix service restart [skip ci]"
+            git commit -m "diag: fix result [skip ci]"
             git push origin main
           }
