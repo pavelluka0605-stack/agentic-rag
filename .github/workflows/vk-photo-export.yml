@@ -47,7 +47,7 @@ jobs:
         run: |
           TOKEN="${{ secrets.VK_MEBELIT_TOKEN }}"
           if [ -z "$TOKEN" ]; then
-            TOKEN="vk1.a.eug9zn4Sf572bPwzbiJZeqQR8bZTW1siodILh-J58AAjUTNloLNiAEWl6NPGMLpWbhRF_EP-fj4GhqGbN3YMyhIIA-4P7TpHisUTwfvmXQ9qZGQMGBKE6SPb2dKkFRozAGzKi87P9sHSNgvxuxhPgGtBQL5ILj9XXC1KvZaVME_fSHhBwSXlkDod8Vo9N6BzNjHZ0HIOO9DQP7oexqPrnA"
+            TOKEN="vk1.a.0hh_Uorp7UybpzFU9jAHom2kp2tdGr3epioUqu7VSjjq57OSxkH4JaROSmUgKG7OITCAbbM44P23zMGHg0yvmOzNPkzMJprhLb-deQou4IwlCuY0myrFq2izoK357pit0xVUS0eyEKyNKhOWiXHTmUhuw_VhYlT6iKAnlEwimILMLejAO4sV1I8T4YPP_NBOCYJziuoHlVNwiLHmmkISVA"
           fi
           echo "::add-mask::$TOKEN"
           echo "VK_MARKET_TOKEN=$TOKEN" >> $GITHUB_ENV
