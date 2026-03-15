@@ -1,91 +1,36 @@
-=== VPS DIAG Sun Mar 15 05:17:09 UTC 2026 ===
+=== FIX SERVICE Sun Mar 15 05:19:38 UTC 2026 ===
 
-=== HEALTH ===
-{"status":"ok","uptime":1050.388536116,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T05:17:11.403Z"}
-=== JOURNAL (last 50) ===
-Mar 15 05:16:44 fra-1-vm-ckr7 node[800901]: }
-Mar 15 05:16:44 fra-1-vm-ckr7 node[800901]: Node.js v20.20.1
-Mar 15 05:16:44 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
-Mar 15 05:16:44 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
-Mar 15 05:16:54 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Scheduled restart job, restart counter is at 195.
-Mar 15 05:16:54 fra-1-vm-ckr7 systemd[1]: Started claude-chat.service - Claude Chat (chat.marbomebel.ru).
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]: Claude CLI: /usr/bin/claude
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]: node:events:502
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:       throw er; // Unhandled 'error' event
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:       ^
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]: Error: listen EADDRINUSE: address already in use 0.0.0.0:3847
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:     at Server.setupListenHandle [as _listen2] (node:net:1908:16)
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:     at listenInCluster (node:net:1965:12)
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:     at doListen (node:net:2139:7)
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:     at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]: Emitted 'error' event on Server instance at:
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:     at emitErrorNT (node:net:1944:8)
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:   code: 'EADDRINUSE',
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:   errno: -98,
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:   syscall: 'listen',
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:   address: '0.0.0.0',
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]:   port: 3847
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]: }
-Mar 15 05:16:54 fra-1-vm-ckr7 node[800913]: Node.js v20.20.1
-Mar 15 05:16:54 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
-Mar 15 05:16:54 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
-Mar 15 05:17:04 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Scheduled restart job, restart counter is at 196.
-Mar 15 05:17:04 fra-1-vm-ckr7 systemd[1]: Started claude-chat.service - Claude Chat (chat.marbomebel.ru).
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]: Claude CLI: /usr/bin/claude
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]: node:events:502
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:       throw er; // Unhandled 'error' event
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:       ^
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]: Error: listen EADDRINUSE: address already in use 0.0.0.0:3847
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:     at Server.setupListenHandle [as _listen2] (node:net:1908:16)
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:     at listenInCluster (node:net:1965:12)
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:     at doListen (node:net:2139:7)
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:     at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]: Emitted 'error' event on Server instance at:
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:     at emitErrorNT (node:net:1944:8)
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:   code: 'EADDRINUSE',
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:   errno: -98,
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:   syscall: 'listen',
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:   address: '0.0.0.0',
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]:   port: 3847
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]: }
-Mar 15 05:17:04 fra-1-vm-ckr7 node[800927]: Node.js v20.20.1
-Mar 15 05:17:04 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
-Mar 15 05:17:04 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
+=== STEP 1: Disable auto-restart ===
+stopped and disabled
 
-=== CONVERSATION DATA ON DISK ===
-total 12
-drwxr-xr-x 2 root root 4096 Mar 15 04:32 .
-drwxr-xr-x 7 root root 4096 Mar 15 04:59 ..
--rw-r--r-- 1 root root  301 Mar 15 04:42 conversations.json
-{
-    "483d26bd-c039-4253-aa3a-470eacade697": {
-        "messages": [
-            {
-                "role": "user",
-                "content": "echo test-ok",
-                "timestamp": 1773549165788
-            }
-        ],
-        "lastActivity": 1773549165788
-    },
-    "be1900b7-2a6b-484c-a6e2-f36b3bb6357d": {
-        "messages": [
-            {
-                "role": "user",
-                "content": "echo test-ok",
-                "timestamp": 1773549306370
-            }
-        ],
-        "lastActivity": 1773549306370
-    }
-}
+=== STEP 2: Kill ALL on port 3847 ===
+killing 801876
+done
 
-=== SERVICE UPTIME ===
-● claude-chat.service - Claude Chat (chat.marbomebel.ru)
-     Loaded: loaded (/etc/systemd/system/claude-chat.service; enabled; preset: enabled)
-     Active: activating (auto-restart) (Result: exit-code) since Sun 2026-03-15 05:17:15 UTC; 4s ago
-    Process: 801069 ExecStart=/usr/bin/node /opt/claude-chat/server.js (code=exited, status=1/FAILURE)
-   Main PID: 801069 (code=exited, status=1/FAILURE)
-        CPU: 180ms
+=== STEP 3: Verify port free ===
+COMMAND      PID USER   FD   TYPE  DEVICE SIZE/OFF NODE NAME
+node\x20/ 802256 root   20u  IPv4 6724523      0t0  TCP *:3847 (LISTEN)
+PORT STILL BUSY
+
+=== STEP 4: Re-enable and start ===
+
+=== STEP 5: Check result ===
+activating
+SERVICE_FAIL
+{"status":"ok","uptime":17.471997413,"activeRequests":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T05:20:01.955Z"}
+=== JOURNAL (last 15) ===
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at listenInCluster (node:net:1965:12)
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at doListen (node:net:2139:7)
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at process.processTicksAndRejections (node:internal/process/task_queues:83:21)
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]: Emitted 'error' event on Server instance at:
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at emitErrorNT (node:net:1944:8)
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   code: 'EADDRINUSE',
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   errno: -98,
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   syscall: 'listen',
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   address: '0.0.0.0',
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]:   port: 3847
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]: }
+Mar 15 05:20:01 fra-1-vm-ckr7 node[802725]: Node.js v20.20.1
+Mar 15 05:20:01 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
+Mar 15 05:20:01 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
