@@ -1,78 +1,9 @@
-=== 1. Systemd claude-chat service ===
-× claude-chat.service - Claude Chat (chat.marbomebel.ru)
-     Loaded: loaded (/etc/systemd/system/claude-chat.service; disabled; preset: enabled)
-     Active: failed (Result: exit-code) since Sun 2026-03-15 05:28:42 UTC; 4h 35min ago
-   Duration: 189ms
-   Main PID: 805602 (code=exited, status=1/FAILURE)
-        CPU: 192ms
-
-Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]:     at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
-Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]:   code: 'EADDRINUSE',
-Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]:   errno: -98,
-Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]:   syscall: 'listen',
-Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]:   address: '0.0.0.0',
-Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]:   port: 3847
-Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]: }
-Mar 15 05:28:42 fra-1-vm-ckr7 node[805602]: Node.js v20.20.1
-Mar 15 05:28:42 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Main process exited, code=exited, status=1/FAILURE
-Mar 15 05:28:42 fra-1-vm-ckr7 systemd[1]: claude-chat.service: Failed with result 'exit-code'.
-systemd service not found
-
-=== 2. PM2 status ===
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 821984   │ 5m     │ 5    │ online    │ 0%       │ 55.2mb   │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-
-=== 3. What process is ACTUALLY on port 3847? ===
-LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=821984,fd=20))                                                                                                                      
-
-=== 4. ALL node processes ===
-root      821984  0.3  1.4 1030132 56696 ?       Ssl  09:59   0:01 node /opt/claude-chat/server.js
-
-=== 5. Current index.html — does it have #cc0000 (red) or RAG/manifest? ===
-Has #cc0000: 0
-Has manifest: 1
-Has RAG: 20
-Has photo/Vision: 0
-Title: <title>Claude Chat — VPS</title>
-
-=== 6. Systemd service file ===
-[Unit]
-Description=Claude Chat (chat.marbomebel.ru)
-After=network.target
-[Service]
-Type=simple
-WorkingDirectory=/opt/claude-chat
-EnvironmentFile=/opt/claude-chat/.env
-ExecStart=/usr/bin/node /opt/claude-chat/server.js
-Restart=no
-RestartSec=10
-KillSignal=SIGTERM
-TimeoutStopSec=15
-[Install]
-WantedBy=multi-user.target
-
-=== 7. Recent deploy-p0 runs (check systemd journal) ===
--- No entries --
-
-=== 8. File modification times ===
-/opt/claude-chat/server.js 2026-03-15 09:50:42.749513741 +0000
-/opt/claude-chat/public/index.html 2026-03-15 09:50:43.702535052 +0000
-
-=== 9. Stop systemd, verify PM2 takes over ===
-Stopping systemd...
-After stop — what's on 3847:
-LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=821984,fd=20))                                                                                                                      
-
-=== 10. Kill ALL node claude-chat processes ===
-[PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
-[PM2] [claude-chat](0) ✓
-┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
-After kill all — port 3847:
-Port 3847 is FREE
-
-DONE
+=== External check Sun Mar 15 10:12:29 UTC 2026 ===
+Title: <title>AI Ассистент</title>
+RAG count: 16
+StatusLine: id="statusLine">онлайн<
+Health: {"status":"ok","uptime":116.545804363,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:12:32.118Z"}
+Size: 29629
+Manifest link: 0
+0
+HTTP status: HTTP/2 200 
