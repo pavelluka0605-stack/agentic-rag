@@ -1,5 +1,5 @@
 ========================================
-=== VPS FULL DIAGNOSTIC Sun Mar 15 12:04:58 UTC 2026 ===
+=== VPS FULL DIAGNOSTIC Sun Mar 15 12:08:55 UTC 2026 ===
 ========================================
 
 === 1. Service worker files in /opt/claude-chat/public/ ===
@@ -745,7 +745,7 @@ app.listen(PORT, '0.0.0.0', () => {
 │ namespace         │ default                               │
 │ version           │ 1.0.0                                 │
 │ restarts          │ 0                                     │
-│ uptime            │ 78m                                   │
+│ uptime            │ 82m                                   │
 │ script path       │ /opt/claude-chat/server.js            │
 │ script args       │ N/A                                   │
 │ error log path    │ /root/.pm2/logs/claude-chat-error.log │
@@ -773,18 +773,18 @@ app.listen(PORT, '0.0.0.0', () => {
  Trigger via: pm2 trigger claude-chat <action_name>
 
  Code metrics value 
-┌────────────────────────┬──────────────────────┐
-│ Used Heap Size         │ 13.23 MiB            │
-│ Heap Usage             │ 92.02 %              │
-│ Heap Size              │ 14.38 MiB            │
-│ Event Loop Latency p95 │ 1.45 ms              │
-│ Event Loop Latency     │ 0.52 ms              │
-│ Active handles         │ 5                    │
-│ Active requests        │ 0                    │
-│ HTTP                   │ 0.03 req/min         │
-│ HTTP P95 Latency       │ 470.5999999999925 ms │
-│ HTTP Mean Latency      │ 2 ms                 │
-└────────────────────────┴──────────────────────┘
+┌────────────────────────┬───────────────────────┐
+│ Used Heap Size         │ 13.70 MiB             │
+│ Heap Usage             │ 92.08 %               │
+│ Heap Size              │ 14.88 MiB             │
+│ Event Loop Latency p95 │ 1.46 ms               │
+│ Event Loop Latency     │ 0.53 ms               │
+│ Active handles         │ 5                     │
+│ Active requests        │ 0                     │
+│ HTTP                   │ 0.04 req/min          │
+│ HTTP P95 Latency       │ 11955.599999999982 ms │
+│ HTTP Mean Latency      │ 2 ms                  │
+└────────────────────────┴───────────────────────┘
  Divergent env variables from local env 
 ┌────────────────┬──────────────────────────────────────┐
 │ PWD            │ /opt/claude-chat                     │
@@ -803,8 +803,8 @@ app.listen(PORT, '0.0.0.0', () => {
 
 === 7. ALL Docker containers ===
 CONTAINER ID   IMAGE                         COMMAND                  CREATED        STATUS                 PORTS                                                                          NAMES
-e292f6cbdd5a   wordpress:6.7-php8.2-apache   "docker-entrypoint.s…"   10 hours ago   Up 10 hours            0.0.0.0:8080->80/tcp, [::]:8080->80/tcp                                        mebelit-wp-wordpress-1
-ef1604097c60   mysql:8.0                     "docker-entrypoint.s…"   10 hours ago   Up 10 hours            0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp                         mebelit-wp-db-1
+e292f6cbdd5a   wordpress:6.7-php8.2-apache   "docker-entrypoint.s…"   11 hours ago   Up 11 hours            0.0.0.0:8080->80/tcp, [::]:8080->80/tcp                                        mebelit-wp-wordpress-1
+ef1604097c60   mysql:8.0                     "docker-entrypoint.s…"   11 hours ago   Up 11 hours            0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp                         mebelit-wp-db-1
 bfdfe0129de2   9f9e493a5f9e                  "tini -- /docker-ent…"   46 hours ago   Created                                                                                               n8n-traefik-n8n-1
 581a07387d54   traefik                       "/entrypoint.sh --ap…"   46 hours ago   Up 44 hours            0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp   n8n-traefik-traefik-1
 b77d63637705   pgvector/pgvector:pg16        "docker-entrypoint.s…"   6 days ago     Up 6 days              5432/tcp                                                                       n8n-postgres-1
@@ -899,7 +899,7 @@ Traefik container: 581a07387d54
 < access-control-allow-origin: *
 < cache-control: no-cache, no-store, must-revalidate
 < content-type: text/html; charset=utf-8
-< date: Sun, 15 Mar 2026 12:04:59 GMT
+< date: Sun, 15 Mar 2026 12:08:56 GMT
 < etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 < expires: 0
 < pragma: no-cache
@@ -933,7 +933,7 @@ MATCH: Same content
 ; <<>> DiG 9.18.39-0ubuntu0.24.04.2-Ubuntu <<>> chat.marbomebel.ru
 ;; global options: +cmd
 ;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 41992
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 53570
 ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
 
 ;; OPT PSEUDOSECTION:
@@ -942,11 +942,11 @@ MATCH: Same content
 ;chat.marbomebel.ru.		IN	A
 
 ;; ANSWER SECTION:
-chat.marbomebel.ru.	5223	IN	A	72.56.127.126
+chat.marbomebel.ru.	7199	IN	A	72.56.127.126
 
-;; Query time: 1 msec
+;; Query time: 0 msec
 ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
-;; WHEN: Sun Mar 15 12:04:59 UTC 2026
+;; WHEN: Sun Mar 15 12:08:56 UTC 2026
 ;; MSG SIZE  rcvd: 63
 
 
@@ -961,7 +961,7 @@ access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
 content-type: text/html; charset=utf-8
-date: Sun, 15 Mar 2026 12:05:00 GMT
+date: Sun, 15 Mar 2026 12:08:56 GMT
 etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 expires: 0
 pragma: no-cache
