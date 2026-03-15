@@ -9,7 +9,7 @@ found 0 vulnerabilities
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 0    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 1    │ stopped   │ 0%       │ 0b       │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 [PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
 [PM2] [claude-chat](0) ✓
@@ -21,12 +21,12 @@ found 0 vulnerabilities
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 815322   │ 0s     │ 0    │ online    │ 0%       │ 17.1mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 815979   │ 0s     │ 0    │ online    │ 0%       │ 15.3mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 815406   │ 0s     │ 1    │ online    │ 0%       │ 58.0mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 815979   │ 3s     │ 0    │ online    │ 0%       │ 58.0mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
 === 3. Test redirect (no version param) ===
@@ -43,7 +43,7 @@ Location: /?v=20260315v3
 Vary: Accept
 Content-Type: text/plain; charset=utf-8
 Content-Length: 36
-Date: Sun, 15 Mar 2026 08:27:56 GMT
+Date: Sun, 15 Mar 2026 08:47:13 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -60,7 +60,7 @@ Expires: 0
 Content-Type: text/html; charset=utf-8
 Content-Length: 30473
 ETag: W/"7709-qdCYKpK4/+mBpakQl8XICZgC4rU"
-Date: Sun, 15 Mar 2026 08:27:56 GMT
+Date: Sun, 15 Mar 2026 08:47:13 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -73,7 +73,7 @@ access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
 content-type: text/plain; charset=utf-8
-date: Sun, 15 Mar 2026 08:27:56 GMT
+date: Sun, 15 Mar 2026 08:47:13 GMT
 expires: 0
 location: /?v=20260315v3
 pragma: no-cache
@@ -89,7 +89,7 @@ access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
 content-type: text/html; charset=utf-8
-date: Sun, 15 Mar 2026 08:27:56 GMT
+date: Sun, 15 Mar 2026 08:47:13 GMT
 etag: W/"7709-qdCYKpK4/+mBpakQl8XICZgC4rU"
 expires: 0
 pragma: no-cache
@@ -105,5 +105,5 @@ v15.03
 Size: 30473
 
 === 6. PM2 health ===
-{"status":"ok","uptime":1.225796771,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T08:27:56.812Z"}
+{"status":"ok","uptime":3.579363187,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T08:47:13.669Z"}
 DONE
