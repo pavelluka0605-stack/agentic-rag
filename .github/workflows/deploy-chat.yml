@@ -29,12 +29,6 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Stop service on VPS
-        run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'systemctl stop claude-chat 2>/dev/null || true; sleep 2; kill $(lsof -t -i:3847) 2>/dev/null || true; sleep 1; echo "Service stopped"'
-
       - name: Copy files to VPS
         run: |
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
@@ -44,69 +38,54 @@ jobs:
             memory_store.py retriever.py \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/
 
-      - name: Install deps and start service
+      - name: Deploy and restart
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' << 'ENDSSH'
-          set -e
-          cd /opt/claude-chat
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' <<'SCRIPT'
+          set -ex
 
+          cd /opt/claude-chat
           npm install --omit=dev 2>&1 | tail -5
           command -v python3 &>/dev/null && pip3 install --quiet numpy openai 2>&1 | tail -3 || true
-          mkdir -p /opt/claude-chat/data
+          mkdir -p data
 
-          if [ ! -f .env ]; then
-            source /opt/p0-foundation/.env 2>/dev/null || true
+          test -f .env || {
+            . /opt/p0-foundation/.env 2>/dev/null || true
             printf 'BEARER_TOKEN=%s\nOPENAI_API_KEY=%s\nPORT=3847\n' \
               "$(openssl rand -hex 32)" "${OPENAI_API_KEY:-}" > .env
             echo "created .env"
-          fi
+          }
 
-          cat > /etc/systemd/system/claude-chat.service << 'UNIT'
-          [Unit]
-          Description=Claude Chat (chat.marbomebel.ru)
-          After=network.target
-          [Service]
-          Type=simple
-          WorkingDirectory=/opt/claude-chat
-          EnvironmentFile=/opt/claude-chat/.env
-          ExecStart=/usr/bin/node /opt/claude-chat/server.js
-          Restart=always
-          RestartSec=10
-          KillSignal=SIGTERM
-          TimeoutStopSec=15
-          [Install]
-          WantedBy=multi-user.target
-          UNIT
-          sed -i 's/^          //' /etc/systemd/system/claude-chat.service
-
-          systemctl daemon-reload
-          systemctl enable claude-chat
-
-          # Stop everything, free port, start with retry
+          # === STOP ===
           systemctl stop claude-chat 2>/dev/null || true
           sleep 2
-          kill $(lsof -t -i:3847) 2>/dev/null || true
-          sleep 1
-
-          for attempt in 1 2 3; do
-            echo "=== Start attempt $attempt ==="
-            kill $(lsof -t -i:3847) 2>/dev/null || true
-            sleep 1
-            systemctl start claude-chat
-            sleep 4
-            if systemctl is-active --quiet claude-chat; then
-              echo "OK: Claude Chat running on :3847"
-              curl -s --max-time 5 http://localhost:3847/api/health | head -c 300
-              echo ""
-              exit 0
-            fi
-            echo "Attempt $attempt failed, retrying..."
-            systemctl stop claude-chat 2>/dev/null || true
-            sleep 3
+          # Force-kill anything on port 3847
+          for pid in $(lsof -t -i:3847 2>/dev/null); do
+            echo "Killing PID $pid on port 3847"
+            kill -9 "$pid" 2>/dev/null || true
           done
+          sleep 1
+          # Verify port is free
+          if lsof -i:3847 >/dev/null 2>&1; then
+            echo "ERROR: Port 3847 still in use!"
+            lsof -i:3847
+            exit 1
+          fi
+          echo "Port 3847 is free"
 
-          echo "FAIL: Claude Chat not running after 3 attempts"
-          journalctl -u claude-chat -n 30 --no-pager
-          exit 1
-          ENDSSH
+          # === START ===
+          systemctl daemon-reload
+          systemctl enable claude-chat
+          systemctl start claude-chat
+          sleep 4
+
+          if systemctl is-active --quiet claude-chat; then
+            echo "OK: Claude Chat running"
+            curl -s --max-time 5 http://localhost:3847/api/health | head -c 300 || true
+            echo ""
+          else
+            echo "FAIL — journal:"
+            journalctl -u claude-chat -n 30 --no-pager
+            exit 1
+          fi
+          SCRIPT
