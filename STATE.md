@@ -69,7 +69,7 @@
 | `site-analysis/DISCOVERY-AUDIT.md` | Полный аудит mebelit.site |
 | `site-analysis/vk-photos-index.json` | Индекс 205 фото из VK Market |
 | `site-analysis/vk-photo-report.md` | Отчёт по фото |
-| `.github/workflows/yandex-metrika.yml` | Workflow Яндекс Метрики (НУЖНА ПОЧИНКА) |
+| `.github/workflows/yandex-metrika.yml` | Workflow Яндекс Метрики |
 
 ---
 

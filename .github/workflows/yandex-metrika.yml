@@ -1,11 +1,6 @@
 name: "Yandex Metrika — Pull Stats"
 
 on:
-  push:
-    branches:
-      - 'claude/mebelit-discovery-audit-gRQGq'
-    paths:
-      - '.github/workflows/yandex-metrika.yml'
   workflow_dispatch:
     inputs:
       period:
