@@ -21,11 +21,10 @@
 - [x] Workflow запущен автоматически через push-триггер
 
 ### Что в процессе
-- [ ] Добавить данные Метрики в DISCOVERY-AUDIT.md (раздел аналитики)
-- [ ] Убрать push-триггер из `yandex-metrika.yml` (был добавлен временно для автозапуска)
+- (всё завершено)
 
 ### Что дальше
-- [ ] Финальный отчёт для ребрендинга mebelit.site → кухнирема.рф
+- [ ] Реализация REBRAND-PLAN.md — сборка нового сайта кухнирема.рф
 
 ### Ключевые данные Яндекс Метрики (90 дней: 2025-12-15 — 2026-03-15)
 - 7 287 визитов, 5 286 уников
@@ -69,6 +68,8 @@
 | `site-analysis/DISCOVERY-AUDIT.md` | Полный аудит mebelit.site |
 | `site-analysis/vk-photos-index.json` | Индекс 205 фото из VK Market |
 | `site-analysis/vk-photo-report.md` | Отчёт по фото |
+| `site-analysis/REBRAND-PLAN.md` | **План ребрендинга** — 10 разделов, roadmap |
+| `site-analysis/yandex-metrika-report.md` | Отчёт Яндекс Метрики (90 дней) |
 | `.github/workflows/yandex-metrika.yml` | Workflow Яндекс Метрики |
 
 ---
@@ -83,3 +84,6 @@
 - Починка workflow (баг с env → tmp-файлы)
 - Получены данные Метрики: 7287 визитов, 90% реклама, 82% Красноярск
 - Создан STATE.md как система памяти
+- Данные Метрики добавлены в DISCOVERY-AUDIT.md (раздел 10)
+- Создан REBRAND-PLAN.md — 10 разделов, roadmap 5 фаз
+- Push-триггер убран из yandex-metrika.yml
