@@ -8,6 +8,10 @@ on:
       - ".github/workflows/deploy-chat.yml"
   workflow_dispatch:
 
+concurrency:
+  group: deploy-chat
+  cancel-in-progress: true
+
 jobs:
   deploy-chat:
     name: "Deploy chat.marbomebel.ru"
@@ -18,12 +22,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH key
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Stop service on VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'systemctl stop claude-chat 2>/dev/null || true; sleep 2; kill $(lsof -t -i:3847) 2>/dev/null || true; sleep 1; echo "Service stopped"'
 
       - name: Copy files to VPS
         run: |
@@ -34,9 +44,25 @@ jobs:
             memory_store.py retriever.py \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/
 
-      - name: Create systemd unit file
+      - name: Install deps and start service
         run: |
-          cat > /tmp/claude-chat.service << 'EOF'
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' << 'ENDSSH'
+          set -e
+          cd /opt/claude-chat
+
+          npm install --omit=dev 2>&1 | tail -5
+          command -v python3 &>/dev/null && pip3 install --quiet numpy openai 2>&1 | tail -3 || true
+          mkdir -p /opt/claude-chat/data
+
+          if [ ! -f .env ]; then
+            source /opt/p0-foundation/.env 2>/dev/null || true
+            printf 'BEARER_TOKEN=%s\nOPENAI_API_KEY=%s\nPORT=3847\n' \
+              "$(openssl rand -hex 32)" "${OPENAI_API_KEY:-}" > .env
+            echo "created .env"
+          fi
+
+          cat > /etc/systemd/system/claude-chat.service << 'UNIT'
           [Unit]
           Description=Claude Chat (chat.marbomebel.ru)
           After=network.target
@@ -51,47 +77,18 @@ jobs:
           TimeoutStopSec=15
           [Install]
           WantedBy=multi-user.target
-          EOF
-          # Убираем лишние отступы
-          sed -i 's/^          //' /tmp/claude-chat.service
-          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
-            /tmp/claude-chat.service \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/etc/systemd/system/claude-chat.service
+          UNIT
+          sed -i 's/^          //' /etc/systemd/system/claude-chat.service
 
-      - name: Install dependencies and restart service
-        run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
-          set -e
-          cd /opt/claude-chat
-
-          # Node.js deps
-          npm install --omit=dev 2>&1 | tail -5
-
-          # Python RAG deps
-          command -v python3 &>/dev/null && pip3 install --quiet numpy openai 2>&1 | tail -3 || true
-
-          # Data dir
-          mkdir -p /opt/claude-chat/data
-
-          # .env — не перезаписываем если есть
-          if [ ! -f .env ]; then
-            source /opt/p0-foundation/.env 2>/dev/null || true
-            printf 'BEARER_TOKEN=%s\nOPENAI_API_KEY=%s\nPORT=3847\n' \
-              "$(openssl rand -hex 32)" "${OPENAI_API_KEY:-}" > .env
-            echo "created .env"
-          fi
-
-          # Restart (stop first to free port)
           systemctl daemon-reload
           systemctl enable claude-chat
-          systemctl stop claude-chat || true
-          sleep 2
-          # Kill any leftover process on port 3847
-          fuser -k 3847/tcp 2>/dev/null || true
+
+          # Make sure port is free
+          kill $(lsof -t -i:3847) 2>/dev/null || true
           sleep 1
+
           systemctl start claude-chat
-          sleep 3
+          sleep 4
 
           if systemctl is-active --quiet claude-chat; then
             echo "OK: Claude Chat running on :3847"
@@ -99,7 +96,7 @@ jobs:
             echo ""
           else
             echo "FAIL: Claude Chat not running"
-            journalctl -u claude-chat -n 20 --no-pager
+            journalctl -u claude-chat -n 30 --no-pager
             exit 1
           fi
           ENDSSH
