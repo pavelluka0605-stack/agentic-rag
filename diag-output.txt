@@ -1,5 +1,5 @@
 ========================================
-=== VPS FULL DIAGNOSTIC Sun Mar 15 09:05:30 UTC 2026 ===
+=== VPS FULL DIAGNOSTIC Sun Mar 15 09:14:06 UTC 2026 ===
 ========================================
 
 === 1. Service worker files in /opt/claude-chat/public/ ===
@@ -49,11 +49,11 @@ af8b3449a4f1334866c06e08e0acade5  /opt/claude-chat/public/uploads/0a2193dc-5ee3-
 af8b3449a4f1334866c06e08e0acade5  /opt/claude-chat/public/uploads/d6923b8f-ebe6-4cb5-a9e6-8900455e40a9.jpeg
 ade5115d0c52503a7c708dbc0ff92446  /opt/claude-chat/public/uploads/6f26c725-4d9c-498c-9f2e-9d0e7acfec59.png
 6faac3a98b43007508aeba523fc15c62  /opt/claude-chat/public/manifest.json
-b94dba3190f258272cccdab584981b16  /opt/claude-chat/public/index.html
+f69499b91889d4bbe8d1c1e958826903  /opt/claude-chat/public/index.html
 1f85245eb5a6f24e87bb0e5e073bf1ea  /opt/claude-chat/public/icon-512.png
 
 === 3. MD5 hash of /opt/claude-chat/server.js ===
-ba92dac1fbc2795451574dfc06ec9afa  /opt/claude-chat/server.js
+4b6d0688d389934b4d3e07f083a39525  /opt/claude-chat/server.js
 
 === 4. FULL server.js content ===
 --- BEGIN server.js ---
@@ -131,13 +131,8 @@ app.use((req, res, next) => {
   }
   next();
 });
-// Force cache bust: redirect to URL with version query param
-const APP_VERSION = '20260315v3';
+// Serve index.html dynamically with injected config
 app.get('/', (req, res) => {
-  // If no version param or old version — redirect to bust cache
-  if (req.query.v !== APP_VERSION) {
-    return res.redirect(302, `/?v=${APP_VERSION}`);
-  }
   const htmlPath = path.join(__dirname, 'public', 'index.html');
   let html = fs.readFileSync(htmlPath, 'utf-8');
   // Inject auto-config script before </head>
@@ -757,8 +752,8 @@ app.listen(PORT, '0.0.0.0', () => {
 │ name              │ claude-chat                           │
 │ namespace         │ default                               │
 │ version           │ 1.0.0                                 │
-│ restarts          │ 0                                     │
-│ uptime            │ 9m                                    │
+│ restarts          │ 1                                     │
+│ uptime            │ 2m                                    │
 │ script path       │ /opt/claude-chat/server.js            │
 │ script args       │ N/A                                   │
 │ error log path    │ /root/.pm2/logs/claude-chat-error.log │
@@ -773,7 +768,7 @@ app.listen(PORT, '0.0.0.0', () => {
 │ node env          │ N/A                                   │
 │ watch & reload    │ ✘                                     │
 │ unstable restarts │ 0                                     │
-│ created at        │ 2026-03-15T08:56:28.674Z              │
+│ created at        │ 2026-03-15T09:11:54.983Z              │
 └───────────────────┴───────────────────────────────────────┘
  Actions available 
 ┌────────────────────────┐
@@ -786,25 +781,25 @@ app.listen(PORT, '0.0.0.0', () => {
  Trigger via: pm2 trigger claude-chat <action_name>
 
  Code metrics value 
-┌────────────────────────┬──────────────┐
-│ Used Heap Size         │ 9.56 MiB     │
-│ Heap Usage             │ 89.15 %      │
-│ Heap Size              │ 10.73 MiB    │
-│ Event Loop Latency p95 │ 1.43 ms      │
-│ Event Loop Latency     │ 0.48 ms      │
-│ Active handles         │ 4            │
-│ Active requests        │ 0            │
-│ HTTP                   │ 0.12 req/min │
-│ HTTP P95 Latency       │ 7 ms         │
-│ HTTP Mean Latency      │ 1 ms         │
-└────────────────────────┴──────────────┘
+┌────────────────────────┬───────────┐
+│ Used Heap Size         │ 8.97 MiB  │
+│ Heap Usage             │ 89.9 %    │
+│ Heap Size              │ 9.98 MiB  │
+│ Event Loop Latency p95 │ 1.43 ms   │
+│ Event Loop Latency     │ 0.41 ms   │
+│ Active handles         │ 4         │
+│ Active requests        │ 0         │
+│ HTTP                   │ 0 req/min │
+│ HTTP P95 Latency       │ 10 ms     │
+│ HTTP Mean Latency      │ 10 ms     │
+└────────────────────────┴───────────┘
  Divergent env variables from local env 
-┌────────────────┬─────────────────────────────────────┐
-│ PWD            │ /opt/claude-chat                    │
-│ SSH_CONNECTION │ 20.81.159.36 63488 72.56.127.126 22 │
-│ XDG_SESSION_ID │ 5494                                │
-│ SSH_CLIENT     │ 20.81.159.36 63488 22               │
-└────────────────┴─────────────────────────────────────┘
+┌────────────────┬────────────────────────────────────┐
+│ PWD            │ /opt/claude-chat                   │
+│ SSH_CONNECTION │ 20.55.15.99 33831 72.56.127.126 22 │
+│ XDG_SESSION_ID │ 5501                               │
+│ SSH_CLIENT     │ 20.55.15.99 33831 22               │
+└────────────────┴────────────────────────────────────┘
 
  Add your own code metrics: http://bit.ly/code-metrics
  Use `pm2 logs claude-chat [--lines 1000]` to display logs
@@ -816,8 +811,8 @@ app.listen(PORT, '0.0.0.0', () => {
 
 === 7. ALL Docker containers ===
 CONTAINER ID   IMAGE                         COMMAND                  CREATED        STATUS                 PORTS                                                                          NAMES
-e292f6cbdd5a   wordpress:6.7-php8.2-apache   "docker-entrypoint.s…"   7 hours ago    Up 7 hours             0.0.0.0:8080->80/tcp, [::]:8080->80/tcp                                        mebelit-wp-wordpress-1
-ef1604097c60   mysql:8.0                     "docker-entrypoint.s…"   7 hours ago    Up 7 hours             0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp                         mebelit-wp-db-1
+e292f6cbdd5a   wordpress:6.7-php8.2-apache   "docker-entrypoint.s…"   8 hours ago    Up 8 hours             0.0.0.0:8080->80/tcp, [::]:8080->80/tcp                                        mebelit-wp-wordpress-1
+ef1604097c60   mysql:8.0                     "docker-entrypoint.s…"   8 hours ago    Up 8 hours             0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp                         mebelit-wp-db-1
 bfdfe0129de2   9f9e493a5f9e                  "tini -- /docker-ent…"   43 hours ago   Created                                                                                               n8n-traefik-n8n-1
 581a07387d54   traefik                       "/entrypoint.sh --ap…"   43 hours ago   Up 41 hours            0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp   n8n-traefik-traefik-1
 b77d63637705   pgvector/pgvector:pg16        "docker-entrypoint.s…"   6 days ago     Up 6 days              5432/tcp                                                                       n8n-postgres-1
@@ -843,7 +838,7 @@ a99e00dabc0d   n8nio/n8n                     "tini -- /docker-ent…"   12 days 
 --- ss output ---
 LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
 LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
-LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=816518,fd=20))                                                                                                                      
+LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=817809,fd=20))                                                                                                                      
 LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
 LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=577310,fd=7))                                                                                                                          
 --- netstat output ---
@@ -906,37 +901,37 @@ Traefik container: 581a07387d54
 > Accept: */*
 > 
 { [5 bytes data]
-< HTTP/2 302 
+< HTTP/2 200 
 < access-control-allow-headers: Content-Type, Authorization
 < access-control-allow-methods: GET, POST, OPTIONS
 < access-control-allow-origin: *
 < cache-control: no-cache, no-store, must-revalidate
-< content-type: text/plain; charset=utf-8
-< date: Sun, 15 Mar 2026 09:05:31 GMT
+< content-type: text/html; charset=utf-8
+< date: Sun, 15 Mar 2026 09:14:07 GMT
+< etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 < expires: 0
-< location: /?v=20260315v3
 < pragma: no-cache
-< vary: Accept
 < x-powered-by: Express
-< content-length: 36
+< content-length: 29629
 < 
-* Ignoring the response-body
-100    36  100    36    0     0    578      0 --:--:-- --:--:-- --:--:--   580
-* Connection #0 to host chat.marbomebel.ru left intact
-* Issue another request to this URL: 'https://chat.marbomebel.ru/?v=20260315v3'
-* Found bundle for host: 0x5dbb938e3890 [can multiplex]
-* Re-using existing connection with host chat.marbomebel.ru
-* [HTTP/2] [3] OPENED stream for https://chat.marbomebel.ru/?v=20260315v3
-* [HTTP/2] [3] [:method: GET]
-* [HTTP/2] [3] [:scheme: https]
-* [HTTP/2] [3] [:authority: chat.marbomebel.ru]
-* [HTTP/2] [3] [:path: /?v=20260315v3]
-* [HTTP/2] [3] [user-agent: curl/8.5.0]
-* [HTTP/2] [3] [accept: */*]
+{ [29629 bytes data]
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AI Ассистент</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a14;
+  --surface: #12121e;
 
 === 12. Compare HTML: localhost:3847 vs https://chat.marbomebel.ru/ ===
-localhost:3847  => 2f71403374d5dd8d786803a7ec01d1bc  -
-chat.marbomebel => 2f71403374d5dd8d786803a7ec01d1bc  -
+localhost:3847  => 09ff1f0bfff113be37857974857fe30e  -
+chat.marbomebel => 09ff1f0bfff113be37857974857fe30e  -
 MATCH: Same content
 
 === 13. DNS resolution from VPS ===
@@ -946,7 +941,7 @@ MATCH: Same content
 ; <<>> DiG 9.18.39-0ubuntu0.24.04.2-Ubuntu <<>> chat.marbomebel.ru
 ;; global options: +cmd
 ;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 3493
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 64483
 ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
 
 ;; OPT PSEUDOSECTION:
@@ -955,11 +950,11 @@ MATCH: Same content
 ;chat.marbomebel.ru.		IN	A
 
 ;; ANSWER SECTION:
-chat.marbomebel.ru.	4423	IN	A	72.56.127.126
+chat.marbomebel.ru.	3906	IN	A	72.56.127.126
 
 ;; Query time: 0 msec
 ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
-;; WHEN: Sun Mar 15 09:05:31 UTC 2026
+;; WHEN: Sun Mar 15 09:14:07 UTC 2026
 ;; MSG SIZE  rcvd: 63
 
 
@@ -968,19 +963,18 @@ chat.marbomebel.ru.	4423	IN	A	72.56.127.126
 cache-control: no-cache, no-store, must-revalidate
 
 --- ALL response headers ---
-HTTP/2 302 
+HTTP/2 200 
 access-control-allow-headers: Content-Type, Authorization
 access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
-content-type: text/plain; charset=utf-8
-date: Sun, 15 Mar 2026 09:05:31 GMT
+content-type: text/html; charset=utf-8
+date: Sun, 15 Mar 2026 09:14:07 GMT
+etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 expires: 0
-location: /?v=20260315v3
 pragma: no-cache
-vary: Accept
 x-powered-by: Express
-content-length: 36
+content-length: 29629
 
 
 ========================================
