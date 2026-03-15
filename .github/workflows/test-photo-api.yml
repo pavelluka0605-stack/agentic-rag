@@ -33,7 +33,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Fetch VPS data
+      - name: Fix and restart service
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -42,33 +42,44 @@ jobs:
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
           OUT="diag-output.txt"
 
-          echo "=== VPS DIAG $(date -u) ===" > $OUT
+          echo "=== FIX SERVICE $(date -u) ===" > $OUT
 
           echo "" >> $OUT
-          echo "=== HEALTH ===" >> $OUT
-          $SSH "curl -s http://localhost:3847/api/health" >> $OUT 2>&1
+          echo "=== STEP 1: Disable auto-restart ===" >> $OUT
+          $SSH "systemctl stop claude-chat 2>/dev/null; systemctl disable claude-chat 2>/dev/null; echo 'stopped and disabled'" >> $OUT 2>&1
+          sleep 3
 
           echo "" >> $OUT
-          echo "=== JOURNAL (last 50) ===" >> $OUT
-          $SSH "journalctl -u claude-chat -n 50 --no-pager" >> $OUT 2>&1
+          echo "=== STEP 2: Kill ALL on port 3847 ===" >> $OUT
+          $SSH "for p in \$(lsof -t -i:3847 2>/dev/null); do echo \"killing \$p\"; kill -9 \$p; done; echo done" >> $OUT 2>&1
+          sleep 3
 
           echo "" >> $OUT
-          echo "=== CONVERSATION DATA ON DISK ===" >> $OUT
-          $SSH "ls -la /opt/claude-chat/data/ 2>/dev/null || echo 'no data dir'" >> $OUT 2>&1
-          $SSH "cat /opt/claude-chat/data/conversations.json 2>/dev/null | python3 -m json.tool 2>/dev/null || echo 'no conversations.json'" >> $OUT 2>&1
+          echo "=== STEP 3: Verify port free ===" >> $OUT
+          $SSH "lsof -i:3847 2>/dev/null && echo 'PORT STILL BUSY' || echo 'PORT IS FREE'" >> $OUT 2>&1
 
           echo "" >> $OUT
-          echo "=== SERVICE UPTIME ===" >> $OUT
-          $SSH "systemctl status claude-chat --no-pager 2>&1 | head -15" >> $OUT 2>&1
+          echo "=== STEP 4: Re-enable and start ===" >> $OUT
+          $SSH "systemctl daemon-reload; systemctl enable claude-chat; systemctl start claude-chat" >> $OUT 2>&1
+          sleep 5
+
+          echo "" >> $OUT
+          echo "=== STEP 5: Check result ===" >> $OUT
+          $SSH "systemctl is-active claude-chat && echo 'SERVICE_OK' || echo 'SERVICE_FAIL'" >> $OUT 2>&1
+          $SSH "curl -s --max-time 5 http://localhost:3847/api/health || echo 'health failed'" >> $OUT 2>&1
+
+          echo "" >> $OUT
+          echo "=== JOURNAL (last 15) ===" >> $OUT
+          $SSH "journalctl -u claude-chat -n 15 --no-pager" >> $OUT 2>&1
 
           cat $OUT
 
-      - name: Save to repo
+      - name: Save output
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet && echo "No changes" || {
-            git commit -m "diag: VPS data dump [skip ci]"
+            git commit -m "diag: fix service restart [skip ci]"
             git push origin main
           }
