@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>AI Ассистент — marbomebel</title>
+<title>AI Ассистент</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-180.png">
 <link rel="icon" type="image/png" href="/favicon.png">
@@ -25,7 +25,6 @@
   --bot-bg: #1e1e32;
   --error: #ff4466;
   --success: #44cc88;
-  --rag: #f0b429;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 body {
@@ -45,30 +44,18 @@ body {
 }
 .header .avatar {
   width: 44px; height: 44px; border-radius: 50%;
-  background: var(--bg);
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
   display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
-}
-.header .avatar img {
-  width: 38px; height: 38px;
+  font-size: 20px;
 }
 .header .info { flex: 1; }
 .header .info h1 { font-size: 17px; font-weight: 600; }
-.header .status-row { display: flex; align-items: center; gap: 8px; }
 .header .status { font-size: 12px; color: var(--success); }
 .header .status::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--success); margin-right: 4px; }
-.header .rag-badge {
-  display: none; font-size: 10px; padding: 2px 6px; border-radius: 8px;
-  background: rgba(240,180,41,0.15); color: var(--rag); border: 1px solid rgba(240,180,41,0.3);
-  font-weight: 600;
-}
-.header .rag-badge.show { display: inline-block; }
-.header-btns { display: flex; gap: 6px; }
-.header .menu-btn, .header .new-btn {
+.header .menu-btn {
   width: 36px; height: 36px; border-radius: 8px; border: none;
   background: var(--surface2); color: var(--text); font-size: 18px; cursor: pointer;
 }
-.header .new-btn { font-size: 16px; }
 
 /* Messages area */
 .messages {
@@ -80,10 +67,7 @@ body {
 .msg.user { align-self: flex-end; background: var(--user-bg); color: #fff; border-bottom-right-radius: 4px; }
 .msg.bot { align-self: flex-start; background: var(--bot-bg); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 .msg.error { align-self: center; background: rgba(255,68,102,0.15); color: var(--error); border: 1px solid rgba(255,68,102,0.3); font-size: 14px; text-align: center; max-width: 90%; }
-.msg.system { align-self: center; background: rgba(124,92,252,0.1); color: var(--accent2); border: 1px solid rgba(124,92,252,0.2); font-size: 13px; text-align: center; max-width: 90%; padding: 8px 14px; }
 .msg .elapsed { font-size: 11px; color: var(--text2); margin-top: 6px; text-align: right; }
-.msg .rag-info { font-size: 11px; color: var(--rag); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
-.msg .rag-info::before { content: ''; display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: var(--rag); }
 .msg img { max-width: 100%; border-radius: 8px; margin-top: 8px; }
 .msg pre { background: #0d0d18; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 13px; margin-top: 8px; }
 .msg code { font-family: 'SF Mono', Monaco, monospace; font-size: 13px; }
@@ -200,52 +184,22 @@ body {
   background: var(--error); color: #fff; border: none;
   font-size: 12px; cursor: pointer;
 }
-
-/* Settings dropdown */
-.settings-menu {
-  display: none; position: absolute; top: 60px; right: 12px;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 12px; overflow: hidden; z-index: 100;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5); min-width: 200px;
-}
-.settings-menu.open { display: block; }
-.settings-menu button {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; padding: 14px 20px; border: none;
-  background: transparent; color: var(--text); font-size: 14px;
-  cursor: pointer; text-align: left;
-}
-.settings-menu button:active { background: var(--surface); }
-.settings-menu button + button { border-top: 1px solid var(--border); }
-.settings-menu .danger { color: var(--error); }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="avatar"><img src="/logo.svg" alt="AI"></div>
+  <div class="avatar"><img src="/logo.svg" alt="AI" style="width:28px;height:28px;"></div>
   <div class="info">
     <h1>AI Ассистент</h1>
-    <div class="status-row">
-      <div class="status" id="statusLine">онлайн</div>
-      <div class="rag-badge" id="ragBadge">RAG</div>
-    </div>
+    <div class="status" id="statusLine">онлайн</div>
   </div>
-  <div class="header-btns">
-    <button class="new-btn" onclick="newSession()" title="Новый чат">&#10010;</button>
-    <button class="menu-btn" onclick="toggleSettings()">&#9776;</button>
-  </div>
+  <button class="menu-btn" onclick="toggleSettings()">&#9776;</button>
 </div>
 
 <div class="conn-banner" id="connBanner">
   Соединение прервано
   <button onclick="recoverSession()">Повторить</button>
-</div>
-
-<div class="settings-menu" id="settingsMenu">
-  <button onclick="newSession(); closeSettings()">&#10010; Новый чат</button>
-  <button onclick="showMemoryStats(); closeSettings()">&#128200; Статус памяти</button>
-  <button class="danger" onclick="clearHistory(); closeSettings()">&#128465; Очистить историю</button>
 </div>
 
 <div class="messages" id="messages"></div>
@@ -257,13 +211,12 @@ body {
   <button onclick="quickCmd('покажи последние логи N8N')">N8N логи</button>
   <button onclick="quickCmd('docker ps')">docker ps</button>
   <button onclick="quickCmd('покажи ресурсы сервера')">Ресурсы</button>
-  <button onclick="quickCmd('статус всех сервисов')">Сервисы</button>
 </div>
 
 <div class="input-area">
   <button class="add-btn" onclick="toggleFileMenu()">+</button>
   <div class="text-wrap">
-    <textarea id="msgInput" placeholder="Сообщение..." rows="1"
+    <textarea id="msgInput" placeholder="Сообщение" rows="1"
       oninput="autoGrow(this); toggleSendBtn()"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
     <button class="send-btn" id="sendBtn" onclick="sendMessage()">&#8593;</button>
@@ -271,10 +224,10 @@ body {
   <button class="mic-btn" id="micBtn" onclick="toggleVoice()">&#127908;</button>
 </div>
 
-<div class="overlay" id="overlay" onclick="closeFileMenu(); closeSettings()"></div>
+<div class="overlay" id="overlay" onclick="closeFileMenu()"></div>
 <div class="file-menu" id="fileMenu">
-  <button onclick="pickPhoto('camera')">&#128247; Сделать фото</button>
-  <button onclick="pickPhoto('gallery')">&#128444; Выбрать из галереи</button>
+  <button onclick="pickPhoto('camera')">&#128247; Take Photo</button>
+  <button onclick="pickPhoto('gallery')">&#128444; Choose Photo</button>
 </div>
 
 <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhotos(this)">
@@ -296,27 +249,25 @@ if (!sessionId) {
 
 let currentRequestId = null;
 let sending = false;
-let pendingPhotos = [];
+let pendingPhotos = []; // { file, dataUrl }
 let history = [];
-let pollAbort = null;
-let clientTimeout = null;
-let requestStartTime = null;
-let currentRagCount = 0; // RAG записей для текущего запроса
+let pollAbort = null; // AbortController for polling
+let clientTimeout = null; // total client-side timeout
+let requestStartTime = null; // когда начался текущий запрос
 
 const $messages = document.getElementById('messages');
 const $input = document.getElementById('msgInput');
 const $sendBtn = document.getElementById('sendBtn');
 const $attachments = document.getElementById('attachments');
 const $connBanner = document.getElementById('connBanner');
-const $ragBadge = document.getElementById('ragBadge');
 
-// --- Загрузка истории ---
+// --- Load history from localStorage ---
 function loadLocalHistory() {
   try {
     const saved = localStorage.getItem('chat_history_' + sessionId);
     if (saved) {
       const msgs = JSON.parse(saved);
-      msgs.forEach(m => addMessage(m.role, m.content, { elapsed: m.elapsed, rag: m.rag, save: false }));
+      msgs.forEach(m => addMessage(m.role, m.content, { elapsed: m.elapsed, save: false }));
       history = msgs.map(m => ({ role: m.role, content: m.content }));
     }
   } catch (_) {}
@@ -324,22 +275,15 @@ function loadLocalHistory() {
 
 function saveLocalHistory() {
   try {
-    const items = [];
-    for (let i = 0; i < history.length; i++) {
+    const toSave = history.slice(-50).map((m, i) => {
       const el = $messages.children[i];
-      const ragEl = el?.querySelector('.rag-info');
-      items.push({
-        role: history[i].role,
-        content: history[i].content,
-        elapsed: el?.querySelector('.elapsed')?.textContent || '',
-        rag: ragEl ? ragEl.textContent : '',
-      });
-    }
-    localStorage.setItem('chat_history_' + sessionId, JSON.stringify(items));
+      return { role: m.role, content: m.content, elapsed: el?.querySelector('.elapsed')?.textContent || '' };
+    });
+    localStorage.setItem('chat_history_' + sessionId, JSON.stringify(toSave));
   } catch (_) {}
 }
 
-// --- Сообщения ---
+// --- Messages ---
 function addMessage(role, content, opts = {}) {
   const div = document.createElement('div');
   div.className = `msg ${role}`;
@@ -347,34 +291,24 @@ function addMessage(role, content, opts = {}) {
   if (role === 'bot' || role === 'assistant') {
     div.className = 'msg bot';
     div.innerHTML = formatMarkdown(content);
-    if (opts.rag) {
-      const ri = document.createElement('div');
-      ri.className = 'rag-info';
-      ri.textContent = opts.rag;
-      div.appendChild(ri);
-    }
     if (opts.elapsed) {
       const el = document.createElement('div');
       el.className = 'elapsed';
       el.textContent = opts.elapsed;
       div.appendChild(el);
     }
+    // Copy button
     const cb = document.createElement('button');
     cb.className = 'copy-btn';
-    cb.textContent = 'Копировать';
-    cb.onclick = () => {
-      navigator.clipboard.writeText(content).then(() => {
-        cb.textContent = 'Скопировано!';
-        setTimeout(() => cb.textContent = 'Копировать', 1500);
-      });
-    };
+    cb.textContent = 'Copy';
+    cb.onclick = () => { navigator.clipboard.writeText(content).then(() => { cb.textContent = 'Copied!'; setTimeout(() => cb.textContent = 'Copy', 1500); }); };
     div.appendChild(cb);
   } else if (role === 'error') {
     div.innerHTML = `<b>Ошибка:</b> ${escapeHtml(content)}`;
-  } else if (role === 'system') {
-    div.innerHTML = escapeHtml(content);
   } else {
+    // user
     div.innerHTML = escapeHtml(content).replace(/\n/g, '<br>');
+    // Append photos if any
     if (opts.photos) {
       opts.photos.forEach(p => {
         const img = document.createElement('img');
@@ -398,7 +332,7 @@ function addMessage(role, content, opts = {}) {
   return div;
 }
 
-function showTyping(text = 'Думаю') {
+function showTyping(text = 'Ожидание ответа') {
   removeTyping();
   const div = document.createElement('div');
   div.className = 'typing';
@@ -412,11 +346,12 @@ function removeTyping() {
   document.getElementById('typing')?.remove();
 }
 
-// --- Отправка сообщения ---
+// --- Send message ---
 let lastSendTime = 0;
 async function sendMessage() {
-  if (sending) return;
+  if (sending) return; // debounce
 
+  // Защита от двойного тапа на мобильном (минимум 1.5с между отправками)
   const now = Date.now();
   if (now - lastSendTime < 1500) return;
 
@@ -425,25 +360,24 @@ async function sendMessage() {
 
   if (!text && photos.length === 0) return;
 
+  // Prevent double send
   lastSendTime = now;
   sending = true;
   $sendBtn.disabled = true;
   $input.value = '';
   autoGrow($input);
   toggleSendBtn();
-  currentRagCount = 0;
 
+  // Show user message
   const photoUrls = photos.map(p => p.dataUrl);
   addMessage('user', text || '(фото)', { photos: photoUrls });
 
+  // Clear attachments
   pendingPhotos = [];
   $attachments.innerHTML = '';
 
-  // Загрузка и анализ фото через Vision API
-  let photoDescriptions = [];
-  if (photos.length > 0) {
-    showTyping('Анализирую фото');
-  }
+  // Upload photos first
+  let uploadedUrls = [];
   for (const p of photos) {
     try {
       const fd = new FormData();
@@ -455,27 +389,25 @@ async function sendMessage() {
       });
       if (resp.ok) {
         const data = await resp.json();
-        if (data.description) {
-          photoDescriptions.push(data.description);
-        }
+        uploadedUrls.push(data.url);
       }
     } catch (_) {}
   }
 
+  // Build message with photo references
   let fullMessage = text;
-  if (photoDescriptions.length > 0) {
-    const photoSection = photoDescriptions.map((desc, i) =>
-      photos.length > 1 ? `Фото ${i + 1}:\n${desc}` : desc
-    ).join('\n\n');
-    fullMessage += (text ? '\n\n' : '') + `[Пользователь прикрепил ${photoDescriptions.length} фото. Описание:]\n${photoSection}`;
+  if (uploadedUrls.length > 0) {
+    fullMessage += (text ? '\n\n' : '') + 'Attached photos:\n' + uploadedUrls.join('\n');
   }
 
   showTyping();
   $connBanner.classList.remove('show');
 
+  // Запоминаем время начала запроса в localStorage
   requestStartTime = Date.now();
   localStorage.setItem('chat_request_start', requestStartTime.toString());
 
+  // Hard client-side timeout: 6 minutes — guarantees UI never hangs forever
   clientTimeout = setTimeout(() => {
     if (sending && currentRequestId) {
       console.warn('Client timeout — forcing cleanup');
@@ -491,6 +423,7 @@ async function sendMessage() {
       headers: AUTH,
       body: JSON.stringify({
         message: fullMessage,
+        history: history.slice(-6),
         sessionId,
       }),
     });
@@ -505,6 +438,7 @@ async function sendMessage() {
       return;
     }
 
+    // Read SSE stream
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let botText = '';
@@ -529,15 +463,6 @@ async function sendMessage() {
 
         if (event.type === 'start') {
           currentRequestId = event.id;
-        } else if (event.type === 'rag') {
-          // RAG-память нашла контекст
-          currentRagCount = event.found;
-          $ragBadge.classList.add('show');
-          $ragBadge.textContent = `RAG: ${event.found}`;
-          const typingEl = document.getElementById('typing');
-          if (typingEl) {
-            typingEl.querySelector('span').textContent = `Думаю (память: ${event.found} записей)`;
-          }
         } else if (event.type === 'chunk') {
           if (!botDiv) {
             removeTyping();
@@ -553,26 +478,15 @@ async function sendMessage() {
           removeTyping();
           if (clientTimeout) { clearTimeout(clientTimeout); clientTimeout = null; }
           if (botDiv) {
-            // RAG индикатор
-            if (currentRagCount > 0) {
-              const ri = document.createElement('div');
-              ri.className = 'rag-info';
-              ri.textContent = `Память: ${currentRagCount} записей`;
-              botDiv.appendChild(ri);
-            }
             const el = document.createElement('div');
             el.className = 'elapsed';
             el.textContent = `${event.elapsed}s`;
             botDiv.appendChild(el);
+            // Copy button
             const cb = document.createElement('button');
             cb.className = 'copy-btn';
-            cb.textContent = 'Копировать';
-            cb.onclick = () => {
-              navigator.clipboard.writeText(botText).then(() => {
-                cb.textContent = 'Скопировано!';
-                setTimeout(() => cb.textContent = 'Копировать', 1500);
-              });
-            };
+            cb.textContent = 'Copy';
+            cb.onclick = () => { navigator.clipboard.writeText(botText).then(() => { cb.textContent = 'Copied!'; setTimeout(() => cb.textContent = 'Copy', 1500); }); };
             botDiv.appendChild(cb);
           }
           if (botText) {
@@ -580,26 +494,25 @@ async function sendMessage() {
             saveLocalHistory();
           }
           currentRequestId = null;
-          currentRagCount = 0;
           localStorage.removeItem('chat_request_start');
-          // Скрыть RAG бейдж через 3 секунды
-          setTimeout(() => $ragBadge.classList.remove('show'), 3000);
         }
       }
     }
 
+    // SSE stream ended without 'done' event — server closed unexpectedly
     if (!sseCompleted && currentRequestId) {
       showTyping('Восстанавливаю соединение');
       pollForResult(currentRequestId);
-      return;
+      return; // pollForResult handles cleanup
     }
   } catch (err) {
     removeTyping();
+    // Connection lost — try to recover
     $connBanner.classList.add('show');
     if (currentRequestId) {
       showTyping('Соединение потеряно, ожидаю ответ');
       pollForResult(currentRequestId);
-      return;
+      return; // pollForResult handles cleanup
     } else {
       addMessage('error', 'Соединение прервано. Проверьте интернет.');
     }
@@ -612,7 +525,7 @@ async function sendMessage() {
   }
 }
 
-// --- Отмена запроса ---
+// --- Cancel current request ---
 async function cancelCurrentRequest() {
   if (pollAbort) pollAbort.abort();
   if (clientTimeout) { clearTimeout(clientTimeout); clientTimeout = null; }
@@ -636,10 +549,10 @@ async function cancelCurrentRequest() {
   addMessage('error', 'Запрос отменён');
 }
 
-// --- Восстановление после разрыва ---
+// --- Poll for result after disconnect ---
 async function pollForResult(requestId) {
   pollAbort = new AbortController();
-  const maxAttempts = 60;
+  const maxAttempts = 60; // 5 minutes max (every 5s)
   let lastPartialText = '';
 
   for (let i = 0; i < maxAttempts; i++) {
@@ -655,6 +568,7 @@ async function pollForResult(requestId) {
       if (!resp.ok) continue;
       const data = await resp.json();
 
+      // Show partial text as it arrives
       if (data.fullText && data.fullText !== lastPartialText) {
         lastPartialText = data.fullText;
         const typingEl = document.getElementById('typing');
@@ -679,6 +593,7 @@ async function pollForResult(requestId) {
       }
     } catch (e) {
       if (e.name === 'AbortError') return;
+      // Still offline, keep trying
     }
   }
   removeTyping();
@@ -689,7 +604,7 @@ async function pollForResult(requestId) {
   pollAbort = null;
 }
 
-// --- Восстановление сессии ---
+// --- Recover session on app reopen ---
 async function recoverSession() {
   $connBanner.classList.remove('show');
   showTyping('Восстанавливаю');
@@ -705,6 +620,7 @@ async function recoverSession() {
     const data = await resp.json();
     removeTyping();
 
+    // Старые запросы (>5 мин) — не ждём
     const MAX_AGE_MS = 5 * 60 * 1000;
     if (data.status === 'running' && data.ageMs && data.ageMs > MAX_AGE_MS) {
       addMessage('error', 'Предыдущий запрос истёк. Отправьте сообщение заново.');
@@ -732,18 +648,21 @@ async function recoverSession() {
   }
 }
 
-// --- Авто-восстановление при загрузке ---
+// --- Auto-recover on page load ---
 async function checkPendingOnLoad() {
+  // Первая проверка: клиентский возраст запроса (не зависит от сервера)
   const MAX_AGE_MS = 5 * 60 * 1000;
   const savedStart = localStorage.getItem('chat_request_start');
   if (savedStart) {
     const age = Date.now() - parseInt(savedStart, 10);
     if (age > MAX_AGE_MS) {
+      // Запрос старше 5 мин — точно мёртвый, убираем
       localStorage.removeItem('chat_request_start');
       removeTyping();
       return;
     }
   } else {
+    // Нет активного запроса — нечего восстанавливать
     return;
   }
 
@@ -757,6 +676,7 @@ async function checkPendingOnLoad() {
     }
     const data = await resp.json();
 
+    // Двойная проверка: серверный возраст
     if (data.ageMs && data.ageMs > MAX_AGE_MS && data.status === 'running') {
       localStorage.removeItem('chat_request_start');
       if (data.requestId) {
@@ -781,14 +701,16 @@ async function checkPendingOnLoad() {
         addMessage('bot', data.fullText, { elapsed: data.elapsed ? `${data.elapsed}s` : '' });
       }
     } else {
+      // status: 'none' — запрос потерян
       localStorage.removeItem('chat_request_start');
     }
   } catch (_) {
+    // Сервер недоступен — не показываем зависший индикатор
     localStorage.removeItem('chat_request_start');
   }
 }
 
-// --- Фото ---
+// --- Photos ---
 function toggleFileMenu() {
   document.getElementById('fileMenu').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('open');
@@ -808,7 +730,7 @@ function pickPhoto(source) {
 function handlePhotos(input) {
   const files = Array.from(input.files || []);
   for (const file of files) {
-    if (pendingPhotos.length >= 4) break;
+    if (pendingPhotos.length >= 4) break; // max 4 photos
     const reader = new FileReader();
     reader.onload = (e) => {
       pendingPhotos.push({ file, dataUrl: e.target.result });
@@ -833,7 +755,7 @@ function removePhoto(idx) {
   renderAttachments();
 }
 
-// --- Быстрые команды ---
+// --- Quick commands ---
 function quickCmd(text) {
   $input.value = text;
   autoGrow($input);
@@ -841,7 +763,7 @@ function quickCmd(text) {
   sendMessage();
 }
 
-// --- Голос ---
+// --- Voice ---
 let mediaRecorder = null;
 let audioChunks = [];
 function toggleVoice() {
@@ -859,6 +781,7 @@ function toggleVoice() {
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      // Transcribe
       const fd = new FormData();
       fd.append('audio', blob, 'voice.webm');
       try {
@@ -881,79 +804,7 @@ function toggleVoice() {
   }).catch(() => {});
 }
 
-// --- Новая сессия ---
-function newSession() {
-  // Сохраняем текущую сессию перед созданием новой
-  saveLocalHistory();
-  // Новый ID
-  sessionId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
-  localStorage.setItem('chat_session_id', sessionId);
-  // Очищаем UI
-  history = [];
-  $messages.innerHTML = '';
-  currentRequestId = null;
-  sending = false;
-  $sendBtn.disabled = false;
-  addMessage('system', 'Новая сессия начата', { save: false });
-}
-
-// --- Очистка истории ---
-async function clearHistory() {
-  try {
-    await fetch(`${API}/api/clear-history`, {
-      method: 'POST',
-      headers: AUTH,
-      body: JSON.stringify({ sessionId }),
-    });
-  } catch (_) {}
-  localStorage.removeItem('chat_history_' + sessionId);
-  history = [];
-  $messages.innerHTML = '';
-  addMessage('system', 'История очищена', { save: false });
-}
-
-// --- Статус памяти ---
-async function showMemoryStats() {
-  try {
-    const resp = await fetch(`${API}/api/health`, {
-      headers: { 'Authorization': `Bearer ${TOKEN}` },
-    });
-    if (resp.ok) {
-      const data = await resp.json();
-      const rag = data.rag || {};
-      let text = `Статус сервера:\n`;
-      text += `Аптайм: ${data.uptime ? Math.floor(data.uptime/60) + ' мин' : 'N/A'}\n`;
-      text += `Активные запросы: ${data.activeRequests}\n`;
-      text += `Сессий: ${data.conversations}\n`;
-      text += `Claude CLI: ${data.claudeCli}\n\n`;
-      text += `RAG-память:\n`;
-      text += `Всего записей: ${rag.total || 0}\n`;
-      if (rag.by_category) {
-        text += `По категориям: ${Object.entries(rag.by_category).map(([k,v]) => `${k}: ${v}`).join(', ')}\n`;
-      }
-      if (rag.projects) {
-        text += `Проекты: ${rag.projects.join(', ') || 'нет'}`;
-      }
-      addMessage('system', text, { save: false });
-    }
-  } catch (_) {
-    addMessage('error', 'Не удалось получить статус');
-  }
-}
-
-// --- Настройки ---
-function toggleSettings() {
-  const menu = document.getElementById('settingsMenu');
-  const overlay = document.getElementById('overlay');
-  menu.classList.toggle('open');
-  overlay.classList.toggle('open');
-}
-function closeSettings() {
-  document.getElementById('settingsMenu').classList.remove('open');
-  document.getElementById('overlay').classList.remove('open');
-}
-
-// --- UI-помощники ---
+// --- UI helpers ---
 function autoGrow(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
@@ -961,6 +812,9 @@ function autoGrow(el) {
 function toggleSendBtn() {
   const hasContent = $input.value.trim() || pendingPhotos.length > 0;
   $sendBtn.classList.toggle('visible', hasContent);
+}
+function toggleSettings() {
+  // TODO: settings panel
 }
 
 function escapeHtml(s) {
@@ -970,26 +824,30 @@ function escapeHtml(s) {
 function formatMarkdown(text) {
   if (!text) return '';
   let html = escapeHtml(text);
+  // Code blocks
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
     `<pre><code>${code.trim()}</code></pre>`);
+  // Inline code
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Bold
   html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  // Italic
   html = html.replace(/\*(.+?)\*/g, '<i>$1</i>');
-  // Заголовки
-  html = html.replace(/^### (.+)/gm, '<b style="font-size:14px">$1</b>');
-  html = html.replace(/^## (.+)/gm, '<b style="font-size:15px">$1</b>');
-  html = html.replace(/^# (.+)/gm, '<b style="font-size:16px">$1</b>');
+  // Lists
   html = html.replace(/^[-*] (.+)/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+  // Numbered lists
   html = html.replace(/^\d+\. (.+)/gm, '<li>$1</li>');
+  // Line breaks
   html = html.replace(/\n/g, '<br>');
   return html;
 }
 
-// --- Инициализация ---
+// --- Init ---
 loadLocalHistory();
 checkPendingOnLoad();
 
+// Visibility change — recover when app comes back to foreground
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     checkPendingOnLoad();
