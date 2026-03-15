@@ -45,7 +45,7 @@ jobs:
 
       - name: Export VK photos
         env:
-          VK_TOKEN: ${{ secrets.VK_TOKEN }}
+          VK_TOKEN: ${{ secrets.VK_USER_TOKEN }}
           ACTION: ${{ inputs.action || 'scan' }}
           VK_SCREEN_NAME: mebelit_krsk
         run: |
@@ -66,9 +66,12 @@ jobs:
               r = requests.get(f"{API}/{method}", params=params, timeout=30)
               data = r.json()
               if "error" in data:
-                  print(f"  VK API error: {data['error'].get('error_msg', data['error'])}")
+                  err = data['error']
+                  print(f"  VK API error [{method}]: code={err.get('error_code')} msg={err.get('error_msg', err)}")
                   return None
-              return data.get("response")
+              resp = data.get("response")
+              print(f"  [OK] {method} → {type(resp).__name__}" + (f" items={len(resp.get('items',[]))}" if isinstance(resp, dict) and 'items' in resp else ""))
+              return resp
 
           # ── 0. Определяем GROUP_ID по screen_name ──
           print(f"=== Определяем ID группы по screen_name: {SCREEN_NAME} ===")
