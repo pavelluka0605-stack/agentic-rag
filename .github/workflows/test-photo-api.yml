@@ -28,22 +28,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy chat files
-        env:
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
-        run: |
-          echo "=== Copying files ==="
-          scp -i ~/.ssh/deploy_key -P $VPS_PORT -r \
-            claude-chat/ \
-            $VPS_USER@$VPS_HOST:/opt/
-          scp -i ~/.ssh/deploy_key -P $VPS_PORT \
-            memory_store.py retriever.py \
-            $VPS_USER@$VPS_HOST:/opt/
-          echo "Files copied"
-
-      - name: Restart service
+      - name: Check chat conversations
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -51,32 +36,23 @@ jobs:
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
 
-          echo "=== Pre-restart status ==="
-          $SSH "systemctl status claude-chat --no-pager 2>&1 || true"
+          echo "=== SERVICE STATUS ==="
+          $SSH "systemctl is-active claude-chat && echo OK || echo FAIL"
 
           echo ""
-          echo "=== Stopping ==="
-          $SSH "systemctl stop claude-chat 2>/dev/null || true"
-          sleep 3
-          $SSH "for p in \$(lsof -t -i:3847 2>/dev/null); do kill -9 \$p 2>/dev/null; done; echo 'killed leftover processes'"
-          sleep 2
+          echo "=== HEALTH ==="
+          $SSH "curl -s http://localhost:3847/api/health"
 
           echo ""
-          echo "=== Installing deps ==="
-          $SSH "cd /opt/claude-chat && npm install --omit=dev 2>&1 | tail -5"
-          $SSH "command -v python3 && pip3 install --quiet numpy openai 2>&1 | tail -3 || true"
-          $SSH "mkdir -p /opt/claude-chat/data"
+          echo "=== ACTIVE CONVERSATIONS ==="
+          TOKEN=$($SSH "grep BEARER_TOKEN /opt/claude-chat/.env | cut -d= -f2")
+          echo "Token found: ${#TOKEN} chars"
 
           echo ""
-          echo "=== Creating .env if needed ==="
-          $SSH "test -f /opt/claude-chat/.env && echo '.env exists' || { . /opt/p0-foundation/.env 2>/dev/null; printf 'BEARER_TOKEN=%s\nOPENAI_API_KEY=%s\nPORT=3847\n' \"\$(openssl rand -hex 32)\" \"\${OPENAI_API_KEY:-}\" > /opt/claude-chat/.env; echo 'created .env'; }"
+          echo "=== CONVERSATION DATA ==="
+          $SSH "ls -la /opt/claude-chat/data/ 2>/dev/null || echo 'no data dir'"
+          $SSH "cat /opt/claude-chat/data/conversations.json 2>/dev/null | head -c 5000 || echo 'no conversations file'"
 
           echo ""
-          echo "=== Starting service ==="
-          $SSH "systemctl daemon-reload && systemctl enable claude-chat && systemctl start claude-chat"
-          sleep 5
-
-          echo ""
-          echo "=== Post-start check ==="
-          $SSH "systemctl is-active claude-chat && echo 'SERVICE_OK' || { echo 'SERVICE_FAIL'; journalctl -u claude-chat -n 30 --no-pager; }"
-          $SSH "curl -s --max-time 5 http://localhost:3847/api/health || echo 'health check failed'"
+          echo "=== RECENT LOGS ==="
+          $SSH "journalctl -u claude-chat -n 20 --no-pager 2>/dev/null"
