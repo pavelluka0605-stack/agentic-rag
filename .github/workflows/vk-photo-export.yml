@@ -1,27 +1,27 @@
-name: "VK Photo Export — mebelit_krsk"
+name: "VK Photo Export — Market Photos"
 
 on:
   workflow_dispatch:
     inputs:
-      action:
-        description: "Что делать"
+      source:
+        description: "Source for photo list"
         required: true
-        default: "scan"
+        default: "index"
         type: choice
         options:
-          - scan        # Только сканировать — показать что есть (альбомы, кол-во фото, посты)
-          - download    # Скачать все фото в максимальном разрешении
+          - index      # Use existing vk-photos-index.json
+          - api        # Fetch fresh data from VK API market.get
 
 permissions:
   contents: write
 
 concurrency:
-  group: vk-photo-${{ github.ref }}
+  group: vk-photo-export-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   export:
-    name: "VK Photo Export"
+    name: "Download & Convert VK Market Photos"
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -36,353 +36,291 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install requests
+        run: pip install requests Pillow
 
-      - name: Export VK market photos
+      - name: Download and convert photos
         env:
-          VK_TOKEN: ${{ secrets.VK_MEBELIT_USER_TOKEN }}
-          ACTION: ${{ inputs.action || 'scan' }}
-          VK_SCREEN_NAME: mebelit_krsk
+          VK_TOKEN: ${{ secrets.VK_USER_TOKEN }}
+          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
+          SOURCE: ${{ inputs.source || 'index' }}
         run: |
           python3 << 'PYTHON'
-          import requests, json, os, time
+          import requests, json, os, re, time, unicodedata
           from pathlib import Path
+          from PIL import Image
+          from io import BytesIO
           from datetime import datetime
 
           TOKEN = os.environ["VK_TOKEN"]
-          SCREEN_NAME = os.environ.get("VK_SCREEN_NAME", "mebelit_krsk")
-          ACTION = os.environ.get("ACTION", "scan")
+          GROUP_ID = os.environ["VK_GROUP_ID"]
+          SOURCE = os.environ.get("SOURCE", "index")
           API = "https://api.vk.com/method"
           V = "5.199"
-          PHOTO_DIR = Path("site-analysis/vk-photos")
-          REPORT_FILE = Path("site-analysis/vk-photo-report.md")
-          debug_log = []
+
+          OUTPUT_DIR = Path("vk-photos")
+          INDEX_FILE = Path("site-analysis/vk-photos-index.json")
 
           def vk(method, **params):
+              """Call VK API with rate limiting."""
               params.update(access_token=TOKEN, v=V)
               r = requests.get(f"{API}/{method}", params=params, timeout=30)
               data = r.json()
               if "error" in data:
-                  err = data['error']
-                  msg = f"VK API error [{method}]: code={err.get('error_code')} msg={err.get('error_msg', err)}"
-                  print(f"  {msg}")
-                  debug_log.append(msg)
+                  err = data["error"]
+                  print(f"  VK API error [{method}]: code={err.get('error_code')} msg={err.get('error_msg')}")
                   return None
-              resp = data.get("response")
-              info = f"[OK] {method}"
-              if isinstance(resp, dict) and "items" in resp:
-                  info += f" → {len(resp['items'])} items (count={resp.get('count','?')})"
-              print(f"  {info}")
-              return resp
+              return data.get("response")
 
-          # ── 0. Определяем GROUP_ID ──
-          print(f"=== Определяем ID группы: {SCREEN_NAME} ===")
-          debug_log.append(f"Token length: {len(TOKEN)}")
+          def slugify(text):
+              """Convert Russian/English text to a URL-safe slug."""
+              # Remove special characters but keep Cyrillic and Latin
+              text = text.strip()
+              # Common transliteration map for Russian
+              translit = {
+                  'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+                  'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+                  'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+                  'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+                  'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+              }
+              result = []
+              for ch in text.lower():
+                  if ch in translit:
+                      result.append(translit[ch])
+                  elif ch.isascii() and ch.isalnum():
+                      result.append(ch)
+                  elif ch in (' ', '-', '_', '.'):
+                      result.append('-')
+                  # skip other chars
+              slug = '-'.join(filter(None, ''.join(result).split('-')))
+              return slug or 'product'
 
-          # groups.getById работает с screen_name напрямую
-          group_info = vk("groups.getById", group_id=SCREEN_NAME,
-                          fields="members_count,description,status,site,market")
-          GROUP_ID = SCREEN_NAME
-          group_name = "mebelit_krsk"
-          members = "?"
-          desc = site = status = ""
-          has_market = False
+          # ── 1. Get photo list ──────────────────────────────────────────────
 
-          if group_info and isinstance(group_info, dict) and "groups" in group_info:
-              g = group_info["groups"][0]
-              GROUP_ID = str(g["id"])
-              group_name = g.get("name", "?")
-              members = g.get("members_count", "?")
-              desc = g.get("description", "")
-              site = g.get("site", "")
-              status = g.get("status", "")
-              market = g.get("market", {})
-              has_market = market.get("enabled", 0) == 1 if isinstance(market, dict) else bool(market)
-              debug_log.append(f"Group: {group_name}, ID: {GROUP_ID}, market: {market}")
-          elif group_info and isinstance(group_info, list):
-              g = group_info[0]
-              GROUP_ID = str(g["id"])
-              group_name = g.get("name", "?")
-              members = g.get("members_count", "?")
-              desc = g.get("description", "")
-              site = g.get("site", "")
-              market = g.get("market", {})
-              has_market = market.get("enabled", 0) == 1 if isinstance(market, dict) else bool(market)
+          photos_by_product = {}  # product_id -> {title, price, description, photos: [...]}
 
-          print(f"  Группа: {group_name} (ID: {GROUP_ID})")
-          print(f"  Подписчики: {members}")
-          print(f"  Маркет: {'да' if has_market else 'нет/неизвестно'}")
+          if SOURCE == "index" and INDEX_FILE.exists():
+              print("=== Reading photos from vk-photos-index.json ===")
+              with open(INDEX_FILE, "r", encoding="utf-8") as f:
+                  index_data = json.load(f)
 
-          owner_id = f"-{GROUP_ID}"
-
-          # ── 1. Получаем товары (market.get) ──
-          print("\n=== Товары (Market) ===")
-          all_products = []
-          offset = 0
-          total_market = 0
-
-          while True:
-              market_resp = vk("market.get", owner_id=owner_id, count=200, offset=offset,
-                               extended=1)
-              if not market_resp:
-                  # Попробуем без extended
-                  market_resp = vk("market.get", owner_id=owner_id, count=200, offset=offset)
-              if not market_resp or not market_resp.get("items"):
-                  if offset == 0:
-                      debug_log.append(f"market.get returned: {market_resp}")
-                  break
-              total_market = market_resp.get("count", 0)
-              items = market_resp["items"]
-              all_products.extend(items)
-              print(f"  Загружено: {len(all_products)}/{total_market}")
-              if len(items) < 200:
-                  break
-              offset += 200
-              time.sleep(0.35)
-
-          print(f"  Всего товаров: {total_market}, загружено: {len(all_products)}")
-
-          # ── 2. Получаем подборки товаров (market.getAlbums) ──
-          print("\n=== Подборки товаров ===")
-          market_albums = []
-          albums_resp = vk("market.getAlbums", owner_id=owner_id, count=100)
-          if albums_resp and albums_resp.get("items"):
-              for a in albums_resp["items"]:
-                  market_albums.append({
-                      "id": a["id"],
-                      "title": a.get("title", "?"),
-                      "count": a.get("count", 0)
+              for photo in index_data.get("photos", []):
+                  pid = photo.get("product_id", 0)
+                  if pid not in photos_by_product:
+                      photos_by_product[pid] = {
+                          "title": photo.get("title", ""),
+                          "price": photo.get("price", ""),
+                          "description": photo.get("description", ""),
+                          "photos": []
+                      }
+                  photos_by_product[pid]["photos"].append({
+                      "url": photo["url"],
+                      "width": photo.get("width", 0),
+                      "height": photo.get("height", 0),
+                      "photo_id": photo.get("photo_id"),
                   })
-                  print(f"  [{a['id']}] {a.get('title','?')} — {a.get('count',0)} товаров")
+
+              print(f"  Found {len(photos_by_product)} products, "
+                    f"{sum(len(p['photos']) for p in photos_by_product.values())} photos")
+
           else:
-              print("  Подборок нет или нет доступа")
+              print("=== Fetching products from VK API market.get ===")
+              owner_id = f"-{GROUP_ID}"
 
-          # ── 3. Извлекаем фото из товаров ──
-          print("\n=== Извлечение фото из товаров ===")
-          product_photos = []
+              # Get all products
+              all_products = []
+              offset = 0
+              while True:
+                  resp = vk("market.get", owner_id=owner_id, count=200, offset=offset, extended=1)
+                  if not resp:
+                      resp = vk("market.get", owner_id=owner_id, count=200, offset=offset)
+                  if not resp or not resp.get("items"):
+                      break
+                  items = resp["items"]
+                  all_products.extend(items)
+                  total = resp.get("count", 0)
+                  print(f"  Loaded: {len(all_products)}/{total}")
+                  if len(items) < 200:
+                      break
+                  offset += 200
+                  time.sleep(0.35)
 
-          for product in all_products:
-              pid = product.get("id", 0)
-              title = product.get("title", "")
-              price_info = product.get("price", {})
-              price_text = price_info.get("text", "") if isinstance(price_info, dict) else ""
-              description = product.get("description", "")[:300]
-              likes = product.get("likes", {}).get("count", 0) if isinstance(product.get("likes"), dict) else 0
-              availability = product.get("availability", 0)
-              date = product.get("date", 0)
+              print(f"  Total products: {len(all_products)}")
 
-              # Главное фото товара
-              thumb = product.get("thumb_photo", "")
-              photos_list = product.get("photos", [])
+              # For each product, get detailed photos via market.getById
+              for i, product in enumerate(all_products):
+                  pid = product["id"]
+                  title = product.get("title", "")
+                  price_info = product.get("price", {})
+                  price_text = price_info.get("text", "") if isinstance(price_info, dict) else ""
+                  description = product.get("description", "")[:500]
 
-              # Если есть массив photos — берём все фото товара
-              if photos_list:
-                  for photo in photos_list:
+                  # Check if photos are already in the listing
+                  product_photo_list = product.get("photos", [])
+
+                  if not product_photo_list:
+                      # Fetch details
+                      detail = vk("market.getById", item_ids=f"{owner_id}_{pid}", extended=1)
+                      if detail and detail.get("items"):
+                          item = detail["items"][0]
+                          product_photo_list = item.get("photos", [])
+                          if not title:
+                              title = item.get("title", "")
+                          if not price_text:
+                              pi = item.get("price", {})
+                              price_text = pi.get("text", "") if isinstance(pi, dict) else ""
+                          if not description:
+                              description = item.get("description", "")[:500]
+                      time.sleep(0.35)
+
+                  photos_by_product[pid] = {
+                      "title": title,
+                      "price": price_text,
+                      "description": description,
+                      "photos": []
+                  }
+
+                  for photo in product_photo_list:
                       sizes = photo.get("sizes", [])
                       if sizes:
                           best = max(sizes, key=lambda s: s.get("width", 0) * s.get("height", 0))
-                          product_photos.append({
+                          photos_by_product[pid]["photos"].append({
                               "url": best["url"],
                               "width": best.get("width", 0),
                               "height": best.get("height", 0),
                               "photo_id": photo.get("id"),
-                              "product_id": pid,
-                              "title": title,
-                              "price": price_text,
-                              "description": description,
-                              "likes": likes,
-                              "availability": availability,
-                              "date": date,
-                              "source": "market"
                           })
-              elif thumb:
-                  # Если photos нет, берём thumb_photo URL
-                  product_photos.append({
-                      "url": thumb,
-                      "width": 0,
-                      "height": 0,
-                      "photo_id": None,
-                      "product_id": pid,
-                      "title": title,
-                      "price": price_text,
-                      "description": description,
-                      "likes": likes,
-                      "availability": availability,
-                      "date": date,
-                      "source": "market_thumb"
-                  })
 
-          # Если photos массив пуст, загрузим детали каждого товара
-          if all_products and not any(p.get("photos") for p in all_products):
-              print("  Фото не в списке, загружаем детали каждого товара...")
-              product_photos = []
-              for i, product in enumerate(all_products):
-                  pid = product["id"]
-                  detail = vk("market.getById", item_ids=f"{owner_id}_{pid}", extended=1)
-                  if detail and detail.get("items"):
-                      item = detail["items"][0]
-                      title = item.get("title", "")
-                      price_info = item.get("price", {})
-                      price_text = price_info.get("text", "") if isinstance(price_info, dict) else ""
-                      description = item.get("description", "")[:300]
-                      likes = item.get("likes", {}).get("count", 0) if isinstance(item.get("likes"), dict) else 0
-                      availability = item.get("availability", 0)
-                      date = item.get("date", 0)
+                  if (i + 1) % 10 == 0:
+                      print(f"  Processed: {i+1}/{len(all_products)}")
 
-                      for photo in item.get("photos", []):
-                          sizes = photo.get("sizes", [])
-                          if sizes:
-                              best = max(sizes, key=lambda s: s.get("width", 0) * s.get("height", 0))
-                              product_photos.append({
-                                  "url": best["url"],
-                                  "width": best.get("width", 0),
-                                  "height": best.get("height", 0),
-                                  "photo_id": photo.get("id"),
-                                  "product_id": pid,
-                                  "title": title,
-                                  "price": price_text,
-                                  "description": description,
-                                  "likes": likes,
-                                  "availability": availability,
-                                  "date": date,
-                                  "source": "market_detail"
-                              })
-                  if (i + 1) % 50 == 0:
-                      print(f"  Обработано: {i+1}/{len(all_products)}")
-                  time.sleep(0.35)
+              print(f"  Products with photos: {len(photos_by_product)}")
 
-          # Дедупликация по photo_id
-          seen = set()
-          unique_photos = []
-          for p in product_photos:
-              key = p.get("photo_id") or p.get("url", "")
-              if key and key not in seen:
-                  seen.add(key)
-                  unique_photos.append(p)
+          # ── 2. Download & convert ──────────────────────────────────────────
 
-          # Фильтр >= 600px (отсекаем мелкие превью)
-          good_photos = [p for p in unique_photos if p["width"] >= 600 or p["height"] >= 600 or p["width"] == 0]
+          total_photos = sum(len(p["photos"]) for p in photos_by_product.values())
+          print(f"\n=== Downloading {total_photos} photos from {len(photos_by_product)} products ===")
 
-          print(f"\n=== ИТОГО ===")
-          print(f"  Товаров: {len(all_products)}")
-          print(f"  Подборок: {len(market_albums)}")
-          print(f"  Фото из товаров: {len(product_photos)}")
-          print(f"  Уникальных фото: {len(unique_photos)}")
-          print(f"  Фото >= 600px: {len(good_photos)}")
+          manifest = {
+              "exported_at": datetime.now().isoformat(),
+              "total_products": len(photos_by_product),
+              "total_photos": 0,
+              "products": []
+          }
 
-          # ── 4. Генерируем отчёт ──
-          report = []
-          report.append(f"# VK Market Photo Export — {group_name}")
-          report.append(f"")
-          report.append(f"**Дата:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-          report.append(f"**Группа:** vk.com/mebelit_krsk (ID: {GROUP_ID})")
-          report.append(f"**Подписчики:** {members}")
-          report.append(f"**Описание:** {desc[:300]}")
-          report.append(f"**Сайт:** {site}")
-          report.append(f"")
-          report.append(f"## Статистика товаров")
-          report.append(f"")
-          report.append(f"| Метрика | Значение |")
-          report.append(f"|---------|----------|")
-          report.append(f"| Всего товаров | {total_market} |")
-          report.append(f"| Подборок | {len(market_albums)} |")
-          report.append(f"| Фото из товаров | {len(product_photos)} |")
-          report.append(f"| Уникальных фото | {len(unique_photos)} |")
-          report.append(f"| Фото >= 600px | {len(good_photos)} |")
-          report.append(f"")
+          downloaded = 0
+          errors = 0
 
-          if market_albums:
-              report.append(f"## Подборки товаров")
-              report.append(f"")
-              report.append(f"| ID | Название | Кол-во |")
-              report.append(f"|----|----------|--------|")
-              for a in market_albums:
-                  report.append(f"| {a['id']} | {a['title']} | {a['count']} |")
-              report.append(f"")
+          for pid, product_data in photos_by_product.items():
+              title = product_data["title"]
+              slug = slugify(title)
+              model_dir = OUTPUT_DIR / slug
+              model_dir.mkdir(parents=True, exist_ok=True)
 
-          # Список всех товаров
-          if all_products:
-              report.append(f"## Товары ({len(all_products)})")
-              report.append(f"")
-              report.append(f"| # | Название | Цена | Фото |")
-              report.append(f"|---|----------|------|------|")
-              for i, p in enumerate(all_products, 1):
-                  title = p.get("title", "?")[:50]
-                  price = p.get("price", {}).get("text", "?") if isinstance(p.get("price"), dict) else "?"
-                  n_photos = sum(1 for ph in unique_photos if ph.get("product_id") == p.get("id"))
-                  report.append(f"| {i} | {title} | {price} | {n_photos} |")
-              report.append(f"")
+              product_manifest = {
+                  "product_id": pid,
+                  "title": title,
+                  "slug": slug,
+                  "price": product_data["price"],
+                  "description": product_data.get("description", "")[:300],
+                  "photo_count": 0,
+                  "photos": []
+              }
 
-          # ── 5. Скачиваем если download ──
-          if ACTION == "download" and good_photos:
-              PHOTO_DIR.mkdir(parents=True, exist_ok=True)
-              print(f"\n=== Скачивание {len(good_photos)} фото ===")
-              downloaded = 0
-              for i, p in enumerate(good_photos):
-                  ext = "jpg"
-                  if ".png" in p["url"]:
-                      ext = "png"
-                  safe_title = "".join(c if c.isalnum() or c in "-_ " else "" for c in p.get("title","")[:30]).strip().replace(" ","_") or "product"
-                  fname = f"market_{p.get('product_id', i)}_{safe_title}_{i}.{ext}"
-                  fpath = PHOTO_DIR / fname
-                  if fpath.exists():
-                      continue
+              for idx, photo in enumerate(product_data["photos"], 1):
+                  url = photo["url"]
+                  jpg_name = f"photo-{idx}.jpg"
+                  webp_name = f"photo-{idx}.webp"
+                  jpg_path = model_dir / jpg_name
+                  webp_path = model_dir / webp_name
+
                   try:
-                      r = requests.get(p["url"], timeout=30)
-                      if r.status_code == 200:
-                          fpath.write_bytes(r.content)
-                          downloaded += 1
-                          if downloaded % 20 == 0:
-                              print(f"  Скачано: {downloaded}/{len(good_photos)}")
+                      r = requests.get(url, timeout=30)
+                      if r.status_code != 200:
+                          print(f"  HTTP {r.status_code} for {slug}/photo-{idx}")
+                          errors += 1
+                          continue
+
+                      img_data = r.content
+
+                      # Save original JPEG
+                      jpg_path.write_bytes(img_data)
+
+                      # Convert to WebP (quality 85%)
+                      img = Image.open(BytesIO(img_data))
+                      if img.mode in ("RGBA", "P"):
+                          img = img.convert("RGB")
+                      img.save(str(webp_path), "WEBP", quality=85)
+
+                      jpg_size = jpg_path.stat().st_size
+                      webp_size = webp_path.stat().st_size
+
+                      product_manifest["photos"].append({
+                          "index": idx,
+                          "jpg": f"{slug}/{jpg_name}",
+                          "webp": f"{slug}/{webp_name}",
+                          "width": photo.get("width", img.width),
+                          "height": photo.get("height", img.height),
+                          "jpg_size": jpg_size,
+                          "webp_size": webp_size,
+                          "photo_id": photo.get("photo_id"),
+                          "original_url": url
+                      })
+
+                      downloaded += 1
+                      if downloaded % 20 == 0:
+                          print(f"  Downloaded: {downloaded}/{total_photos}")
+
                   except Exception as e:
-                      print(f"  Ошибка: {fname} — {e}")
+                      print(f"  Error downloading {slug}/photo-{idx}: {e}")
+                      errors += 1
+
                   time.sleep(0.1)
-              print(f"  Скачано: {downloaded}")
-              report.append(f"## Скачанные фото")
-              report.append(f"")
-              report.append(f"Скачано **{downloaded}** фото в `site-analysis/vk-photos/`")
-              report.append(f"")
-          elif ACTION == "scan":
-              report.append(f"## Следующий шаг")
-              report.append(f"")
-              report.append(f"Запустите workflow с action=**download** для скачивания фото.")
-              report.append(f"")
 
-          # Сохраняем JSON
-          json_path = Path("site-analysis/vk-photos-index.json")
-          json_path.parent.mkdir(parents=True, exist_ok=True)
-          with open(json_path, "w", encoding="utf-8") as f:
-              json.dump({
-                  "group": group_name,
-                  "group_id": GROUP_ID,
-                  "members": members,
-                  "source": "market (товары)",
-                  "total_products": len(all_products),
-                  "market_albums": market_albums,
-                  "total_photos": len(unique_photos),
-                  "good_photos": len(good_photos),
-                  "photos": good_photos
-              }, f, ensure_ascii=False, indent=2)
-          report.append(f"Индекс фото сохранён в `site-analysis/vk-photos-index.json`")
+              product_manifest["photo_count"] = len(product_manifest["photos"])
+              manifest["products"].append(product_manifest)
 
-          # Debug лог
-          Path("site-analysis/vk-debug.log").write_text("\n".join(debug_log), encoding="utf-8")
+          manifest["total_photos"] = downloaded
 
-          # Отчёт
-          REPORT_FILE.write_text("\n".join(report), encoding="utf-8")
-          print(f"\nОтчёт сохранён: {REPORT_FILE}")
+          # ── 3. Save manifest ───────────────────────────────────────────────
+
+          manifest_path = OUTPUT_DIR / "manifest.json"
+          with open(manifest_path, "w", encoding="utf-8") as f:
+              json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+          # ── 4. Summary ─────────────────────────────────────────────────────
+
+          total_jpg = sum(
+              p.get("jpg_size", 0)
+              for prod in manifest["products"]
+              for p in prod["photos"]
+          )
+          total_webp = sum(
+              p.get("webp_size", 0)
+              for prod in manifest["products"]
+              for p in prod["photos"]
+          )
+
+          print(f"\n=== RESULTS ===")
+          print(f"  Products: {len(manifest['products'])}")
+          print(f"  Photos downloaded: {downloaded}")
+          print(f"  Errors: {errors}")
+          print(f"  JPEG total size: {total_jpg / 1024 / 1024:.1f} MB")
+          print(f"  WebP total size: {total_webp / 1024 / 1024:.1f} MB")
+          print(f"  WebP savings: {(1 - total_webp / max(total_jpg, 1)) * 100:.0f}%")
+          print(f"  Manifest: {manifest_path}")
+
+          # List all model directories
+          print(f"\n=== Model directories ===")
+          for prod in sorted(manifest["products"], key=lambda p: p["title"]):
+              print(f"  {prod['slug']}/ — {prod['photo_count']} photos — {prod['title']} — {prod['price']}")
 
           PYTHON
 
-      - name: Commit results
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f site-analysis/vk-photo-report.md site-analysis/vk-photos-index.json site-analysis/vk-debug.log
-          if [ "${{ inputs.action }}" = "download" ]; then
-            git add -f site-analysis/vk-photos/ 2>/dev/null || true
-          fi
-          git diff --cached --quiet && echo "No changes" || {
-            git commit -m "data: VK photo export (${{ inputs.action }}) [skip ci]"
-            git push
-          }
+      - name: Upload photos as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vk-market-photos
+          path: vk-photos/
+          retention-days: 30
+          if-no-files-found: error
