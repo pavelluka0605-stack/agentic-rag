@@ -73,16 +73,34 @@ jobs:
               print(f"  [OK] {method} → {type(resp).__name__}" + (f" items={len(resp.get('items',[]))}" if isinstance(resp, dict) and 'items' in resp else ""))
               return resp
 
+          # Debug log file
+          debug_log = []
+
           # ── 0. Определяем GROUP_ID по screen_name ──
           print(f"=== Определяем ID группы по screen_name: {SCREEN_NAME} ===")
+          debug_log.append(f"Token length: {len(TOKEN)}, first 10 chars: {TOKEN[:10]}...")
           resolved = vk("utils.resolveScreenName", screen_name=SCREEN_NAME)
-          if resolved and resolved.get("type") in ("group", "page"):
+          debug_log.append(f"resolveScreenName result: {resolved}")
+          if resolved and isinstance(resolved, dict) and resolved.get("type") in ("group", "page"):
               GROUP_ID = str(resolved["object_id"])
               print(f"  Найдена группа ID: {GROUP_ID}")
+          elif resolved and isinstance(resolved, dict) and "object_id" in resolved:
+              GROUP_ID = str(resolved["object_id"])
+              print(f"  Найдена (тип: {resolved.get('type')}), ID: {GROUP_ID}")
           else:
-              # Попробуем как есть — может SCREEN_NAME = числовой ID
-              GROUP_ID = SCREEN_NAME
-              print(f"  Не удалось разрешить screen_name, используем как ID: {GROUP_ID}")
+              # Fallback: try groups.getById with screen_name directly
+              print(f"  resolveScreenName не вернул ID, пробуем groups.getById...")
+              fallback = vk("groups.getById", group_id=SCREEN_NAME, fields="members_count")
+              debug_log.append(f"groups.getById fallback: {fallback}")
+              if fallback and isinstance(fallback, dict) and "groups" in fallback:
+                  GROUP_ID = str(fallback["groups"][0]["id"])
+                  print(f"  Получен через groups.getById: {GROUP_ID}")
+              elif fallback and isinstance(fallback, list) and len(fallback) > 0:
+                  GROUP_ID = str(fallback[0]["id"])
+                  print(f"  Получен через groups.getById (list): {GROUP_ID}")
+              else:
+                  GROUP_ID = SCREEN_NAME
+                  print(f"  Не удалось разрешить, используем как ID: {GROUP_ID}")
 
           # ── 1. Получаем инфо о группе ──
           print("=== Информация о группе ===")
@@ -317,6 +335,10 @@ jobs:
               }, f, ensure_ascii=False, indent=2)
           report.append(f"Индекс фото сохранён в `site-analysis/vk-photos-index.json`")
 
+          # Сохраняем debug лог
+          debug_path = Path("site-analysis/vk-debug.log")
+          debug_path.write_text("\n".join(debug_log), encoding="utf-8")
+
           # Сохраняем отчёт
           REPORT_FILE.write_text("\n".join(report), encoding="utf-8")
           print(f"\nОтчёт сохранён в {REPORT_FILE}")
@@ -327,7 +349,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f site-analysis/vk-photo-report.md site-analysis/vk-photos-index.json
+          git add -f site-analysis/vk-photo-report.md site-analysis/vk-photos-index.json site-analysis/vk-debug.log
           if [ "${{ inputs.action }}" = "download" ]; then
             git add -f site-analysis/vk-photos/ 2>/dev/null || true
           fi
