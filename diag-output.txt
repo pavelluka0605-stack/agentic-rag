@@ -1,29 +1,52 @@
-=== STEP 1: PM2 status ===
+=== STEP 1: Copy fresh files to VPS ===
+Files copied
+
+=== STEP 2: Stop and delete old PM2 process ===
+[PM2] Applying action stopProcessId on app [claude-chat](ids: [ 0 ])
+[PM2] [claude-chat](0) ✓
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 806742   │ 68m    │ 79   │ online    │ 0%       │ 55.8mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 0        │ 0      │ 79   │ stopped   │ 0%       │ 0b       │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+[PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
+[PM2] [claude-chat](0) ✓
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+Old process removed
+
+=== STEP 3: Install deps ===
+
+20 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+=== STEP 4: Start fresh PM2 process ===
+[PM2] Starting /opt/claude-chat/server.js in fork_mode (1 instance)
+[PM2] Done.
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 809079   │ 0s     │ 0    │ online    │ 0%       │ 18.6mb   │ root     │ disabled │
+└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 809079   │ 4s     │ 0    │ online    │ 0%       │ 59.1mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
-=== STEP 2: Health check ===
-{"status":"ok","uptime":4099.605998638,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T06:46:02.692Z"}
-=== STEP 3: index.html version check ===
---- First 5 lines of title/meta ---
-<title>AI Ассистент</title>
+=== STEP 5: Health check ===
+{"status":"ok","uptime":4.235256964,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T06:52:56.900Z"}
 
---- File sizes ---
--rw-r--r-- 1 root root   420 Mar 15 05:37 /opt/claude-chat/package.json
--rw-r--r-- 1 root root 29503 Mar 15 05:37 /opt/claude-chat/public/index.html
--rw-r--r-- 1 root root 22368 Mar 15 05:37 /opt/claude-chat/server.js
+=== STEP 6: Verify index.html on disk ===
+f69499b91889d4bbe8d1c1e958826903  /opt/claude-chat/public/index.html
+4b6d0688d389934b4d3e07f083a39525  /opt/claude-chat/server.js
+-rw-r--r-- 1 root root 29503 Mar 15 06:52 /opt/claude-chat/public/index.html
+-rw-r--r-- 1 root root 22368 Mar 15 06:52 /opt/claude-chat/server.js
 
---- package.json version ---
-{
-  "name": "claude-chat",
-  "version": "1.0.0",
-  "description": "Mobile PWA chat for VPS management via Claude Code CLI",
-  "main": "server.js",
-
-=== STEP 4: Curl main page (first 30 lines) ===
+=== STEP 7: What browser actually gets ===
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -34,25 +57,40 @@
 <title>AI Ассистент</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-:root {
-  --bg: #0a0a14;
-  --surface: #12121e;
-  --surface2: #1a1a2e;
-  --border: #2a2a3e;
-  --text: #e0e0f0;
-  --text2: #8888aa;
-  --accent: #7c5cfc;
-  --accent2: #9b7dff;
-  --user-bg: #7c5cfc;
-  --bot-bg: #1e1e32;
-  --error: #ff4466;
-  --success: #44cc88;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+...
+<title>AI Ассистент</title>
+Response length: 29629 bytes
+Has double-tap protection: 3
+Has PWA manifest: 0
+Avatar type: &#9670;
+
+=== STEP 8: Check nginx/proxy config ===
+# configuration file /etc/nginx/sites-enabled/chat-marbomebel:
+server {
+    listen 80;
+    server_name chat.marbomebel.ru;
+
+    location / {
+        proxy_pass http://127.0.0.1:3847;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+server {
+    listen 80;
+    server_name chat.marbomebel.ru;
+
+    location / {
+        proxy_pass http://127.0.0.1:3847;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
 }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg); color: var(--text);
-  height: 100vh; height: 100dvh;
-  display: flex; flex-direction: column;
+no conf.d chat config
 
 DONE
