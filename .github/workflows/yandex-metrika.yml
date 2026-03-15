@@ -1,0 +1,307 @@
+name: "Yandex Metrika — Pull Stats"
+
+on:
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "Период (дни назад)"
+        required: true
+        default: "90"
+        type: choice
+        options:
+          - "30"
+          - "90"
+          - "180"
+          - "365"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: yandex-metrika-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pull-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Pull Yandex Metrika data
+        env:
+          YM_TOKEN: ${{ secrets.YANDEX_METRIKA_TOKEN }}
+          PERIOD_DAYS: ${{ inputs.period || '90' }}
+        run: |
+          set -euo pipefail
+          mkdir -p site-analysis
+
+          # Calculate dates
+          DATE_TO=$(date +%Y-%m-%d)
+          DATE_FROM=$(date -d "-${PERIOD_DAYS} days" +%Y-%m-%d)
+          echo "Period: $DATE_FROM — $DATE_TO"
+
+          # 1. List counters
+          echo "=== Listing counters ==="
+          COUNTERS=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/management/v1/counters")
+          echo "$COUNTERS" | python3 -c "
+          import json,sys
+          data=json.load(sys.stdin)
+          for c in data.get('counters',[]):
+              print(f'  {c[\"id\"]:>12} | {c.get(\"site\",\"?\"):30s} | {c[\"name\"]} | status={c.get(\"code_status\",\"?\")}')" || true
+
+          # Get first counter ID (MEBELIT)
+          COUNTER_ID=$(echo "$COUNTERS" | python3 -c "
+          import json,sys
+          data=json.load(sys.stdin)
+          counters=data.get('counters',[])
+          if counters:
+              print(counters[0]['id'])")
+
+          echo "Using counter: $COUNTER_ID"
+
+          # 2. Traffic summary
+          echo "=== Traffic summary ==="
+          SUMMARY=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/stat/v1/data?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=ym:s:visits,ym:s:pageviews,ym:s:users,ym:s:bounceRate,ym:s:pageDepth,ym:s:avgVisitDurationSeconds&dimensions=&accuracy=full")
+
+          # 3. Traffic by source
+          echo "=== Traffic sources ==="
+          SOURCES=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/stat/v1/data?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=ym:s:visits,ym:s:users,ym:s:bounceRate&dimensions=ym:s:lastTrafficSource&sort=-ym:s:visits&limit=20&accuracy=full")
+
+          # 4. Traffic by search engine
+          echo "=== Search engines ==="
+          SEARCH=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/stat/v1/data?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=ym:s:visits,ym:s:users&dimensions=ym:s:lastSearchEngine&sort=-ym:s:visits&limit=10&accuracy=full") || echo "{}"
+
+          # 5. Geography
+          echo "=== Geography ==="
+          GEO=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/stat/v1/data?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=ym:s:visits,ym:s:users&dimensions=ym:s:regionCity&sort=-ym:s:visits&limit=20&accuracy=full")
+
+          # 6. Top pages
+          echo "=== Top pages ==="
+          PAGES=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/stat/v1/data?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=ym:s:visits,ym:s:pageviews,ym:s:bounceRate&dimensions=ym:s:startURL&sort=-ym:s:visits&limit=20&accuracy=full")
+
+          # 7. Devices
+          echo "=== Devices ==="
+          DEVICES=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/stat/v1/data?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=ym:s:visits,ym:s:users&dimensions=ym:s:deviceCategory&sort=-ym:s:visits&accuracy=full")
+
+          # 8. Daily traffic (for chart)
+          echo "=== Daily traffic ==="
+          DAILY=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/stat/v1/data/bytime?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=ym:s:visits,ym:s:users&group=week&accuracy=full") || echo "{}"
+
+          # 9. Goals
+          echo "=== Goals ==="
+          GOALS=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+            "https://api-metrika.yandex.net/management/v1/counter/$COUNTER_ID/goals") || echo "{}"
+
+          # 10. Goal conversions (if goals exist)
+          GOAL_STATS="{}"
+          GOAL_IDS=$(echo "$GOALS" | python3 -c "
+          import json,sys
+          data=json.load(sys.stdin)
+          ids=[str(g['id']) for g in data.get('goals',[])]
+          print(','.join(ids))" 2>/dev/null) || true
+
+          if [ -n "$GOAL_IDS" ]; then
+            echo "=== Goal conversions (IDs: $GOAL_IDS) ==="
+            GOAL_METRICS=""
+            for gid in $(echo "$GOAL_IDS" | tr ',' ' '); do
+              if [ -n "$GOAL_METRICS" ]; then GOAL_METRICS="$GOAL_METRICS,"; fi
+              GOAL_METRICS="${GOAL_METRICS}ym:s:goal${gid}reaches,ym:s:goal${gid}conversionRate"
+            done
+            GOAL_STATS=$(curl -sf -H "Authorization: OAuth $YM_TOKEN" \
+              "https://api-metrika.yandex.net/stat/v1/data?ids=$COUNTER_ID&date1=$DATE_FROM&date2=$DATE_TO&metrics=$GOAL_METRICS&dimensions=&accuracy=full") || echo "{}"
+          fi
+
+          # Generate report
+          python3 << 'PYEOF'
+          import json, sys, os
+          from datetime import datetime
+
+          date_from = os.environ.get('DATE_FROM', '?')
+          date_to = os.environ.get('DATE_TO', '?')
+          period = os.environ.get('PERIOD_DAYS', '90')
+
+          def load(s):
+              try: return json.loads(s)
+              except: return {}
+
+          summary = load(os.environ.get('SUMMARY','{}'))
+          sources = load(os.environ.get('SOURCES','{}'))
+          search = load(os.environ.get('SEARCH','{}'))
+          geo = load(os.environ.get('GEO','{}'))
+          pages = load(os.environ.get('PAGES','{}'))
+          devices = load(os.environ.get('DEVICES','{}'))
+          daily = load(os.environ.get('DAILY','{}'))
+          goals = load(os.environ.get('GOALS','{}'))
+          goal_stats = load(os.environ.get('GOAL_STATS','{}'))
+          counters = load(os.environ.get('COUNTERS','{}'))
+
+          report = []
+          report.append(f"# Яндекс Метрика — MEBELIT\n")
+          report.append(f"**Период:** {date_from} — {date_to} ({period} дней)")
+          report.append(f"**Дата отчёта:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
+
+          # Counter info
+          cnt_list = counters.get('counters', [])
+          if cnt_list:
+              report.append("## Счётчики\n")
+              report.append("| ID | Сайт | Название | Статус |")
+              report.append("|-----|------|----------|--------|")
+              for c in cnt_list:
+                  report.append(f"| {c['id']} | {c.get('site','?')} | {c['name']} | {c.get('code_status','?')} |")
+              report.append("")
+
+          # Summary
+          s = summary.get('totals', [])
+          if s:
+              report.append("## Сводка\n")
+              report.append("| Метрика | Значение |")
+              report.append("|---------|----------|")
+              labels = ['Визиты', 'Просмотры', 'Посетители', 'Отказы (%)', 'Глубина просмотра', 'Ср. время (сек)']
+              for i, label in enumerate(labels):
+                  if i < len(s):
+                      v = s[i]
+                      if isinstance(v, float):
+                          if 'Отказы' in label:
+                              v = f"{v:.1f}%"
+                          elif 'Глубина' in label:
+                              v = f"{v:.2f}"
+                          elif 'время' in label:
+                              mins = int(v) // 60
+                              secs = int(v) % 60
+                              v = f"{mins}:{secs:02d}"
+                          else:
+                              v = f"{v:.0f}"
+                      report.append(f"| {label} | **{v}** |")
+              report.append("")
+
+          # Sources
+          src_data = sources.get('data', [])
+          if src_data:
+              report.append("## Источники трафика\n")
+              report.append("| Источник | Визиты | Посетители | Отказы (%) |")
+              report.append("|----------|--------|------------|------------|")
+              for row in src_data:
+                  dim = row['dimensions'][0].get('name', '?')
+                  m = row['metrics']
+                  bounce = f"{m[2]:.1f}%" if len(m)>2 else "?"
+                  report.append(f"| {dim} | {m[0]:.0f} | {m[1]:.0f} | {bounce} |")
+              report.append("")
+
+          # Search engines
+          se_data = search.get('data', [])
+          if se_data:
+              report.append("## Поисковые системы\n")
+              report.append("| Поисковик | Визиты | Посетители |")
+              report.append("|-----------|--------|------------|")
+              for row in se_data:
+                  dim = row['dimensions'][0].get('name', '?')
+                  m = row['metrics']
+                  report.append(f"| {dim} | {m[0]:.0f} | {m[1]:.0f} |")
+              report.append("")
+
+          # Geography
+          geo_data = geo.get('data', [])
+          if geo_data:
+              report.append("## География\n")
+              report.append("| Город | Визиты | Посетители |")
+              report.append("|-------|--------|------------|")
+              for row in geo_data[:15]:
+                  dim = row['dimensions'][0].get('name', '?')
+                  m = row['metrics']
+                  report.append(f"| {dim} | {m[0]:.0f} | {m[1]:.0f} |")
+              report.append("")
+
+          # Top pages
+          pg_data = pages.get('data', [])
+          if pg_data:
+              report.append("## Топ страницы\n")
+              report.append("| URL | Визиты | Просмотры | Отказы (%) |")
+              report.append("|-----|--------|-----------|------------|")
+              for row in pg_data[:15]:
+                  dim = row['dimensions'][0].get('name', '?')
+                  m = row['metrics']
+                  bounce = f"{m[2]:.1f}%" if len(m)>2 else "?"
+                  report.append(f"| {dim} | {m[0]:.0f} | {m[1]:.0f} | {bounce} |")
+              report.append("")
+
+          # Devices
+          dev_data = devices.get('data', [])
+          if dev_data:
+              report.append("## Устройства\n")
+              report.append("| Тип | Визиты | Посетители |")
+              report.append("|-----|--------|------------|")
+              for row in dev_data:
+                  dim = row['dimensions'][0].get('name', '?')
+                  m = row['metrics']
+                  report.append(f"| {dim} | {m[0]:.0f} | {m[1]:.0f} |")
+              report.append("")
+
+          # Goals
+          goal_list = goals.get('goals', [])
+          if goal_list:
+              report.append("## Цели\n")
+              report.append("| ID | Название | Тип |")
+              report.append("|----|----------|-----|")
+              for g in goal_list:
+                  report.append(f"| {g['id']} | {g['name']} | {g.get('type','?')} |")
+              report.append("")
+
+          # Goal stats
+          gs_totals = goal_stats.get('totals', [])
+          if gs_totals and goal_list:
+              report.append("## Конверсии целей\n")
+              report.append("| Цель | Достижений | Конверсия (%) |")
+              report.append("|------|------------|---------------|")
+              idx = 0
+              for g in goal_list:
+                  if idx+1 < len(gs_totals):
+                      reaches = gs_totals[idx]
+                      conv = gs_totals[idx+1]
+                      report.append(f"| {g['name']} | {reaches:.0f} | {conv:.2f}% |")
+                      idx += 2
+              report.append("")
+
+          text = "\n".join(report)
+          with open("site-analysis/yandex-metrika-report.md", "w") as f:
+              f.write(text)
+          print(text)
+
+          # Save raw JSON
+          raw = {
+              "counters": counters,
+              "summary": summary,
+              "sources": sources,
+              "search_engines": search,
+              "geography": geo,
+              "top_pages": pages,
+              "devices": devices,
+              "daily": daily,
+              "goals": goals,
+              "goal_stats": goal_stats,
+              "period": {"from": date_from, "to": date_to, "days": period}
+          }
+          with open("site-analysis/yandex-metrika-raw.json", "w") as f:
+              json.dump(raw, f, ensure_ascii=False, indent=2)
+          PYEOF
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add site-analysis/yandex-metrika-report.md site-analysis/yandex-metrika-raw.json
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "data: Yandex Metrika report ($(date +%Y-%m-%d)) [skip ci]"
+            git push
+          fi
