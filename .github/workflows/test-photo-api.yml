@@ -1,4 +1,4 @@
-name: Full site verification
+name: Deploy red header test
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - "claude/*"
     paths:
       - ".github/workflows/test-photo-api.yml"
+      - "claude-chat/**"
   workflow_dispatch:
 
 permissions:
@@ -17,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -33,98 +34,46 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Full verification from OUTSIDE
-        run: |
-          OUT="diag-output.txt"
-          echo "=== EXTERNAL CHECK (from GitHub runner, NOT VPS) ===" | tee $OUT
-
-          echo "" | tee -a $OUT
-          echo "=== A. Full HTML from https://chat.marbomebel.ru ===" | tee -a $OUT
-          curl -skL --max-time 15 https://chat.marbomebel.ru/ > /tmp/full_page.html 2>/dev/null
-          echo "Size: $(wc -c < /tmp/full_page.html) bytes" | tee -a $OUT
-          echo "Status: $(curl -skI --max-time 10 https://chat.marbomebel.ru/ | head -1)" | tee -a $OUT
-          echo "--- FULL HTML ---" | tee -a $OUT
-          cat /tmp/full_page.html | tee -a $OUT
-          echo "" | tee -a $OUT
-          echo "--- END HTML ---" | tee -a $OUT
-
-          echo "" | tee -a $OUT
-          echo "=== B. Test chat API (health) ===" | tee -a $OUT
-          curl -sk --max-time 10 https://chat.marbomebel.ru/api/health | tee -a $OUT
-          echo "" | tee -a $OUT
-
-      - name: Check VPS internal state
+      - name: Deploy and verify
         env:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT || 22 }}
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p $VPS_PORT -o StrictHostKeyChecking=no $VPS_USER@$VPS_HOST"
+          SCP="scp -i ~/.ssh/deploy_key -P $VPS_PORT -o StrictHostKeyChecking=no"
           OUT="diag-output.txt"
 
+          echo "=== Deploy red header test ===" | tee $OUT
+          $SCP claude-chat/public/index.html $VPS_USER@$VPS_HOST:/opt/claude-chat/public/index.html 2>&1 | tee -a $OUT
+          $SCP claude-chat/server.js $VPS_USER@$VPS_HOST:/opt/claude-chat/server.js 2>&1 | tee -a $OUT
+
           $SSH 'bash -s' <<'REMOTE' 2>&1 | tee -a $OUT
+          cd /opt/claude-chat
+          pm2 restart claude-chat
+          sleep 3
 
           echo ""
-          echo "=== C. What files are actually on VPS ==="
-          echo "server.js md5: $(md5sum /opt/claude-chat/server.js)"
-          echo "index.html md5: $(md5sum /opt/claude-chat/public/index.html)"
+          echo "=== Verify from localhost ==="
+          echo "Header bg color:"
+          curl -s http://localhost:3847/ | grep -oP 'background:\s*[^;]+' | head -5
           echo ""
-          echo "server.js first 10 lines:"
-          head -10 /opt/claude-chat/server.js
-          echo ""
-          echo "index.html statusLine:"
-          grep -n 'statusLine\|version\|v15' /opt/claude-chat/public/index.html || echo "(not found)"
-
-          echo ""
-          echo "=== D. PM2 status and logs ==="
-          pm2 list
-          echo ""
-          echo "PM2 last 30 lines of error log:"
-          pm2 logs claude-chat --nostream --lines 30 --err 2>/dev/null
-          echo ""
-          echo "PM2 last 10 lines of out log:"
-          pm2 logs claude-chat --nostream --lines 10 --out 2>/dev/null
-
-          echo ""
-          echo "=== E. Test Claude CLI directly ==="
-          which claude 2>/dev/null && echo "Claude CLI found" || echo "Claude CLI NOT FOUND"
-          claude --version 2>/dev/null || echo "claude --version failed"
-
-          echo ""
-          echo "=== F. Test API chat endpoint (send test message) ==="
-          TOKEN=$(grep BEARER_TOKEN /opt/claude-chat/.env | cut -d= -f2)
-          echo "Token found: $([ -n "$TOKEN" ] && echo 'yes' || echo 'NO')"
-          echo "Sending test message..."
-          timeout 30 curl -s http://localhost:3847/api/chat \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $TOKEN" \
-            -d '{"message":"Скажи просто: тест успешен"}' \
-            --max-time 25 2>&1 | head -20
-          echo ""
-
-          echo ""
-          echo "=== G. Crontab / watchdog that might restore files ==="
-          crontab -l 2>/dev/null || echo "No crontab"
-          echo ""
-          echo "Watchdog scripts:"
-          ls -la /opt/claude-chat/watchdog* /opt/watchdog* /opt/scripts/watchdog* 2>/dev/null || echo "No watchdog found"
-          echo ""
-          echo "Systemd timers:"
-          systemctl list-timers --no-pager 2>/dev/null | head -10
-
-          echo ""
-          echo "=== H. pm2 startup / save ==="
-          pm2 save --force 2>&1
-          cat /root/.pm2/dump.pm2 2>/dev/null | python3 -c "
-          import json,sys
-          d=json.load(sys.stdin)
-          for p in d:
-            print(f'  name={p.get(\"name\")} script={p.get(\"pm_exec_path\")} cwd={p.get(\"pm_cwd\")}')
-          " 2>/dev/null || echo "Could not parse dump"
-
-          echo ""
-          echo "DONE"
+          echo "Contains #cc0000 (red):"
+          curl -s http://localhost:3847/ | grep -c '#cc0000'
           REMOTE
+
+          echo "" | tee -a $OUT
+          echo "=== Verify from OUTSIDE (GitHub runner) ===" | tee -a $OUT
+          echo "Header bg color from HTTPS:" | tee -a $OUT
+          curl -sk https://chat.marbomebel.ru/ | grep -oP 'background:\s*[^;]+' | head -5 | tee -a $OUT
+          echo "" | tee -a $OUT
+          echo "Contains #cc0000:" | tee -a $OUT
+          curl -sk https://chat.marbomebel.ru/ | grep -c '#cc0000' | tee -a $OUT
+          echo "" | tee -a $OUT
+          echo "Full page size:" | tee -a $OUT
+          curl -sk https://chat.marbomebel.ru/ | wc -c | tee -a $OUT
+          echo "" | tee -a $OUT
+          echo "DONE" | tee -a $OUT
 
       - name: Save output
         if: always()
@@ -133,6 +82,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f diag-output.txt
           git diff --cached --quiet && echo "No changes" || {
-            git commit -m "verify: полная проверка сайта извне и изнутри [skip ci]"
+            git commit -m "test: red header deployed and verified [skip ci]"
             git push origin HEAD
           }
