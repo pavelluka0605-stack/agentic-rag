@@ -1,40 +1,42 @@
-=== STEP 1: What is on VPS RIGHT NOW? Sun Mar 15 10:39:04 UTC 2026 ===
-Title: <title>AI Ассистент</title>
-RAG in HTML: 0
-0
-Manifest link: 0
-0
-File modified: 2026-03-15 10:34:50.448818443 +0000
-MD5: f69499b91889d4bbe8d1c1e958826903
-Process on 3847: LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=825453,fd=20))                                                                                                                      
-PM2: │ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 825453   │ 4m     │ 0    │ online    │ 0%       │ 53.4mb   │ root     │ disabled │
-Systemd: failed
-inactive
+=== CLEAN DEPLOY Sun Mar 15 10:46:04 UTC 2026 ===
+Files in checkout:
+claude-chat/package.json
+claude-chat/public/index.html
+claude-chat/server.js
 
---- First 15 lines of HTML ---
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>AI Ассистент</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-:root {
-  --bg: #0a0a14;
-  --surface: #12121e;
-  --surface2: #1a1a2e;
-  --border: #2a2a3e;
-
-=== STEP 2: FORCE DEPLOY from this checkout ===
-Local title: <title>AI Ассистент</title>
+=== 1. Stop everything ===
 [PM2] Applying action deleteProcessId on app [claude-chat](ids: [ 0 ])
 [PM2] [claude-chat](0) ✓
 ┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 └────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+=== 2. WIPE public/ (keep uploads and data) ===
+Wiped /opt/claude-chat/
+total 12
+drwxr-xr-x  2 root root 4096 Mar 15 10:46 .
+drwxr-xr-x 17 root root 4096 Mar 15 04:46 ..
+-rw-r--r--  1 root root  334 Mar 15 03:03 .env
+
+=== 3. Copy ONLY March 14 files ===
+
+=== 4. Restore backups ===
+
+=== 5. Files after clean deploy ===
+/opt/claude-chat/
+/opt/claude-chat/.env
+/opt/claude-chat/data
+/opt/claude-chat/data/conversations.json
+/opt/claude-chat/node_modules
+/opt/claude-chat/package.json
+/opt/claude-chat/public
+/opt/claude-chat/public/index.html
+/opt/claude-chat/public/uploads
+/opt/claude-chat/server.js
+/opt/claude-chat/uploads
+
+=== 6. Install & start ===
+  run `npm fund` for details
 
 found 0 vulnerabilities
 [PM2] Starting /opt/claude-chat/server.js in fork_mode (1 instance)
@@ -42,36 +44,34 @@ found 0 vulnerabilities
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 827763   │ 0s     │ 0    │ online    │ 0%       │ 18.8mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 829221   │ 0s     │ 0    │ online    │ 0%       │ 17.9mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 [PM2] Saving current process list...
 [PM2] Successfully saved in /root/.pm2/dump.pm2
 
-After deploy:
+=== 7. Verify ===
 Title: <title>AI Ассистент</title>
-MD5: f69499b91889d4bbe8d1c1e958826903
-Health: {"status":"ok","uptime":3.261943873,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:39:32.085Z"}
+Manifest: 0
+0
+RAG badge: 0
+0
+Logo: 0
+0
+Health: {"status":"ok","uptime":3.311102331,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:46:23.982Z"}
+Files in public:
+total 44
+drwxr-xr-x 3 root root  4096 Mar 15 10:46 .
+drwxr-xr-x 6 root root  4096 Mar 15 10:46 ..
+-rw-r--r-- 1 root root 29503 Mar 15 10:46 index.html
 
-=== STEP 3: Wait 60s and check if overwritten ===
-After 60s wait:
+=== 8. External check ===
 Title: <title>AI Ассистент</title>
-MD5: f69499b91889d4bbe8d1c1e958826903
-File modified: 2026-03-15 10:39:13.148797006 +0000
-Process: LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=827763,fd=20))                                                                                                                      
+Manifest: 0
+0
+RAG badge: 0
+0
+Logo: 0
+0
+Health: {"status":"ok","uptime":9.242853475,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:46:29.913Z"}
 
-=== STEP 4: External check ===
-HTTPS title: <title>AI Ассистент</title>
-HTTPS health: {"status":"ok","uptime":67.908086189,"activeRequests":0,"runningProcesses":0,"backgroundResults":0,"conversations":0,"cleaned":0,"claudeCli":"/usr/bin/claude","timestamp":"2026-03-15T10:40:36.731Z"}
-HTTPS first 10 lines:
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>AI Ассистент</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-DONE Sun Mar 15 10:40:37 UTC 2026
+DONE Sun Mar 15 10:46:29 UTC 2026
