@@ -1,0 +1,299 @@
+name: "Deploy WordPress Theme — Кухни Рема"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "site-build/wordpress/theme/**"
+      - ".github/workflows/deploy-theme.yml"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — validate only, do not deploy"
+        required: false
+        default: false
+        type: boolean
+      run_imports:
+        description: "Run WP-CLI import scripts after deploy"
+        required: false
+        default: false
+        type: boolean
+
+# ─── Secrets required ───
+# VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PORT (optional, default 22)
+# TG_BOT_TOKEN, TG_CHAT_ID
+
+env:
+  THEME_SRC: site-build/wordpress/theme/
+  THEME_DEST: /var/www/kuhnirema/wp-content/themes/kuhni-rema/
+  SSH_PORT: ${{ secrets.VPS_PORT || 22 }}
+
+jobs:
+  deploy-theme:
+    name: "Deploy Theme to VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # ─── 1. Checkout ───
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ─── 2. Setup SSH ───
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      # ─── 3. Local validation ───
+      - name: Validate theme files locally
+        run: |
+          echo "=== Checking theme structure ==="
+          THEME_DIR="${THEME_SRC}"
+
+          # Required files
+          REQUIRED_FILES="functions.php style.css"
+          MISSING=""
+          for f in $REQUIRED_FILES; do
+            if [ ! -f "${THEME_DIR}${f}" ]; then
+              MISSING="${MISSING} ${f}"
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            echo "::error::Missing required theme files:${MISSING}"
+            exit 1
+          fi
+
+          # PHP lint on all PHP files
+          echo "=== PHP lint check ==="
+          LINT_ERRORS=0
+          while IFS= read -r phpfile; do
+            if ! php -l "$phpfile" 2>&1 | grep -q "No syntax errors"; then
+              echo "::error file=${phpfile}::PHP syntax error"
+              LINT_ERRORS=$((LINT_ERRORS + 1))
+            fi
+          done < <(find "${THEME_DIR}" -name "*.php" -type f)
+
+          if [ "$LINT_ERRORS" -gt 0 ]; then
+            echo "::error::Found ${LINT_ERRORS} PHP syntax error(s)"
+            exit 1
+          fi
+
+          echo "All PHP files passed lint check"
+
+          # Count files for summary
+          TOTAL_FILES=$(find "${THEME_DIR}" -type f | wc -l)
+          PHP_FILES=$(find "${THEME_DIR}" -name "*.php" -type f | wc -l)
+          CSS_FILES=$(find "${THEME_DIR}" -name "*.css" -type f | wc -l)
+          JS_FILES=$(find "${THEME_DIR}" -name "*.js" -type f | wc -l)
+          echo "Theme files: ${TOTAL_FILES} total (${PHP_FILES} PHP, ${CSS_FILES} CSS, ${JS_FILES} JS)"
+
+      # ─── 4. Dry run — stop here if dry_run ───
+      - name: Dry run summary
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          echo "::notice::Dry run complete — validation passed, skipping deploy"
+          echo "## Dry Run Result" >> "$GITHUB_STEP_SUMMARY"
+          echo "Validation passed. No files were deployed." >> "$GITHUB_STEP_SUMMARY"
+
+      # ─── 5. Create theme directory on VPS ───
+      - name: Prepare remote directory
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "mkdir -p ${THEME_DEST} && echo 'Directory ready: ${THEME_DEST}'"
+
+      # ─── 6. Rsync theme files to VPS ───
+      - name: Deploy theme via rsync
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          echo "=== Deploying theme to VPS ==="
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='.DS_Store' \
+            --exclude='node_modules' \
+            --exclude='*.log' \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }}" \
+            "${THEME_SRC}" \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${THEME_DEST}"
+          echo "Rsync complete"
+
+      # ─── 7. Set ownership & permissions ───
+      - name: Set file ownership and permissions
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+          set -e
+
+          THEME_DIR="/var/www/kuhnirema/wp-content/themes/kuhni-rema/"
+
+          # Ownership
+          chown -R www-data:www-data "$THEME_DIR"
+
+          # Directories: 755, Files: 644
+          find "$THEME_DIR" -type d -exec chmod 755 {} \;
+          find "$THEME_DIR" -type f -exec chmod 644 {} \;
+
+          echo "Ownership and permissions set"
+          ls -la "$THEME_DIR"
+          REMOTE
+
+      # ─── 8. PHP lint on deployed files ───
+      - name: PHP lint on deployed files
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+          set -e
+          THEME_DIR="/var/www/kuhnirema/wp-content/themes/kuhni-rema/"
+          ERRORS=0
+
+          while IFS= read -r f; do
+            RESULT=$(php -l "$f" 2>&1)
+            if ! echo "$RESULT" | grep -q "No syntax errors"; then
+              echo "LINT ERROR: $f — $RESULT"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < <(find "$THEME_DIR" -name "*.php" -type f)
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "Found $ERRORS PHP lint error(s) on VPS!"
+            exit 1
+          fi
+
+          echo "All deployed PHP files passed lint check on VPS"
+          REMOTE
+
+      # ─── 9. Clear WordPress cache ───
+      - name: Clear WordPress cache
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+          WP_DIR="/var/www/kuhnirema"
+          WP_CLI=$(which wp 2>/dev/null || echo "")
+
+          # WP-CLI cache flush (if available)
+          if [ -n "$WP_CLI" ]; then
+            cd "$WP_DIR"
+            sudo -u www-data wp cache flush 2>/dev/null && echo "WP object cache flushed" || echo "WP cache flush skipped"
+            sudo -u www-data wp rewrite flush 2>/dev/null && echo "WP rewrite rules flushed" || echo "WP rewrite flush skipped"
+          else
+            echo "WP-CLI not found — skipping WP cache flush"
+          fi
+
+          # Clear common cache plugin directories
+          CACHE_DIRS=(
+            "$WP_DIR/wp-content/cache"
+            "$WP_DIR/wp-content/litespeed"
+            "$WP_DIR/wp-content/w3tc-config"
+          )
+          for CDIR in "${CACHE_DIRS[@]}"; do
+            if [ -d "$CDIR" ]; then
+              rm -rf "${CDIR:?}"/*
+              echo "Cleared cache: $CDIR"
+            fi
+          done
+
+          # Restart PHP-FPM to clear opcache
+          if systemctl is-active php8.2-fpm > /dev/null 2>&1; then
+            systemctl restart php8.2-fpm
+            echo "PHP-FPM restarted (opcache cleared)"
+          elif systemctl is-active php8.1-fpm > /dev/null 2>&1; then
+            systemctl restart php8.1-fpm
+            echo "PHP-FPM restarted (opcache cleared)"
+          else
+            echo "PHP-FPM service not found — skipping opcache clear"
+          fi
+
+          echo "Cache clearing complete"
+          REMOTE
+
+      # ─── 10. WP-CLI imports (optional) ───
+      - name: Run WP-CLI import scripts
+        if: ${{ inputs.dry_run != true && inputs.run_imports == true }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+          WP_DIR="/var/www/kuhnirema"
+          WP_CLI=$(which wp 2>/dev/null || echo "")
+
+          if [ -z "$WP_CLI" ]; then
+            echo "::warning::WP-CLI not installed — cannot run imports"
+            exit 0
+          fi
+
+          cd "$WP_DIR"
+
+          # Activate theme if not active
+          ACTIVE_THEME=$(sudo -u www-data wp theme list --status=active --field=name 2>/dev/null || echo "")
+          if [ "$ACTIVE_THEME" != "kuhni-rema" ]; then
+            echo "Activating theme kuhni-rema..."
+            sudo -u www-data wp theme activate kuhni-rema
+          fi
+
+          echo "Theme is active: kuhni-rema"
+
+          # Run any import scripts from theme's import directory
+          IMPORT_DIR="$WP_DIR/wp-content/themes/kuhni-rema/import"
+          if [ -d "$IMPORT_DIR" ]; then
+            for script in "$IMPORT_DIR"/*.sh; do
+              [ -f "$script" ] || continue
+              echo "Running import: $script"
+              bash "$script"
+            done
+          else
+            echo "No import directory found — skipping"
+          fi
+          REMOTE
+
+      # ─── 11. Telegram notification ───
+      - name: Notify Telegram — success
+        if: ${{ success() && inputs.dry_run != true }}
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          MSG=$(cat <<EOF
+          ✅ Theme Deploy — SUCCESS
+
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          By: ${{ github.actor }}
+          Imports: ${{ inputs.run_imports || false }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          )
+          curl -s --max-time 15 "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
+
+      - name: Notify Telegram — failure
+        if: ${{ failure() }}
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          MSG=$(cat <<EOF
+          ❌ Theme Deploy — FAILED
+
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          By: ${{ github.actor }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          )
+          curl -s --max-time 15 "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
+
+      # ─── 12. Cleanup ───
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

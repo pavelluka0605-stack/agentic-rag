@@ -76,11 +76,22 @@
 - [x] 4C-08: Квиз-попап 45 сек — `assets/js/quiz-popup.js`
 - [x] 4C-09: Ecommerce dataLayer — `assets/js/datalayer.js`
 
+**Фаза 5: Деплой (DONE — скрипты и конфиги готовы)**
+- [x] install-wordpress.sh — установка WP + тема + плагины на VPS
+- [x] nginx-kuhnirema.conf — Nginx с SSL, gzip, кэш, безопасность
+- [x] .htaccess — WP rewrite + 301 редиректы + Apache fallback
+- [x] wp-setup.sh — создание страниц, меню, таксономий, настроек
+- [x] deploy-theme.yml — GitHub Actions деплой темы на VPS
+- [x] smoke-test.sh + smoke-test.yml — тестирование всех страниц
+- [x] DEPLOY-GUIDE.md — пошаговая инструкция деплоя (10 шагов)
+
 ### Что дальше
-- [ ] Фаза 5: Деплой темы на хостинг кухнирема.рф
-- [ ] Настройка Bricks Builder (визуальный импорт шаблонов)
-- [ ] DNS, SSL, robots.txt, sitemap
-- [ ] 301 редиректы с mebelit.site
+- [ ] Выполнить деплой на VPS (запуск скриптов)
+- [ ] DNS: A-запись кухнирема.рф → VPS IP
+- [ ] SSL: certbot для кухнирема.рф
+- [ ] Bricks Builder: визуальный импорт шаблонов
+- [ ] Яндекс.Бизнес + 2ГИС — обновление карточек
+- [ ] Фаза 6: пост-запуск (SEO-посадочные, блог, A/B тесты)
 
 ### Ключевые данные Яндекс Метрики (90 дней: 2025-12-15 — 2026-03-15)
 - 7 287 визитов, 5 286 уников
