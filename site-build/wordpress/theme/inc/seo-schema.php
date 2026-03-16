@@ -98,9 +98,9 @@ function kuhni_rema_schema_organization() {
 	$schema = array(
 		'@context'  => 'https://schema.org',
 		'@type'     => 'Organization',
-		'@id'       => 'https://кухнирема.рф/#organization',
+		'@id'       => home_url( '/#organization' ),
 		'name'      => 'Кухни Рема',
-		'url'       => 'https://кухнирема.рф',
+		'url'       => home_url( '/' ),
 		'telephone' => $phone,
 	);
 
@@ -159,9 +159,9 @@ function kuhni_rema_schema_local_business() {
 	$schema = array(
 		'@context'  => 'https://schema.org',
 		'@type'     => 'FurnitureStore',
-		'@id'       => 'https://кухнирема.рф/#organization',
+		'@id'       => home_url( '/#organization' ),
 		'name'      => 'Кухни Рема',
-		'url'       => 'https://кухнирема.рф',
+		'url'       => home_url( '/' ),
 		'telephone' => $phone,
 	);
 
@@ -314,7 +314,7 @@ function kuhni_rema_schema_product() {
 			'url'            => $permalink,
 			'seller'         => array(
 				'@type' => 'Organization',
-				'@id'   => 'https://кухнирема.рф/#organization',
+				'@id'   => home_url( '/#organization' ),
 				'name'  => 'Кухни Рема',
 			),
 		);
@@ -331,7 +331,7 @@ function kuhni_rema_schema_product() {
 			'url'            => $permalink,
 			'seller'         => array(
 				'@type' => 'Organization',
-				'@id'   => 'https://кухнирема.рф/#organization',
+				'@id'   => home_url( '/#organization' ),
 				'name'  => 'Кухни Рема',
 			),
 		);

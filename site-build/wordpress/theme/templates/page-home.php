@@ -244,7 +244,7 @@ $types = array(
                 </div>
 
                 <div class="text-center" style="margin-top: var(--spacing-xl);">
-                    <a href="<?php echo esc_url( home_url( '/portfolio/' ) ); ?>" class="btn btn--ghost">
+                    <a href="<?php echo esc_url( home_url( '/portfolio/' ) ); ?>" class="btn btn--outline">
                         Смотреть все проекты &rarr;
                     </a>
                 </div>
@@ -447,24 +447,56 @@ $types = array(
 
 
     <!-- ================================================================
-         Block 10: Final CTA
+         Block 10: Final CTA — Форма записи на замер
          ================================================================ -->
-    <section class="section section--dark final-cta" aria-label="Призыв к действию">
+    <section class="section section--dark final-cta" aria-label="Запись на замер">
         <div class="container text-center">
 
-            <h2>Готовы обсудить вашу кухню?</h2>
+            <h2>Готовы начать? Запишитесь на бесплатный замер</h2>
+            <p class="final-cta__subtitle" style="color: rgba(255,255,255,0.8); margin-bottom: var(--spacing-lg);">
+                Дизайнер приедет, измерит кухню и составит 3D-проект. Это бесплатно и ни к чему не обязывает
+            </p>
 
-            <div class="final-cta__actions">
-                <a href="<?php echo esc_url( home_url( '/kalkulyator/' ) ); ?>" class="btn btn--primary btn--lg">
-                    Рассчитать стоимость
-                </a>
+            <form class="final-cta__form" data-kuhni-form="zamer" novalidate>
+                <div class="form-group">
+                    <label for="final-cta-name" class="form-label">Ваше имя</label>
+                    <input type="text" id="final-cta-name" name="name" class="form-input" placeholder="Как к вам обращаться?" autocomplete="given-name">
+                </div>
 
-                <?php if ( $phone ) : ?>
-                    <a href="<?php echo esc_url( kuhni_rema_phone_link( $phone ) ); ?>" class="btn btn--ghost btn--lg final-cta__phone">
+                <div class="form-group">
+                    <label for="final-cta-phone" class="form-label">Телефон <span aria-hidden="true">*</span></label>
+                    <input type="tel" id="final-cta-phone" name="phone" class="form-input" data-phone-mask placeholder="+7 (___) ___-__-__" required autocomplete="tel">
+                </div>
+
+                <div class="form-group">
+                    <label for="final-cta-time" class="form-label">Удобное время</label>
+                    <select id="final-cta-time" name="preferred_time" class="form-select">
+                        <option value="">Выберите время</option>
+                        <option value="morning">Утро (10:00–13:00)</option>
+                        <option value="afternoon">День (13:00–17:00)</option>
+                        <option value="evening">Вечер (17:00–20:00)</option>
+                        <option value="weekend">Выходные</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn--primary btn--lg btn--full">
+                    Вызвать замерщика бесплатно
+                </button>
+
+                <p class="final-cta__privacy">
+                    Нажимая кнопку, вы соглашаетесь с
+                    <a href="<?php echo esc_url( home_url( '/politika-konfidencialnosti/' ) ); ?>">политикой конфиденциальности</a>
+                </p>
+            </form>
+
+            <?php if ( $phone ) : ?>
+                <div class="final-cta__or" style="margin-top: var(--spacing-xl); color: rgba(255,255,255,0.5); font-size: var(--font-size-body-sm);">
+                    Или позвоните:
+                    <a href="<?php echo esc_url( kuhni_rema_phone_link( $phone ) ); ?>" style="color: var(--color-primary);">
                         <?php echo esc_html( $phone ); ?>
                     </a>
-                <?php endif; ?>
-            </div>
+                </div>
+            <?php endif; ?>
 
         </div>
     </section>

@@ -1,0 +1,454 @@
+/* ==========================================================================
+   Homepage Sections — Кухни Рема (кухнирема.рф)
+   Depends on: design-tokens.css, base.css, components.css
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. Hero
+   ========================================================================== */
+
+.hero {
+  position: relative;
+  min-height: 85vh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding-top: var(--spacing-3xl);
+  padding-bottom: var(--spacing-3xl);
+  background-color: var(--color-bg-dark);
+  background-size: cover;
+  background-position: center;
+}
+
+.hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(26, 26, 26, 0.55) 0%,
+    rgba(26, 26, 26, 0.7) 100%
+  );
+  z-index: 1;
+}
+
+.hero__inner {
+  position: relative;
+  z-index: 2;
+  max-width: 720px;
+}
+
+.hero__badge {
+  margin-bottom: var(--spacing-md);
+}
+
+.hero__title {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-on-dark);
+  line-height: 1.15;
+  margin-bottom: var(--spacing-md);
+}
+
+.hero__subtitle {
+  font-size: var(--font-size-body);
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.6;
+  margin-bottom: var(--spacing-xl);
+}
+
+.hero__cta {
+  display: inline-flex;
+}
+
+
+/* ==========================================================================
+   2. Advantages
+   ========================================================================== */
+
+.advantages__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+
+/* ==========================================================================
+   3. Catalog Preview
+   ========================================================================== */
+
+.catalog-preview__subtitle {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+}
+
+.catalog-preview__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+.catalog-preview__card {
+  text-decoration: none;
+  color: inherit;
+}
+
+.catalog-preview__card:hover {
+  transform: translateY(-4px);
+}
+
+
+/* ==========================================================================
+   4. Quiz Preview
+   ========================================================================== */
+
+.quiz-preview {
+  background-color: var(--color-bg-dark);
+  color: var(--color-text-on-dark);
+}
+
+.quiz-preview__subtitle {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: var(--spacing-xl);
+}
+
+.quiz-preview__layouts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+  max-width: 480px;
+  margin: 0 auto var(--spacing-xl);
+}
+
+.quiz-preview__layout-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: var(--color-text-on-dark);
+  transition: var(--transition-base);
+  border: 2px solid transparent;
+}
+
+.quiz-preview__layout-card:hover,
+.quiz-preview__layout-card:focus-visible {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--color-primary);
+}
+
+.quiz-preview__layout-icon {
+  width: 80px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.quiz-preview__layout-name {
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.quiz-preview__cta {
+  margin-bottom: var(--spacing-md);
+}
+
+.quiz-preview__disclaimer {
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+
+/* ==========================================================================
+   5. Portfolio Preview
+   ========================================================================== */
+
+.portfolio-preview__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+
+/* ==========================================================================
+   6. How We Work
+   ========================================================================== */
+
+.how-we-work__steps {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-xl);
+  counter-reset: step;
+}
+
+.how-we-work__step {
+  text-align: center;
+}
+
+.how-we-work__number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-primary);
+  color: var(--color-text-on-dark);
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+.how-we-work__step-title {
+  font-size: var(--font-size-h5);
+  margin-bottom: var(--spacing-sm);
+}
+
+.how-we-work__step-text {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body-sm);
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+
+/* ==========================================================================
+   7. Reviews
+   ========================================================================== */
+
+.reviews__social-proof {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body-sm);
+}
+
+.reviews__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+.review__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.review__name {
+  font-weight: var(--font-weight-semibold);
+}
+
+.review__text {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.6;
+}
+
+.review__source {
+  align-self: flex-start;
+}
+
+
+/* ==========================================================================
+   8. Installment
+   ========================================================================== */
+
+.installment__inner {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.installment__description {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: var(--spacing-xl);
+  line-height: 1.6;
+}
+
+.installment__details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.installment__detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.installment__detail-value {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-h4);
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.installment__detail-label {
+  font-size: var(--font-size-body-sm);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.installment__cta {
+  margin-bottom: var(--spacing-md);
+}
+
+.installment__fine-print {
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+
+/* ==========================================================================
+   9. Partners
+   ========================================================================== */
+
+.partners__subtitle {
+  color: var(--color-text-secondary);
+}
+
+.partners__logos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xl);
+}
+
+.partners__logo-item {
+  margin: 0;
+}
+
+.partners__logo {
+  max-height: 48px;
+  width: auto;
+  filter: grayscale(100%);
+  opacity: 0.6;
+  transition: var(--transition-base);
+}
+
+.partners__logo:hover {
+  filter: grayscale(0%);
+  opacity: 1;
+}
+
+
+/* ==========================================================================
+   10. Final CTA
+   ========================================================================== */
+
+.final-cta {
+  background-color: var(--color-bg-dark);
+  color: var(--color-text-on-dark);
+}
+
+.final-cta__form {
+  max-width: 560px;
+  margin: var(--spacing-xl) auto 0;
+}
+
+.final-cta__form .form-group {
+  margin-bottom: var(--spacing-md);
+}
+
+.final-cta__form .form-label {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.final-cta__form .form-input,
+.final-cta__form .form-select {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-text-on-dark);
+}
+
+.final-cta__form .form-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.final-cta__form .form-input:focus,
+.final-cta__form .form-select:focus {
+  border-color: var(--color-primary);
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.final-cta__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.final-cta__privacy {
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: var(--spacing-md);
+}
+
+.final-cta__privacy a {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+
+/* ==========================================================================
+   Responsive — Tablet (768px+)
+   ========================================================================== */
+
+@media (min-width: 768px) {
+  .hero__title {
+    font-size: var(--font-size-h1);
+  }
+
+  .hero__subtitle {
+    font-size: var(--font-size-lg);
+  }
+
+  .advantages__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .catalog-preview__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .portfolio-preview__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .how-we-work__steps {
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--spacing-md);
+  }
+
+  .reviews__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .final-cta__actions {
+    flex-direction: row;
+    justify-content: center;
+  }
+}
+
+
+/* ==========================================================================
+   Responsive — Desktop (1024px+)
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+  .hero {
+    min-height: 90vh;
+  }
+
+  .portfolio-preview__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .reviews__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

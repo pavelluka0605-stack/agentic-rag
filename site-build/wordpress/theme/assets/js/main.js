@@ -32,11 +32,13 @@
 
     function openMenu() {
       body.classList.add('menu-open');
+      body.style.overflow = 'hidden';
       burgerBtn.setAttribute('aria-expanded', 'true');
     }
 
     function closeMenu() {
       body.classList.remove('menu-open');
+      body.style.overflow = '';
       burgerBtn.setAttribute('aria-expanded', 'false');
     }
 
@@ -116,7 +118,7 @@
 
       e.preventDefault();
 
-      var headerOffset = 80;
+      var headerOffset = 100;
       var elementPosition = target.getBoundingClientRect().top + window.pageYOffset;
       var offsetPosition = elementPosition - headerOffset;
 

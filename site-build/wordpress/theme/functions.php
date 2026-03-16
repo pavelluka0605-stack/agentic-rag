@@ -84,6 +84,16 @@ function kuhni_rema_enqueue_assets() {
         KUHNI_REMA_VERSION
     );
 
+    // Homepage sections (conditional)
+    if ( is_front_page() ) {
+        wp_enqueue_style(
+            'kuhni-rema-homepage',
+            KUHNI_REMA_URI . '/assets/css/homepage.css',
+            array( 'kuhni-rema-components' ),
+            KUHNI_REMA_VERSION
+        );
+    }
+
     // Responsive (mobile-first overrides)
     wp_enqueue_style(
         'kuhni-rema-responsive',
