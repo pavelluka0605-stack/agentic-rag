@@ -1,0 +1,8 @@
+[Unit]
+Description=Claude Code Health Check
+After=claude-code.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/claude-code/bin/health.sh --quiet --json
+StandardOutput=journal

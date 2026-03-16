@@ -1,0 +1,24 @@
+[Unit]
+Description=Claude Code Control API
+After=network-online.target claude-code.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/claude-code/control-api
+Environment=CONTROL_API_PORT=3901
+Environment=CLAUDE_BIN_DIR=/opt/claude-code/bin
+Environment=CLAUDE_LOG_DIR=/opt/claude-code/logs
+Environment=MEMORY_DB_PATH=/opt/claude-code/memory/memory.db
+EnvironmentFile=-/opt/claude-code/env/control-api.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+
+# Resource limits
+MemoryMax=128M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

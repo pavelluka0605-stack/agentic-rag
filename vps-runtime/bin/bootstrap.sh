@@ -90,7 +90,7 @@ info "4/7 Installing runtime scripts..."
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-for script in start.sh stop.sh restart.sh connect.sh health.sh; do
+for script in start.sh stop.sh restart.sh connect.sh health.sh verify.sh backup-memory.sh smoke-test.sh; do
   if [ -f "$SCRIPT_DIR/$script" ]; then
     cp "$SCRIPT_DIR/$script" "$BIN_DIR/$script"
     chmod +x "$BIN_DIR/$script"
@@ -104,12 +104,12 @@ done
 
 info "5/7 Installing tmux config..."
 
-if [ -f "$SCRIPT_DIR/../etc/tmux.conf" ]; then
-  cp "$SCRIPT_DIR/../etc/tmux.conf" "$ETC_DIR/tmux.conf"
-  ok "tmux.conf installed"
-else
-  warn "tmux.conf not found, will use defaults"
-fi
+for conf in tmux.conf nginx-webhook.conf; do
+  if [ -f "$SCRIPT_DIR/../etc/$conf" ]; then
+    cp "$SCRIPT_DIR/../etc/$conf" "$ETC_DIR/$conf"
+    ok "$conf installed"
+  fi
+done
 
 # ── 6. Create environment template ─────────────────────────────────────────
 
@@ -148,31 +148,13 @@ fi
 
 info "7/7 Installing systemd service..."
 
-cat > /etc/systemd/system/claude-code.service << 'UNITEOF'
-[Unit]
-Description=Claude Code Runtime (tmux session)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=forking
-User=root
-EnvironmentFile=/opt/claude-code/env/claude.env
-ExecStart=/opt/claude-code/bin/start.sh
-ExecStop=/opt/claude-code/bin/stop.sh
-ExecReload=/opt/claude-code/bin/restart.sh
-Restart=on-failure
-RestartSec=10
-TimeoutStartSec=30
-TimeoutStopSec=30
-
-# Keep tmux session alive
-KillMode=none
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-UNITEOF
+# Install systemd units from etc/ directory
+for unit in claude-code.service github-webhook.service control-api.service claude-code-health.timer claude-code-health.service; do
+  if [ -f "$SCRIPT_DIR/../etc/$unit" ]; then
+    cp "$SCRIPT_DIR/../etc/$unit" /etc/systemd/system/
+    ok "systemd: $unit installed"
+  fi
+done
 
 systemctl daemon-reload
 systemctl enable claude-code.service 2>/dev/null || true
@@ -223,29 +205,49 @@ WEBHOOKENV
   ok "Webhook .env created"
 fi
 
-# Webhook systemd unit
-cat > /etc/systemd/system/github-webhook.service << 'UNITEOF'
-[Unit]
-Description=GitHub Webhook Receiver → Memory
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/claude-code/github-webhook
-EnvironmentFile=/opt/claude-code/github-webhook/.env
-ExecStart=/usr/bin/node server.js
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-UNITEOF
-
-systemctl daemon-reload
 systemctl enable github-webhook.service 2>/dev/null || true
 ok "systemd unit: github-webhook.service"
+
+# ── 10. Install Control API ───────────────────────────────────────────────────
+
+info "10/10 Installing Control API..."
+
+CONTROL_DIR="/opt/claude-code/control-api"
+mkdir -p "$CONTROL_DIR"
+
+if [ -d "$SCRIPT_DIR/../../vps-runtime/control-api" ]; then
+  cp "$SCRIPT_DIR/../../vps-runtime/control-api/package.json" "$CONTROL_DIR/"
+  cp "$SCRIPT_DIR/../../vps-runtime/control-api/server.js" "$CONTROL_DIR/"
+  ok "Control API installed"
+fi
+
+# Control API env (generate token on first install)
+CONTROL_ENV="/opt/claude-code/env/control-api.env"
+if [ ! -f "$CONTROL_ENV" ] || [ "$FORCE" = "--force" ]; then
+  GENERATED_TOKEN=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | xxd -p | head -c 64)
+  cat > "$CONTROL_ENV" << CTRLENV
+CONTROL_API_PORT=3901
+CONTROL_API_TOKEN=$GENERATED_TOKEN
+CTRLENV
+  chmod 600 "$CONTROL_ENV"
+  ok "Control API env created (token auto-generated)"
+  warn "Save this token: $GENERATED_TOKEN"
+fi
+
+systemctl enable control-api.service 2>/dev/null || true
+ok "systemd unit: control-api.service"
+
+# Enable health timer
+systemctl enable claude-code-health.timer 2>/dev/null || true
+systemctl start claude-code-health.timer 2>/dev/null || true
+ok "systemd timer: claude-code-health.timer (every 30min)"
+
+# Setup backup cron
+mkdir -p "$INSTALL_DIR/backups"
+if ! crontab -l 2>/dev/null | grep -q backup-memory; then
+  (crontab -l 2>/dev/null; echo "*/30 * * * * $BIN_DIR/backup-memory.sh >> $LOG_DIR/backup.log 2>&1") | crontab -
+  ok "Backup cron configured (every 30min)"
+fi
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 

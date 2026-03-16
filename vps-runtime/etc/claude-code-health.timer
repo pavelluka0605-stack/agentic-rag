@@ -1,0 +1,11 @@
+[Unit]
+Description=Claude Code Health Check Timer
+Documentation=https://github.com/pavelluka0605-stack/agentic-rag
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
