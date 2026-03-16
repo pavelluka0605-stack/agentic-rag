@@ -4,3 +4,7 @@ __pycache__/
 memory.json
 .google-sa.json
 claude-chat/data/
+
+# Dev memory (local per-machine, not shared)
+.claude/memory/*.jsonl
+.claude/mcp/memory-server/node_modules/

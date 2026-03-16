@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-start.sh 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "memory": {
+      "command": "node",
+      "args": [".claude/mcp/memory-server/index.js"],
+      "cwd": "/home/user/agentic-rag"
+    }
+  }
+}
