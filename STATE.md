@@ -60,19 +60,27 @@
   - `site-build/QA-CHECKLIST.md` — 51 проверка, все PASS
 - [x] Полная валидация каркаса 4A (37 файлов, ~7800 строк): 4 параллельных QA-агента, 0 FAIL
 
-### Что в процессе
-- Фаза 4B: Сборка страниц (шаблоны уже в SCAFFOLD-состоянии)
+**Фаза 4B: Сборка страниц (DONE)**
+- [x] 4B-1: Homepage CSS (homepage.css)
+- [x] 4B-2: Catalog pages (catalog.css + archive-kitchen.php)
+- [x] 4B-3: 7 secondary pages (pages.css)
+
+**Фаза 4C: Интеграции и контент (DONE)**
+- [x] 4C-01: Импорт 42 кухонь из VK Market — `data/import-kitchens.php` (WP-CLI)
+- [x] 4C-02: Импорт 12 проектов портфолио — `data/import-projects.php`
+- [x] 4C-03: n8n webhook документация — `data/n8n-webhooks.md` + `data/n8n-form-webhook.json`
+- [x] 4C-04: RankMath Pro конфигурация — `inc/rankmath-config.php`
+- [x] 4C-05: Яндекс Метрика 12 целей — `data/metrika-goals.md`
+- [x] 4C-06: 15 отзывов (2ГИС/Flamp/VK/Яндекс) — `data/import-reviews.php`
+- [x] 4C-07: 18 FAQ вопросов по 5 категориям — `data/import-faq.php`
+- [x] 4C-08: Квиз-попап 45 сек — `assets/js/quiz-popup.js`
+- [x] 4C-09: Ecommerce dataLayer — `assets/js/datalayer.js`
 
 ### Что дальше
-- [ ] Фаза 4B: Наполнение шаблонов страниц реальной разметкой
-- [ ] Фаза 4C: Интеграции (n8n webhooks, контент, аналитика)
 - [ ] Фаза 5: Деплой темы на хостинг кухнирема.рф
 - [ ] Настройка Bricks Builder (визуальный импорт шаблонов)
-- [ ] Контент: загрузка 42 моделей из VK Market в CPT Kitchen
-- [ ] Контент: создание 10-15 проектов для портфолио из VK фото
-- [ ] Настройка RankMath Pro (meta-теги, карта сайта)
-- [ ] Подключение n8n webhooks к формам
-- [ ] Настройка Яндекс Метрики (12 целей)
+- [ ] DNS, SSL, robots.txt, sitemap
+- [ ] 301 редиректы с mebelit.site
 
 ### Ключевые данные Яндекс Метрики (90 дней: 2025-12-15 — 2026-03-15)
 - 7 287 визитов, 5 286 уников

@@ -52,6 +52,7 @@ require_once KUHNI_REMA_DIR . '/inc/helpers.php';
 
 require_once KUHNI_REMA_DIR . '/inc/seo-schema.php';
 require_once KUHNI_REMA_DIR . '/inc/seo-meta.php';
+require_once KUHNI_REMA_DIR . '/inc/rankmath-config.php';
 
 // =============================================================================
 // 5. Enqueue Styles & Scripts
@@ -181,14 +182,34 @@ function kuhni_rema_enqueue_assets() {
         );
     }
 
-    // Analytics events (Yandex Metrika)
+    // Ecommerce DataLayer (Yandex Metrika Ecommerce / GTM compatible)
     wp_enqueue_script(
-        'kuhni-rema-analytics',
-        KUHNI_REMA_URI . '/assets/js/analytics.js',
+        'kuhni-rema-datalayer',
+        KUHNI_REMA_URI . '/assets/js/datalayer.js',
         array(),
         KUHNI_REMA_VERSION,
         true
     );
+
+    // Analytics events (Yandex Metrika)
+    wp_enqueue_script(
+        'kuhni-rema-analytics',
+        KUHNI_REMA_URI . '/assets/js/analytics.js',
+        array( 'kuhni-rema-datalayer' ),
+        KUHNI_REMA_VERSION,
+        true
+    );
+
+    // Quiz popup (45-second timer) — not on quiz or thanks pages
+    if ( ! is_page( 'kalkulyator' ) && ! is_page_template( 'templates/page-thanks.php' ) ) {
+        wp_enqueue_script(
+            'kuhni-rema-quiz-popup',
+            KUHNI_REMA_URI . '/assets/js/quiz-popup.js',
+            array(),
+            KUHNI_REMA_VERSION,
+            true
+        );
+    }
 }
 
 // =============================================================================
