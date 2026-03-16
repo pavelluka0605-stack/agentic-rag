@@ -84,6 +84,14 @@ function kuhni_rema_enqueue_assets() {
         KUHNI_REMA_VERSION
     );
 
+    // Responsive (mobile-first overrides)
+    wp_enqueue_style(
+        'kuhni-rema-responsive',
+        KUHNI_REMA_URI . '/assets/css/responsive.css',
+        array( 'kuhni-rema-components' ),
+        KUHNI_REMA_VERSION
+    );
+
     // Google Fonts: Montserrat + Inter
     wp_enqueue_style(
         'kuhni-rema-fonts',
