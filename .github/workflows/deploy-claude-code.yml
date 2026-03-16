@@ -93,12 +93,21 @@ jobs:
             echo "⚠ ANTHROPIC_API_KEY secret not set in GitHub"
           fi
 
+      - name: Ensure services running
+        if: github.event_name == 'push'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          # Start or restart services after push deploy
+          $SSH_CMD "systemctl restart control-api.service 2>/dev/null || true"
+          $SSH_CMD "systemctl is-active claude-code.service >/dev/null 2>&1 && /opt/claude-code/bin/restart.sh || /opt/claude-code/bin/start.sh" || true
+          $SSH_CMD "systemctl restart github-webhook.service 2>/dev/null || true"
+          echo "✓ Services started/restarted"
+
       - name: Start
         if: inputs.action == 'start' || inputs.action == 'bootstrap'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/start.sh"
-          # Start control API
           $SSH_CMD "systemctl start control-api.service 2>/dev/null || true"
 
       - name: Stop
@@ -122,7 +131,7 @@ jobs:
           $SSH_CMD "/opt/claude-code/bin/health.sh" || true
 
       - name: Smoke Test
-        if: inputs.action == 'smoke-test' || inputs.action == 'bootstrap'
+        if: inputs.action == 'smoke-test' || inputs.action == 'bootstrap' || github.event_name == 'push'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/smoke-test.sh" || true
