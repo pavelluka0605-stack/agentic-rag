@@ -1,201 +1,329 @@
 #!/usr/bin/env node
+// =============================================================================
+// MCP Memory Server — многослойная память разработки
+// SQLite + FTS5 | 6 типов памяти | GitHub интеграция
+// =============================================================================
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { MemoryDB } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MEMORY_DIR = path.resolve(__dirname, "../../memory");
+const DB_PATH = path.resolve(__dirname, "../../memory/memory.db");
 
-// Ensure memory dir exists
-fs.mkdirSync(MEMORY_DIR, { recursive: true });
+const db = new MemoryDB(DB_PATH);
+const server = new McpServer({ name: "memory-server", version: "2.0.0" });
 
-const MEMORY_FILES = {
-  decisions: path.join(MEMORY_DIR, "decisions.jsonl"),
-  errors: path.join(MEMORY_DIR, "errors.jsonl"),
-  sessions: path.join(MEMORY_DIR, "sessions.jsonl"),
-  patterns: path.join(MEMORY_DIR, "patterns.jsonl"),
-};
+// ── Утилита для JSON-ответа ──────────────────────────────────────────────────
 
-function appendEntry(file, entry) {
-  const line = JSON.stringify({ ...entry, ts: new Date().toISOString() }) + "\n";
-  fs.appendFileSync(file, line);
-  return line.trim();
+function ok(data) {
+  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
 }
 
-function readEntries(file, limit = 50) {
-  if (!fs.existsSync(file)) return [];
-  const lines = fs.readFileSync(file, "utf-8").trim().split("\n").filter(Boolean);
-  const entries = lines.map((l) => {
-    try { return JSON.parse(l); } catch { return null; }
-  }).filter(Boolean);
-  return entries.slice(-limit);
-}
-
-function searchEntries(file, query) {
-  if (!fs.existsSync(file)) return [];
-  const q = query.toLowerCase();
-  const lines = fs.readFileSync(file, "utf-8").trim().split("\n").filter(Boolean);
-  return lines
-    .map((l) => { try { return JSON.parse(l); } catch { return null; } })
-    .filter(Boolean)
-    .filter((e) => JSON.stringify(e).toLowerCase().includes(q));
-}
-
-const server = new McpServer({
-  name: "memory-server",
-  version: "1.0.0",
-});
-
-// --- Tools ---
+// =============================================================================
+// 1. POLICY MEMORY — правила, ограничения, конвенции
+// =============================================================================
 
 server.tool(
-  "add_decision",
-  "Record an architectural or implementation decision",
+  "policy_add",
+  "Записать правило/ограничение/конвенцию проекта",
   {
-    title: z.string().describe("Short title of the decision"),
-    context: z.string().describe("Why this decision was made"),
-    alternatives: z.string().optional().describe("Alternatives considered"),
-    project: z.string().optional().describe("Project name"),
-    tags: z.array(z.string()).optional().describe("Tags for categorization"),
+    title: z.string().describe("Название правила"),
+    content: z.string().describe("Содержание правила"),
+    category: z.enum(["rule", "constraint", "convention", "limitation"]).optional(),
+    project: z.string().optional(),
+    source: z.string().optional().describe("Источник: CLAUDE.md, manual, learned, incident"),
   },
-  async ({ title, context, alternatives, project, tags }) => {
-    const entry = { type: "decision", title, context, alternatives, project, tags };
-    const saved = appendEntry(MEMORY_FILES.decisions, entry);
-    return { content: [{ type: "text", text: `Decision recorded: ${saved}` }] };
-  }
+  async (args) => ok(db.addPolicy(args))
 );
 
 server.tool(
-  "add_error",
-  "Record an error and its fix for future reference",
+  "policy_list",
+  "Получить активные правила проекта",
   {
-    error: z.string().describe("Error message or description"),
-    cause: z.string().describe("Root cause"),
-    fix: z.string().describe("How it was fixed"),
-    project: z.string().optional().describe("Project name"),
-    tags: z.array(z.string()).optional().describe("Tags"),
+    project: z.string().optional(),
+    category: z.enum(["rule", "constraint", "convention", "limitation"]).optional(),
   },
-  async ({ error, cause, fix, project, tags }) => {
-    const entry = { type: "error", error, cause, fix, project, tags };
-    const saved = appendEntry(MEMORY_FILES.errors, entry);
-    return { content: [{ type: "text", text: `Error+fix recorded: ${saved}` }] };
-  }
+  async (args) => ok(db.getPolicies({ ...args, active: true }))
+);
+
+// =============================================================================
+// 2. EPISODIC MEMORY — сессии, прогресс, open loops
+// =============================================================================
+
+server.tool(
+  "episode_save",
+  "Сохранить итоги сессии: что сделано, где остановились, что осталось",
+  {
+    summary: z.string().describe("Краткое резюме сессии"),
+    what_done: z.string().optional().describe("Что было сделано"),
+    where_stopped: z.string().optional().describe("На чём остановились"),
+    what_remains: z.string().optional().describe("Что осталось доделать"),
+    open_loops: z.array(z.string()).optional().describe("Открытые задачи/вопросы"),
+    project: z.string().optional(),
+    branch: z.string().optional(),
+    files_changed: z.array(z.string()).optional(),
+  },
+  async (args) => ok(db.addEpisode(args))
 );
 
 server.tool(
-  "add_pattern",
-  "Record a successful pattern or recipe worth reusing",
+  "episode_list",
+  "Получить последние сессии",
   {
-    name: z.string().describe("Pattern name"),
-    description: z.string().describe("What it does and when to use it"),
-    code: z.string().optional().describe("Code snippet or command"),
-    project: z.string().optional().describe("Project name"),
-    tags: z.array(z.string()).optional().describe("Tags"),
+    project: z.string().optional(),
+    limit: z.number().optional().default(5),
   },
-  async ({ name, description, code, project, tags }) => {
-    const entry = { type: "pattern", name, description, code, project, tags };
-    const saved = appendEntry(MEMORY_FILES.patterns, entry);
-    return { content: [{ type: "text", text: `Pattern recorded: ${saved}` }] };
-  }
+  async (args) => ok(db.getEpisodes(args))
 );
 
 server.tool(
-  "save_session",
-  "Save a session summary when ending work",
+  "episode_open_loops",
+  "Получить все открытые задачи/вопросы из прошлых сессий",
+  { project: z.string().optional() },
+  async (args) => ok(db.getOpenLoops(args))
+);
+
+// =============================================================================
+// 3. INCIDENT MEMORY — ошибки, stack traces, fingerprints, фиксы
+// =============================================================================
+
+server.tool(
+  "incident_add",
+  "Записать ошибку/инцидент (автоматическая дедупликация по fingerprint)",
   {
-    summary: z.string().describe("What was accomplished"),
-    next_steps: z.string().optional().describe("What to do next"),
-    blockers: z.string().optional().describe("Current blockers"),
-    project: z.string().optional().describe("Project name"),
+    error_message: z.string().describe("Текст ошибки"),
+    stack_trace: z.string().optional(),
+    failed_command: z.string().optional(),
+    context: z.string().optional().describe("Что делали, когда произошла ошибка"),
+    probable_cause: z.string().optional(),
+    failed_attempts: z.array(z.string()).optional().describe("Что пробовали и не сработало"),
+    project: z.string().optional(),
+    service: z.string().optional(),
+    github_issue: z.string().optional(),
   },
-  async ({ summary, next_steps, blockers, project }) => {
-    const entry = { type: "session", summary, next_steps, blockers, project };
-    const saved = appendEntry(MEMORY_FILES.sessions, entry);
-    return { content: [{ type: "text", text: `Session saved: ${saved}` }] };
-  }
+  async (args) => ok(db.addIncident(args))
 );
 
 server.tool(
-  "search_memory",
-  "Search across all memory stores for relevant context",
+  "incident_fix",
+  "Записать проверенное исправление для инцидента",
   {
-    query: z.string().describe("Search query"),
-    store: z.enum(["all", "decisions", "errors", "patterns", "sessions"]).optional()
-      .describe("Which store to search (default: all)"),
+    id: z.number().describe("ID инцидента"),
+    verified_fix: z.string().describe("Что именно исправило проблему"),
+    probable_cause: z.string().optional().describe("Уточнённая причина"),
   },
-  async ({ query, store = "all" }) => {
-    const results = {};
-    const stores = store === "all" ? Object.keys(MEMORY_FILES) : [store];
-    for (const s of stores) {
-      if (MEMORY_FILES[s]) {
-        const found = searchEntries(MEMORY_FILES[s], query);
-        if (found.length > 0) results[s] = found;
-      }
-    }
-    const total = Object.values(results).flat().length;
-    return {
-      content: [{
-        type: "text",
-        text: total > 0
-          ? `Found ${total} results:\n${JSON.stringify(results, null, 2)}`
-          : `No results for "${query}"`,
-      }],
-    };
-  }
+  async (args) => ok(db.fixIncident(args.id, args))
 );
 
 server.tool(
-  "get_context",
-  "Get recent memory entries for session context loading",
+  "incident_find_similar",
+  "Найти похожие ошибки в памяти (FTS5 BM25 ranking)",
   {
-    limit: z.number().optional().describe("Max entries per store (default: 10)"),
+    error_message: z.string().describe("Текст ошибки для поиска похожих"),
+    limit: z.number().optional().default(5),
   },
-  async ({ limit = 10 }) => {
-    const context = {};
-    for (const [name, file] of Object.entries(MEMORY_FILES)) {
-      const entries = readEntries(file, limit);
-      if (entries.length > 0) context[name] = entries;
-    }
-    return {
-      content: [{
-        type: "text",
-        text: Object.keys(context).length > 0
-          ? JSON.stringify(context, null, 2)
-          : "Memory is empty. Start recording decisions, errors, and patterns.",
-      }],
-    };
-  }
+  async ({ error_message, limit }) => ok(db.findSimilarIncidents(error_message, limit))
 );
 
-// --- Resources ---
+server.tool(
+  "incident_list",
+  "Получить инциденты с фильтрами",
+  {
+    project: z.string().optional(),
+    service: z.string().optional(),
+    status: z.enum(["open", "investigating", "fixed", "wontfix", "duplicate"]).optional(),
+    limit: z.number().optional().default(10),
+  },
+  async (args) => ok(db.getIncidents(args))
+);
+
+// =============================================================================
+// 4. SOLUTION MEMORY — рабочие решения, паттерны, playbooks
+// =============================================================================
+
+server.tool(
+  "solution_add",
+  "Записать удачное решение/паттерн/playbook",
+  {
+    title: z.string().describe("Название решения"),
+    description: z.string().describe("Описание: что делает, когда применять"),
+    code: z.string().optional().describe("Код или сниппет"),
+    commands: z.array(z.string()).optional().describe("Команды"),
+    pattern_type: z.enum(["workflow", "command", "pattern", "playbook", "snippet", "config"]).optional(),
+    solves_incident: z.number().optional().describe("ID инцидента, который это решает"),
+    verified: z.boolean().optional(),
+    tags: z.array(z.string()).optional(),
+    project: z.string().optional(),
+    service: z.string().optional(),
+    github_pr: z.string().optional(),
+  },
+  async (args) => ok(db.addSolution(args))
+);
+
+server.tool(
+  "solution_verify",
+  "Пометить решение как проверенное",
+  { id: z.number() },
+  async ({ id }) => ok(db.verifySolution(id))
+);
+
+server.tool(
+  "solution_use",
+  "Зафиксировать использование решения (увеличивает use_count)",
+  { id: z.number() },
+  async ({ id }) => ok(db.useSolution(id))
+);
+
+server.tool(
+  "solution_rate",
+  "Оценить полезность решения (0-10)",
+  {
+    id: z.number(),
+    score: z.number().min(0).max(10),
+  },
+  async ({ id, score }) => ok(db.rateSolution(id, score))
+);
+
+server.tool(
+  "solution_find",
+  "Найти подходящие решения по описанию проблемы (FTS5 BM25)",
+  {
+    query: z.string().describe("Описание проблемы или задачи"),
+    limit: z.number().optional().default(5),
+  },
+  async ({ query, limit }) => ok(db.findSimilarSolutions(query, limit))
+);
+
+server.tool(
+  "solution_list",
+  "Получить решения с фильтрами",
+  {
+    project: z.string().optional(),
+    service: z.string().optional(),
+    pattern_type: z.enum(["workflow", "command", "pattern", "playbook", "snippet", "config"]).optional(),
+    verified: z.boolean().optional(),
+    limit: z.number().optional().default(10),
+  },
+  async (args) => ok(db.getSolutions(args))
+);
+
+// =============================================================================
+// 5. DECISION MEMORY — архитектурные решения, компромиссы
+// =============================================================================
+
+server.tool(
+  "decision_add",
+  "Записать архитектурное решение: что выбрали, почему, что сознательно не делаем",
+  {
+    title: z.string().describe("Название решения"),
+    context: z.string().describe("Контекст: зачем это решение понадобилось"),
+    chosen: z.string().describe("Что выбрали"),
+    alternatives: z.array(z.string()).optional().describe("Какие варианты рассматривали"),
+    tradeoffs: z.string().optional().describe("Чем жертвуем"),
+    not_doing: z.string().optional().describe("Что сознательно НЕ делаем"),
+    revisit_trigger: z.string().optional().describe("При каких условиях пересмотреть"),
+    supersedes: z.number().optional().describe("ID предыдущего решения, которое заменяем"),
+    tags: z.array(z.string()).optional(),
+    project: z.string().optional(),
+  },
+  async (args) => ok(db.addDecision(args))
+);
+
+server.tool(
+  "decision_list",
+  "Получить архитектурные решения",
+  {
+    project: z.string().optional(),
+    limit: z.number().optional().default(10),
+  },
+  async (args) => ok(db.getDecisions(args))
+);
+
+// =============================================================================
+// 6. CODE/CONTEXT MEMORY — код, инфра, доки, deployment knowledge
+// =============================================================================
+
+server.tool(
+  "context_add",
+  "Сохранить важный контекст: код, конфиг, deployment knowledge",
+  {
+    title: z.string().describe("Название"),
+    content: z.string().describe("Содержимое (код, конфиг, описание)"),
+    category: z.enum(["code", "infra", "docs", "deployment", "summary", "config", "api"]).optional(),
+    file_path: z.string().optional(),
+    language: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    project: z.string().optional(),
+    verified: z.boolean().optional(),
+  },
+  async (args) => ok(db.addContext(args))
+);
+
+server.tool(
+  "context_list",
+  "Получить сохранённые контексты",
+  {
+    project: z.string().optional(),
+    category: z.enum(["code", "infra", "docs", "deployment", "summary", "config", "api"]).optional(),
+    limit: z.number().optional().default(10),
+  },
+  async (args) => ok(db.getContexts(args))
+);
+
+// =============================================================================
+// CROSS-LAYER TOOLS — поиск, bootstrap, статистика
+// =============================================================================
+
+server.tool(
+  "memory_search",
+  "Поиск по всей памяти (FTS5 BM25 ranking) с фильтрами по типу и проекту",
+  {
+    query: z.string().describe("Поисковый запрос"),
+    tables: z.array(z.enum(["incidents", "solutions", "decisions", "contexts", "policies", "episodes"])).optional()
+      .describe("В каких слоях искать (по умолчанию — все)"),
+    project: z.string().optional(),
+    limit: z.number().optional().default(10),
+  },
+  async (args) => ok(db.search(args.query, args))
+);
+
+server.tool(
+  "memory_bootstrap",
+  "Загрузить контекст для старта сессии: policies, последние сессии, open incidents, top solutions, решения, open loops",
+  { project: z.string().optional() },
+  async ({ project }) => ok(db.getBootstrapContext(project))
+);
+
+server.tool(
+  "memory_stats",
+  "Статистика по всем слоям памяти",
+  {},
+  async () => ok(db.getStats())
+);
+
+// =============================================================================
+// RESOURCES
+// =============================================================================
 
 server.resource(
   "memory-stats",
   "memory://stats",
-  async (uri) => {
-    const stats = {};
-    for (const [name, file] of Object.entries(MEMORY_FILES)) {
-      if (fs.existsSync(file)) {
-        const lines = fs.readFileSync(file, "utf-8").trim().split("\n").filter(Boolean);
-        stats[name] = lines.length;
-      } else {
-        stats[name] = 0;
-      }
-    }
-    return {
-      contents: [{
-        uri: uri.href,
-        mimeType: "application/json",
-        text: JSON.stringify(stats, null, 2),
-      }],
-    };
-  }
+  async (uri) => ({
+    contents: [{
+      uri: uri.href,
+      mimeType: "application/json",
+      text: JSON.stringify(db.getStats(), null, 2),
+    }],
+  })
 );
 
-// Start server
+// =============================================================================
+// START
+// =============================================================================
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

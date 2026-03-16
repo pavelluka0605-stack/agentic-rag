@@ -149,14 +149,24 @@
 - Итого: 37 файлов, ~7800 строк кода
 
 ### Сессия 2026-03-16 (Dev Environment)
-- **Dev Memory System**: MCP memory server (Node.js) + JSONL stores + Claude Code hooks
-  - 6 MCP tools: add_decision, add_error, add_pattern, save_session, search_memory, get_context
-  - Self-diagnostics: 20 checks, все проходят
-  - `.claude/settings.json` с hooks и MCP config
+- **Dev Memory System v1**: MCP memory server (Node.js) + JSONL stores + Claude Code hooks
 - **VPS Runtime Layer**: tmux + systemd + bash wrapper scripts
-  - bootstrap.sh: one-time VPS setup (tmux, node, claude CLI, systemd unit)
-  - start.sh: 3-window tmux session (workspace, monitor, logs)
-  - stop.sh, restart.sh, connect.sh, health.sh (8 health checks)
-  - tmux.conf: 100k scrollback, mouse, status bar
-  - deploy-claude-code.yml: GitHub Actions workflow для деплоя
-  - claude.env.example: шаблон environment variables
+  - bootstrap.sh, start.sh, stop.sh, restart.sh, connect.sh, health.sh
+  - deploy-claude-code.yml: GitHub Actions workflow
+
+### Сессия 2026-03-16 (Knowledge + Memory + GitHub Layer)
+- **Dev Memory System v2**: Полная перестройка на SQLite + FTS5
+  - 7 таблиц: policies, episodes, incidents, solutions, decisions, contexts, github_events
+  - 6 FTS5 virtual tables с BM25 ranking + auto-sync triggers
+  - 22 MCP tools: CRUD + search + bootstrap + dedup + ranking + verify
+  - Дедупликация инцидентов по SHA256 fingerprint
+  - Решение: SQLite вместо Postgres/Qdrant (zero-ops, single file, FTS5 достаточно)
+- **GitHub Integration Layer**:
+  - Webhook receiver (server.js, порт 3900) → автоматическая запись в memory
+  - PR merged → solutions (verified)
+  - Issue opened (bug) → incidents
+  - Workflow failed → incidents (с fingerprint)
+  - Workflow succeeded after retry → solutions (verified)
+  - systemd unit: github-webhook.service
+- **Bootstrap обновлён**: теперь ставит memory-server + webhook на VPS
+- Smoke test пройден: все 22 tools работают, FTS5 поиск находит релевантные записи

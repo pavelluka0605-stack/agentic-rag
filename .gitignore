@@ -7,4 +7,9 @@ claude-chat/data/
 
 # Dev memory (local per-machine, not shared)
 .claude/memory/*.jsonl
+.claude/memory/*.db
+.claude/memory/*.db-wal
+.claude/memory/*.db-shm
 .claude/mcp/memory-server/node_modules/
+vps-runtime/github-webhook/node_modules/
+vps-runtime/github-webhook/.env

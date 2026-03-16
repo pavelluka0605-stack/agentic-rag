@@ -1,0 +1,10 @@
+{
+  "name": "github-webhook-receiver",
+  "version": "1.0.0",
+  "description": "GitHub webhook receiver → memory layer",
+  "type": "module",
+  "main": "server.js",
+  "dependencies": {
+    "better-sqlite3": "^12.0.0"
+  }
+}
