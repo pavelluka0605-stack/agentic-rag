@@ -202,46 +202,60 @@ agentic-rag/
 3. Дашборд/отчёты по продажам в Telegram (еженедельная сводка)
 4. Настройка webhook URL в BlueSales для P0-06 (нужен публичный URL N8N)
 
-## Dev Environment (Claude Code)
+## Dev Memory System (многослойная)
 
 ### Архитектура
-JSONL append-only logs + Node.js MCP server + Claude Code native hooks.
+SQLite + FTS5 (BM25 ranking) | Node.js MCP server | 6 слоёв памяти | 22 инструмента
 
-### Структура
-```
-.claude/
-├── settings.json              # Hooks + MCP конфигурация
-├── hooks/
-│   ├── session-start.sh       # Загрузка контекста памяти
-│   └── diagnose.sh            # Самодиагностика среды
-├── memory/
-│   ├── decisions.jsonl        # Архитектурные решения
-│   ├── errors.jsonl           # Ошибки и исправления
-│   ├── patterns.jsonl         # Успешные паттерны/рецепты
-│   └── sessions.jsonl         # Итоги сессий
-└── mcp/
-    └── memory-server/         # MCP сервер памяти (Node.js)
-        ├── index.js
-        └── package.json
-```
+### Хранилище
+- **БД:** `.claude/memory/memory.db` (SQLite, WAL mode)
+- **Бэкап:** `cp memory.db memory.db.bak`
+- **Zero-ops:** нет Docker, нет Postgres, один файл
 
-### MCP Tools (memory server)
-| Tool | Описание |
-|------|----------|
-| `add_decision` | Записать архитектурное решение |
-| `add_error` | Записать ошибку и исправление |
-| `add_pattern` | Записать успешный паттерн/рецепт |
-| `save_session` | Сохранить итоги сессии |
-| `search_memory` | Поиск по всем хранилищам |
-| `get_context` | Загрузить последние записи для контекста |
+### 6 слоёв памяти
+
+| # | Слой | Таблица | Описание |
+|---|------|---------|----------|
+| 1 | **Policy** | `policies` | Правила, ограничения, конвенции, known limitations |
+| 2 | **Episodic** | `episodes` | Сессии, прогресс, open loops, где остановились |
+| 3 | **Incident** | `incidents` | Ошибки, stack traces, fingerprints, фиксы, дедупликация |
+| 4 | **Solution** | `solutions` | Рабочие решения, паттерны, playbooks, verified/rated |
+| 5 | **Decision** | `decisions` | Архитектурные решения, компромиссы, что НЕ делаем |
+| 6 | **Context** | `contexts` | Код, инфра, доки, deployment knowledge |
+
+### MCP Tools (22 инструмента)
+
+**Policy:** `policy_add`, `policy_list`
+**Episodic:** `episode_save`, `episode_list`, `episode_open_loops`
+**Incident:** `incident_add` (auto-dedup), `incident_fix`, `incident_find_similar`, `incident_list`
+**Solution:** `solution_add`, `solution_verify`, `solution_use`, `solution_rate`, `solution_find`, `solution_list`
+**Decision:** `decision_add`, `decision_list`
+**Context:** `context_add`, `context_list`
+**Cross-layer:** `memory_search` (FTS5 BM25), `memory_bootstrap`, `memory_stats`
 
 ### Правила работы с памятью
-1. **Старт сессии**: `get_context` — загрузить накопленный опыт
-2. **Решение принято**: `add_decision` — записать что и почему
-3. **Ошибка исправлена**: `add_error` — записать ошибку, причину, fix
-4. **Паттерн найден**: `add_pattern` — записать рецепт для повторного использования
-5. **Конец сессии**: `save_session` — записать итоги и next steps
-6. **Нужен контекст**: `search_memory` — найти релевантные записи
+1. **Старт сессии**: `memory_bootstrap` — загрузить policies, open incidents, top solutions, open loops
+2. **Решение принято**: `decision_add` — записать что, почему, альтернативы, что НЕ делаем
+3. **Ошибка найдена**: `incident_add` — auto-dedup по fingerprint
+4. **Ошибка исправлена**: `incident_fix` — записать verified fix
+5. **Нашёл похожую ошибку**: `incident_find_similar` — FTS5 поиск
+6. **Удачный паттерн**: `solution_add` → `solution_verify` → `solution_rate`
+7. **Конец сессии**: `episode_save` — итоги, open loops, что осталось
+8. **Нужен контекст**: `memory_search` — поиск по всем слоям
+
+### GitHub → Memory (автоматически через webhook)
+- **PR merged** → `solutions` (verified)
+- **Issue opened (bug label)** → `incidents`
+- **Issue opened (other)** → `episodes` (open loop)
+- **Workflow failed** → `incidents` (с fingerprint)
+- **Workflow succeeded after retry** → `solutions` (verified)
+
+### Webhook receiver
+- Порт: 3900
+- Endpoint: `POST /webhook/github`
+- Health: `GET /health`
+- Stats: `GET /stats`
+- systemd: `github-webhook.service`
 
 ### Диагностика
 ```bash
@@ -270,6 +284,11 @@ tmux + systemd + bash wrapper scripts.
 ├── logs/
 │   ├── session-*.log   # Daily session logs
 │   └── events.log      # Start/stop events
+├── memory/
+│   └── memory.db       # SQLite database (все 6 слоёв)
+├── memory-server/      # MCP memory server (Node.js)
+├── github-webhook/     # GitHub webhook → memory
+│   └── .env            # WEBHOOK_PORT, SECRET, DB_PATH
 └── workspace/          # Git repos & working directories
 ```
 

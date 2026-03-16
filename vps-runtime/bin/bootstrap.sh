@@ -176,7 +176,76 @@ UNITEOF
 
 systemctl daemon-reload
 systemctl enable claude-code.service 2>/dev/null || true
-ok "systemd unit installed and enabled"
+ok "systemd unit: claude-code.service"
+
+# ── 8. Install MCP memory server ───────────────────────────────────────────
+
+info "8/9 Installing MCP memory server..."
+
+MCP_DIR="/opt/claude-code/memory-server"
+MEMORY_DIR="/opt/claude-code/memory"
+mkdir -p "$MCP_DIR" "$MEMORY_DIR"
+
+if [ -d "$SCRIPT_DIR/../../.claude/mcp/memory-server" ]; then
+  cp "$SCRIPT_DIR/../../.claude/mcp/memory-server/package.json" "$MCP_DIR/"
+  cp "$SCRIPT_DIR/../../.claude/mcp/memory-server/index.js" "$MCP_DIR/"
+  cp "$SCRIPT_DIR/../../.claude/mcp/memory-server/db.js" "$MCP_DIR/"
+  cp "$SCRIPT_DIR/../../.claude/mcp/memory-server/github.js" "$MCP_DIR/"
+  cp -r "$SCRIPT_DIR/../../.claude/mcp/memory-server/migrations" "$MCP_DIR/"
+  cd "$MCP_DIR" && npm install --omit=dev 2>&1 | tail -3
+  ok "MCP memory server installed"
+else
+  warn "MCP memory server source not found"
+fi
+
+# ── 9. Install GitHub Webhook Receiver ──────────────────────────────────────
+
+info "9/9 Installing GitHub webhook receiver..."
+
+WEBHOOK_DIR="/opt/claude-code/github-webhook"
+mkdir -p "$WEBHOOK_DIR"
+
+if [ -d "$SCRIPT_DIR/../../vps-runtime/github-webhook" ]; then
+  cp "$SCRIPT_DIR/../../vps-runtime/github-webhook/package.json" "$WEBHOOK_DIR/"
+  cp "$SCRIPT_DIR/../../vps-runtime/github-webhook/server.js" "$WEBHOOK_DIR/"
+  cd "$WEBHOOK_DIR" && npm install --omit=dev 2>&1 | tail -3
+  ok "GitHub webhook receiver installed"
+fi
+
+# Webhook env
+WEBHOOK_ENV="$WEBHOOK_DIR/.env"
+if [ ! -f "$WEBHOOK_ENV" ] || [ "$FORCE" = "--force" ]; then
+  cat > "$WEBHOOK_ENV" << 'WEBHOOKENV'
+WEBHOOK_PORT=3900
+GITHUB_WEBHOOK_SECRET=
+MEMORY_DB_PATH=/opt/claude-code/memory/memory.db
+WEBHOOKENV
+  ok "Webhook .env created"
+fi
+
+# Webhook systemd unit
+cat > /etc/systemd/system/github-webhook.service << 'UNITEOF'
+[Unit]
+Description=GitHub Webhook Receiver → Memory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/claude-code/github-webhook
+EnvironmentFile=/opt/claude-code/github-webhook/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+
+systemctl daemon-reload
+systemctl enable github-webhook.service 2>/dev/null || true
+ok "systemd unit: github-webhook.service"
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 
