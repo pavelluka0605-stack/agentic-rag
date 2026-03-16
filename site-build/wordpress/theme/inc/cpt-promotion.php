@@ -128,6 +128,16 @@ function kuhni_rema_promotion_acf_fields() {
                     'single'  => 'Карточка кухни',
                 ),
             ),
+            array(
+                'key'           => 'field_promo_discount',
+                'label'         => 'Скидка (%)',
+                'name'          => 'promo_discount',
+                'type'          => 'number',
+                'instructions'  => 'Процент скидки (если применимо)',
+                'min'           => 0,
+                'max'           => 100,
+                'step'          => 1,
+            ),
         ),
         'location' => array(
             array(
