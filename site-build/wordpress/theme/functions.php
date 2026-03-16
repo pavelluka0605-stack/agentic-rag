@@ -109,6 +109,25 @@ function kuhni_rema_enqueue_assets() {
         );
     }
 
+    // Secondary pages (about, contacts, FAQ, reviews, portfolio, thanks, privacy)
+    if (
+        is_page_template( 'templates/page-about.php' ) ||
+        is_page_template( 'templates/page-contacts.php' ) ||
+        is_page_template( 'templates/page-faq.php' ) ||
+        is_page_template( 'templates/page-reviews.php' ) ||
+        is_page_template( 'templates/page-portfolio.php' ) ||
+        is_page_template( 'templates/page-thanks.php' ) ||
+        is_page_template( 'templates/page-privacy.php' ) ||
+        is_singular( 'project' )
+    ) {
+        wp_enqueue_style(
+            'kuhni-rema-pages',
+            KUHNI_REMA_URI . '/assets/css/pages.css',
+            array( 'kuhni-rema-components' ),
+            KUHNI_REMA_VERSION
+        );
+    }
+
     // Responsive (mobile-first overrides)
     wp_enqueue_style(
         'kuhni-rema-responsive',
