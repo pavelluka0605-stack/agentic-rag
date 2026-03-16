@@ -1,0 +1,173 @@
+{
+  "_doc": "Subagent strategy — какие роли, когда вызывать, на какой модели, read-only или нет",
+  "_version": "1.0.0",
+
+  "roles": {
+    "architect": {
+      "description": "Сравнивает варианты, выбирает схему, следит за простотой",
+      "subagent_type": "Plan",
+      "model": "opus",
+      "read_only": true,
+      "when": [
+        "Выбор между несколькими архитектурными вариантами",
+        "Планирование нового модуля/сервиса",
+        "Оценка trade-offs перед решением",
+        "Ревью существующей архитектуры"
+      ],
+      "parallel": true,
+      "typical_prompt_prefix": "Проанализируй архитектурные варианты для задачи:"
+    },
+
+    "repo-explorer": {
+      "description": "Исследует структуру проекта, собирает bootstrap knowledge",
+      "subagent_type": "Explore",
+      "model": "sonnet",
+      "read_only": true,
+      "when": [
+        "Начало работы с незнакомой частью кода",
+        "Поиск файлов по паттерну",
+        "Анализ зависимостей между модулями",
+        "Сбор контекста перед изменениями"
+      ],
+      "parallel": true,
+      "typical_prompt_prefix": "Исследуй кодовую базу:"
+    },
+
+    "memory-engineer": {
+      "description": "Schema, retrieval, ranking, dedup, verification памяти",
+      "subagent_type": "general-purpose",
+      "model": "sonnet",
+      "read_only": false,
+      "when": [
+        "Проблемы с retrieval качеством",
+        "Оптимизация FTS5 запросов",
+        "Миграция схемы БД",
+        "Проверка целостности данных памяти"
+      ],
+      "parallel": false,
+      "typical_prompt_prefix": "Работай с системой памяти (SQLite+FTS5):"
+    },
+
+    "incident-analyst": {
+      "description": "Анализ ошибок, fingerprint, root cause, связь с прошлыми случаями",
+      "subagent_type": "general-purpose",
+      "model": "sonnet",
+      "read_only": true,
+      "when": [
+        "Повторяющаяся ошибка без очевидной причины",
+        "Нужен глубокий анализ stack trace",
+        "Связь текущей ошибки с прошлыми инцидентами",
+        "Классификация и приоритизация ошибки"
+      ],
+      "parallel": true,
+      "typical_prompt_prefix": "Проанализируй инцидент. Определи root cause, класс ошибки, связь с прошлыми случаями:"
+    },
+
+    "repair-agent": {
+      "description": "Безопасные fixes с обязательной проверкой после",
+      "subagent_type": "general-purpose",
+      "model": "opus",
+      "read_only": false,
+      "isolation": "worktree",
+      "when": [
+        "Repair loop предложил fix, нужно применить",
+        "Исправление конкретного бага с тестированием",
+        "Применение verified solution из памяти"
+      ],
+      "parallel": false,
+      "typical_prompt_prefix": "Исправь проблему и обязательно проверь fix:"
+    },
+
+    "qa-verifier": {
+      "description": "Build/lint/test/smoke проверки, подтверждение/опровержение фиксов",
+      "subagent_type": "general-purpose",
+      "model": "haiku",
+      "read_only": true,
+      "when": [
+        "После любого fix — нужно подтвердить",
+        "Перед закрытием задачи",
+        "Перед commit/push",
+        "Smoke test после деплоя"
+      ],
+      "parallel": true,
+      "typical_prompt_prefix": "Проверь что всё работает. Запусти тесты, lint, проверь синтаксис:"
+    },
+
+    "github-operator": {
+      "description": "GitHub integration: webhook, issues, PRs, workflows, secrets",
+      "subagent_type": "general-purpose",
+      "model": "sonnet",
+      "read_only": false,
+      "when": [
+        "Настройка webhook",
+        "Создание/закрытие issues",
+        "Работа с PR (review, merge)",
+        "Проверка статуса workflows",
+        "Управление secrets"
+      ],
+      "parallel": false,
+      "typical_prompt_prefix": "Выполни GitHub операцию:"
+    },
+
+    "docs-writer": {
+      "description": "README, install/run/backup/restore, handoff docs",
+      "subagent_type": "general-purpose",
+      "model": "sonnet",
+      "read_only": false,
+      "when": [
+        "Нужно обновить документацию после изменений",
+        "Handoff другому разработчику",
+        "Инструкции по установке/настройке",
+        "Changelog и release notes"
+      ],
+      "parallel": true,
+      "typical_prompt_prefix": "Напиши/обнови документацию:"
+    }
+  },
+
+  "workflows": {
+    "investigate-and-fix": {
+      "description": "Полный цикл: исследование → анализ → фикс → проверка",
+      "steps": [
+        {"role": "repo-explorer", "action": "Найти связанные файлы", "parallel": false},
+        {"role": "incident-analyst", "action": "Определить root cause", "parallel": false},
+        {"role": "repair-agent", "action": "Применить fix", "parallel": false},
+        {"role": "qa-verifier", "action": "Подтвердить fix", "parallel": false}
+      ]
+    },
+    "architecture-decision": {
+      "description": "Сравнение вариантов → решение → документирование",
+      "steps": [
+        {"role": "repo-explorer", "action": "Собрать текущий контекст", "parallel": true},
+        {"role": "architect", "action": "Сравнить варианты", "parallel": true},
+        {"role": "docs-writer", "action": "Задокументировать решение", "parallel": false}
+      ]
+    },
+    "pre-deploy-check": {
+      "description": "Проверки перед деплоем",
+      "steps": [
+        {"role": "qa-verifier", "action": "Lint + test + build", "parallel": true},
+        {"role": "repo-explorer", "action": "Проверить незакоммиченное", "parallel": true},
+        {"role": "github-operator", "action": "Проверить CI статус", "parallel": true}
+      ]
+    },
+    "session-bootstrap": {
+      "description": "Старт сессии — загрузка контекста",
+      "steps": [
+        {"role": "repo-explorer", "action": "Обзор изменений с прошлой сессии", "parallel": true},
+        {"role": "memory-engineer", "action": "Загрузить open loops и инциденты", "parallel": true}
+      ]
+    }
+  },
+
+  "model_selection": {
+    "opus": ["architect", "repair-agent"],
+    "sonnet": ["repo-explorer", "memory-engineer", "incident-analyst", "github-operator", "docs-writer"],
+    "haiku": ["qa-verifier"]
+  },
+
+  "permissions": {
+    "read_only": ["architect", "repo-explorer", "incident-analyst", "qa-verifier"],
+    "read_write": ["memory-engineer", "repair-agent", "github-operator", "docs-writer"]
+  }
+}

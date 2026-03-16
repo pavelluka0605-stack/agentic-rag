@@ -171,7 +171,18 @@ else
   echo "1" > "$REPAIR_COUNT_FILE"
 fi
 
-# ── 5. Очистка старых temp-файлов repair loop ─────────────────────────────────
+# ── 5. Subagent рекомендации ────────────────────────────────────────────────
+
+REPAIR_ATTEMPTS="${ATTEMPTS:-1}"
+if [ "$REPAIR_ATTEMPTS" -ge 2 ]; then
+  echo ""
+  echo "🤖 Рекомендация по subagents:"
+  echo "   1. Запусти incident-analyst (Explore, read-only) для глубокого анализа root cause"
+  echo "   2. Затем repair-agent (general-purpose, worktree) для безопасного fix"
+  echo "   3. Затем qa-verifier (haiku) для подтверждения"
+fi
+
+# ── 6. Очистка старых temp-файлов repair loop ─────────────────────────────────
 find /tmp -maxdepth 1 -name "claude-repair-*" -mtime +1 -delete 2>/dev/null
 
 exit 0
