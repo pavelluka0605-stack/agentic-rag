@@ -257,7 +257,25 @@ SQLite + FTS5 (BM25 ranking) | Node.js MCP server | 6 слоёв памяти | 
 - Stats: `GET /stats`
 - systemd: `github-webhook.service`
 
-### Диагностика
+### Hooks (самодиагностика + самоисправление)
+
+| Event | Hook | Что делает |
+|-------|------|-----------|
+| `PreToolUse[Bash]` | `pre-bash.sh` | Блокирует `rm -rf /`, предупреждает об опасных командах, ищет похожие инциденты |
+| `PreToolUse[Edit\|Write]` | `pre-edit.sh` | Блокирует запись в `.env`/credentials, предупреждает при правке инфра-файлов |
+| `PostToolUse[Bash]` | `post-bash.sh` | При ошибке: записывает incident, ищет похожие фиксы, запускает repair retrieval |
+| `Stop` | `session-end.sh` | Напоминает сохранить episode, закрыть incidents, записать decisions |
+
+### Self-Healing (repair loop)
+1. Ошибка → классификация (9 классов: permissions, network, syntax, dependency...)
+2. Retrieval похожих инцидентов и solutions из памяти
+3. Рекомендация фикса (если есть verified fix — предлагает его)
+4. Лимит 3 попытки на уникальную ошибку — потом СТОП
+5. Каждая попытка должна быть ДРУГОЙ
+6. Успешный фикс → `incident_fix` + `solution_add`
+7. Неудачный → запись в `failed_attempts`, не скрывать
+
+### Диагностика (38 проверок)
 ```bash
 bash .claude/hooks/diagnose.sh
 ```
