@@ -1,0 +1,755 @@
+/* ==========================================================================
+   Catalog — Кухни Рема (кухнирема.рф)
+   Styles for: page-catalog.php, archive-kitchen.php, single-kitchen.php
+   Depends on: design-tokens.css, base.css, components.css
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. Catalog Hero
+   ========================================================================== */
+
+.catalog-hero {
+  position: relative;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.catalog-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(28, 28, 28, 0.85) 0%, rgba(28, 28, 28, 0.5) 100%);
+  z-index: 1;
+}
+
+.catalog-hero__inner {
+  position: relative;
+  z-index: 2;
+}
+
+.catalog-hero__title {
+  color: var(--color-text-on-dark);
+  font-size: var(--font-size-h1);
+  margin-bottom: var(--spacing-sm);
+}
+
+.catalog-hero__subtitle {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.catalog-hero__subtitle strong {
+  color: var(--color-primary);
+}
+
+@media (min-width: 768px) {
+  .catalog-hero {
+    min-height: 340px;
+  }
+}
+
+
+/* ==========================================================================
+   2. Catalog Filters
+   ========================================================================== */
+
+.catalog-filters {
+  padding-top: var(--spacing-lg);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.catalog-filter__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.catalog-filter__group {
+  flex: 1;
+  min-width: 0;
+}
+
+.catalog-filter__label {
+  display: block;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Filter checkboxes */
+.catalog-filter__checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.catalog-filter__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 6px 12px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-body-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  user-select: none;
+}
+
+.catalog-filter__checkbox:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.catalog-filter__checkbox input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.catalog-filter__checkbox:has(input:checked) {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-on-dark);
+}
+
+/* Filter select */
+.catalog-filter__select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body-sm);
+  font-family: var(--font-body);
+  background-color: var(--color-surface-light);
+  cursor: pointer;
+}
+
+.catalog-filter__select:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(194, 97, 58, 0.15);
+}
+
+/* Price slider track (placeholder) */
+.catalog-filter__slider-track {
+  height: 4px;
+  background-color: var(--color-border-light);
+  border-radius: 2px;
+  margin-top: var(--spacing-sm);
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .catalog-filter__row {
+    flex-direction: row;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .catalog-filter__group--price {
+    flex: 0 0 200px;
+  }
+
+  .catalog-filter__group--sort {
+    flex: 0 0 180px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .catalog-filter__row {
+    flex-wrap: nowrap;
+  }
+}
+
+
+/* ==========================================================================
+   3. Catalog Grid (kitchen cards)
+   ========================================================================== */
+
+.catalog-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+@media (min-width: 480px) {
+  .catalog-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .catalog-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* 4-column variant (used for related kitchens on single) */
+.catalog-grid--4 {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+  .catalog-grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .catalog-grid--4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Kitchen card overrides for catalog context */
+.card--kitchen__link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.card--kitchen__image {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background-color: var(--color-bg-light);
+}
+
+.card--kitchen__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-slow);
+}
+
+.card--kitchen:hover .card--kitchen__image img {
+  transform: scale(1.04);
+}
+
+/* Badges overlay on card image */
+.card--kitchen__badges {
+  position: absolute;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  display: flex;
+  gap: var(--spacing-xs);
+  z-index: 2;
+}
+
+.card--kitchen__body {
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+}
+
+.card--kitchen__title {
+  font-size: var(--font-size-h5);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-xs);
+  line-height: var(--line-height-tight);
+}
+
+.card--kitchen__price {
+  margin-bottom: var(--spacing-sm);
+}
+
+.card--kitchen__dimensions {
+  display: inline-block;
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-secondary);
+  margin-right: var(--spacing-sm);
+}
+
+.card--kitchen__material {
+  display: inline-block;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-light);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+/* Empty state */
+.catalog-grid__empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--spacing-3xl) var(--spacing-lg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+}
+
+/* Results count */
+.catalog-results-count {
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-lg);
+}
+
+
+/* ==========================================================================
+   4. Pagination
+   ========================================================================== */
+
+.catalog-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-2xl);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.catalog-pagination .page-numbers {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: var(--transition-fast);
+}
+
+.catalog-pagination .page-numbers:hover {
+  background-color: rgba(194, 97, 58, 0.08);
+  color: var(--color-primary);
+}
+
+.catalog-pagination .page-numbers.current {
+  background-color: var(--color-primary);
+  color: var(--color-text-on-dark);
+}
+
+.catalog-pagination .page-numbers.dots {
+  pointer-events: none;
+  color: var(--color-text-muted);
+}
+
+.catalog-pagination .prev,
+.catalog-pagination .next {
+  font-weight: var(--font-weight-semibold);
+}
+
+
+/* ==========================================================================
+   5. Competitor Project Block
+   ========================================================================== */
+
+.competitor-project__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.competitor-project__title {
+  font-size: var(--font-size-h3);
+  margin-bottom: var(--spacing-sm);
+}
+
+.competitor-project__subtitle {
+  color: var(--color-text-secondary);
+}
+
+.competitor-project__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.competitor-project__submit {
+  margin-top: var(--spacing-sm);
+}
+
+@media (min-width: 768px) {
+  .competitor-project__inner {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .competitor-project__text {
+    flex: 1;
+  }
+
+  .competitor-project__form {
+    flex: 1;
+  }
+
+  .competitor-project__fields {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .competitor-project__fields .form-group {
+    flex: 1;
+    min-width: 180px;
+  }
+}
+
+
+/* ==========================================================================
+   6. Advantages Grid (catalog page)
+   ========================================================================== */
+
+.advantages__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+.advantages__card {
+  text-align: center;
+  padding: var(--spacing-lg);
+}
+
+.advantages__icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: var(--spacing-md);
+}
+
+.advantages__title {
+  font-size: var(--font-size-h5);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--spacing-sm);
+}
+
+.advantages__desc {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body-sm);
+}
+
+@media (min-width: 768px) {
+  .advantages__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .advantages__grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+
+/* ==========================================================================
+   7. Single Kitchen — Layout
+   ========================================================================== */
+
+.kitchen-single__layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  padding-top: var(--spacing-lg);
+  padding-bottom: var(--spacing-xl);
+}
+
+@media (min-width: 768px) {
+  .kitchen-single__layout {
+    flex-direction: row;
+    gap: var(--spacing-2xl);
+  }
+
+  .kitchen-single__gallery {
+    flex: 3;
+    min-width: 0;
+  }
+
+  .kitchen-single__sidebar {
+    flex: 2;
+    min-width: 280px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .kitchen-single__gallery {
+    flex: 5;
+  }
+
+  .kitchen-single__sidebar {
+    flex: 3;
+  }
+}
+
+
+/* ==========================================================================
+   8. Single Kitchen — Gallery
+   ========================================================================== */
+
+.kitchen-gallery__tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.kitchen-gallery__tab {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-full);
+  background: transparent;
+  font-size: var(--font-size-body-sm);
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.kitchen-gallery__tab--active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-on-dark);
+}
+
+.kitchen-gallery__main {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: var(--color-bg-light);
+}
+
+.kitchen-gallery__image {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.kitchen-gallery__badge {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  z-index: 2;
+}
+
+.kitchen-gallery__thumbs {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--spacing-xs);
+}
+
+.kitchen-gallery__thumb {
+  flex: 0 0 auto;
+  width: 72px;
+  height: 54px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+  transition: var(--transition-fast);
+}
+
+.kitchen-gallery__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.kitchen-gallery__thumb--active {
+  border-color: var(--color-primary);
+}
+
+.kitchen-gallery__thumb:hover {
+  border-color: var(--color-primary);
+}
+
+.kitchen-gallery__slides--hidden {
+  display: none;
+}
+
+
+/* ==========================================================================
+   9. Single Kitchen — Specs Card (kitchen-detail)
+   ========================================================================== */
+
+.kitchen-detail {
+  background-color: var(--color-surface-light);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.kitchen-detail__title {
+  font-size: var(--font-size-h3);
+  margin-bottom: var(--spacing-md);
+  line-height: var(--line-height-heading);
+}
+
+.kitchen-detail__price {
+  margin-bottom: var(--spacing-md);
+}
+
+.kitchen-detail__price .price {
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-price);
+  color: var(--color-primary);
+}
+
+.kitchen-detail__price .price--sale .price__old {
+  font-size: var(--font-size-lg);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.kitchen-detail__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Specs table */
+.kitchen-detail__specs {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kitchen-detail__specs tr {
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.kitchen-detail__specs tr:last-child {
+  border-bottom: none;
+}
+
+.kitchen-detail__spec-label,
+.kitchen-detail__spec-value {
+  padding: 10px 0;
+  font-size: var(--font-size-body-sm);
+}
+
+.kitchen-detail__spec-label {
+  color: var(--color-text-secondary);
+  width: 45%;
+}
+
+.kitchen-detail__spec-value {
+  font-weight: var(--font-weight-medium);
+  text-align: right;
+}
+
+
+/* ==========================================================================
+   10. Single Kitchen — CTA Sidebar
+   ========================================================================== */
+
+.kitchen-cta-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+.kitchen-cta-sidebar__btn {
+  width: 100%;
+  justify-content: center;
+}
+
+
+/* ==========================================================================
+   11. Single Kitchen — Equipment
+   ========================================================================== */
+
+.kitchen-detail__section-title {
+  font-size: var(--font-size-h3);
+  margin-bottom: var(--spacing-lg);
+}
+
+.kitchen-detail__equipment-content {
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-body);
+}
+
+.kitchen-detail__equipment-content p {
+  margin-bottom: var(--spacing-md);
+}
+
+.kitchen-detail__equipment-content ul {
+  padding-left: var(--spacing-lg);
+}
+
+
+/* ==========================================================================
+   12. Related Kitchens
+   ========================================================================== */
+
+.related-kitchens__title {
+  font-size: var(--font-size-h3);
+  margin-bottom: var(--spacing-xl);
+}
+
+
+/* ==========================================================================
+   13. Trust Block (single kitchen)
+   ========================================================================== */
+
+.trust-block__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xl);
+  justify-content: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.trust-block__item {
+  text-align: center;
+}
+
+.trust-block__link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.trust-block__number {
+  display: block;
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary);
+}
+
+.trust-block__label {
+  display: block;
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+.trust-block__partners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xl);
+  justify-content: center;
+  align-items: center;
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.trust-block__partner-logo {
+  max-height: 48px;
+  width: auto;
+  filter: grayscale(100%);
+  opacity: 0.6;
+  transition: var(--transition-base);
+}
+
+.trust-block__partner:hover .trust-block__partner-logo {
+  filter: grayscale(0%);
+  opacity: 1;
+}
