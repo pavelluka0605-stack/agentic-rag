@@ -1,0 +1,427 @@
+/* ==========================================================================
+   Responsive CSS — Кухни Рема (кухнирема.рф)
+   Mobile-first overrides (76.7% mobile traffic)
+   Depends on: design-tokens.css, base.css, components.css
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. Header — Mobile (< 768px)
+   ========================================================================== */
+
+.site-header {
+  height: 56px;
+  padding: 0 var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  background-color: var(--color-surface-light);
+}
+
+.header__nav,
+.header__hours,
+.header__cta {
+  display: none;
+}
+
+.header__burger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Phone link: icon only on mobile */
+.header__phone .header__phone-text {
+  display: none;
+}
+
+/* Mobile slide-in nav */
+.header__mobile-nav {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  width: 280px;
+  height: calc(100vh - 56px);
+  background-color: var(--color-surface-light);
+  transform: translateX(100%);
+  transition: transform var(--transition-base);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-overlay);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.menu-open .header__mobile-nav {
+  transform: translateX(0);
+}
+
+/* Overlay behind mobile nav */
+body.menu-open::after {
+  content: "";
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: calc(var(--z-overlay) - 1);
+}
+
+/* Prevent body scroll when menu open */
+body.menu-open {
+  overflow: hidden;
+}
+
+
+/* ==========================================================================
+   2. Header — Tablet / Desktop (>= 768px)
+   ========================================================================== */
+
+@media (min-width: 768px) {
+  .site-header {
+    height: 72px;
+  }
+
+  .header__burger {
+    display: none;
+  }
+
+  .header__nav {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+  }
+
+  .header__hours {
+    display: block;
+  }
+
+  .header__cta {
+    display: inline-flex;
+  }
+
+  .header__phone .header__phone-text {
+    display: inline;
+  }
+
+  .header__mobile-nav {
+    display: none;
+  }
+
+  /* Remove overlay on desktop */
+  body.menu-open::after {
+    display: none;
+  }
+}
+
+
+/* ==========================================================================
+   3. Footer — Mobile (< 768px)
+   ========================================================================== */
+
+.footer__columns {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Accordion behavior for catalog and links sections */
+.footer__catalog .footer__accordion-content,
+.footer__links .footer__accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--transition-base);
+}
+
+.footer__catalog[data-accordion].is-open .footer__accordion-content,
+.footer__links[data-accordion].is-open .footer__accordion-content {
+  max-height: 500px;
+}
+
+/* Accordion toggle indicator */
+.footer__accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--spacing-md) 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-heading);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-body);
+  color: var(--color-text-on-dark);
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border-dark);
+}
+
+.footer__accordion-toggle::after {
+  content: "+";
+  font-size: 20px;
+  transition: transform var(--transition-fast);
+}
+
+[data-accordion].is-open .footer__accordion-toggle::after {
+  content: "\2212"; /* minus sign */
+}
+
+/* Contacts section always visible */
+.footer__contacts .footer__accordion-content {
+  max-height: none;
+  overflow: visible;
+}
+
+@media (min-width: 768px) {
+  .footer__columns {
+    flex-direction: row;
+    gap: var(--spacing-xl);
+  }
+
+  /* Disable accordion on desktop */
+  .footer__catalog .footer__accordion-content,
+  .footer__links .footer__accordion-content {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .footer__accordion-toggle {
+    pointer-events: none;
+    border-bottom: none;
+  }
+
+  .footer__accordion-toggle::after {
+    display: none;
+  }
+}
+
+
+/* ==========================================================================
+   4. Grid — Mobile Override
+   ========================================================================== */
+
+/* On mobile, all grid items span full width */
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .grid > [class*="col-"] {
+    grid-column: span 1;
+  }
+}
+
+/* col-md-* classes already defined in base.css at >= 768px */
+/* col-lg-* classes already defined in base.css at >= 1024px */
+
+
+/* ==========================================================================
+   5. Cards — Mobile / Catalog Grid
+   ========================================================================== */
+
+.catalog-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 768px) {
+  .catalog-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-lg);
+  }
+}
+
+@media (min-width: 1024px) {
+  .catalog-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Card images: full width on mobile */
+.card--kitchen .card__image {
+  width: 100%;
+}
+
+
+/* ==========================================================================
+   6. Forms — Mobile (iOS zoom prevention & touch targets)
+   ========================================================================== */
+
+.form-input,
+.form-select {
+  font-size: 16px; /* prevents iOS auto-zoom on focus */
+}
+
+.btn {
+  min-height: 48px;
+  min-width: 48px; /* WCAG touch target minimum */
+}
+
+
+/* ==========================================================================
+   7. Quiz — Mobile
+   ========================================================================== */
+
+.quiz__options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 768px) {
+  .quiz__options {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .quiz__options {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Sticky quiz navigation at bottom */
+.quiz__nav {
+  position: sticky;
+  bottom: 0;
+  background-color: var(--color-surface-light);
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--color-border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+  z-index: var(--z-sticky);
+}
+
+
+/* ==========================================================================
+   8. CTA Sticky — Mobile
+   ========================================================================== */
+
+/* Hidden by default (set in components.css, reinforced here) */
+.cta-sticky {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .cta-sticky.is-visible {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+}
+
+
+/* ==========================================================================
+   9. Kitchen Detail — Mobile
+   ========================================================================== */
+
+.kitchen-detail {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+.kitchen-detail__gallery {
+  width: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kitchen-detail__gallery-track {
+  display: flex;
+  gap: 0;
+}
+
+.kitchen-detail__gallery-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+}
+
+.kitchen-detail__gallery-slide img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .kitchen-detail {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .kitchen-detail__gallery {
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+}
+
+
+/* ==========================================================================
+   10. Hero — Mobile
+   ========================================================================== */
+
+.hero {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+}
+
+.hero__title {
+  font-size: var(--font-size-h2);
+}
+
+@media (min-width: 768px) {
+  .hero {
+    min-height: 90vh;
+  }
+
+  .hero__title {
+    font-size: var(--font-size-h1);
+  }
+}
+
+
+/* ==========================================================================
+   11. Typography — Mobile
+   Already handled in design-tokens.css via :root (mobile-first) and
+   @media overrides at 768px / 1024px. No additional rules needed here.
+   ========================================================================== */
+
+
+/* ==========================================================================
+   12. Utility — Responsive Visibility
+   ========================================================================== */
+
+/* Hide on mobile (< 768px) */
+@media (max-width: 767px) {
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .show-mobile-only {
+    display: block !important;
+  }
+}
+
+/* Hide on desktop (>= 768px) */
+@media (min-width: 768px) {
+  .hide-desktop {
+    display: none !important;
+  }
+
+  .show-mobile-only {
+    display: none !important;
+  }
+}

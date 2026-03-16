@@ -2,7 +2,7 @@
 
 > **ИНСТРУКЦИЯ ДЛЯ CLAUDE:** Этот файл — твоя память. Читай его В НАЧАЛЕ каждой сессии
 > и ПОСЛЕ каждого сжатия контекста. Обновляй после завершения значимых задач.
-> Последнее обновление: 2026-03-15
+> Последнее обновление: 2026-03-16
 
 ---
 
@@ -38,11 +38,29 @@
 - [x] Структура 10 блоков главной + 7 шаблонов + контентная логика — `site-build/design/03-page-structures.md`
 - [x] Фото/визуал + риски + переход в этап 4 — `site-build/design/04-visual-content-risks-handoff.md`
 
+**Этап 4: Реализация (WordPress тема)**
+- [x] 4.1 Каркас проекта — functions.php, style.css, 6 CPT, ACF Options, helpers, admin-roles
+- [x] 4.2 Контент-модель — 6 CPT с полными ACF полями (Kitchen 14, Project 10, Review 10, Team 4, Promotion 8, FAQ 3)
+- [x] 4.3 Глобальные компоненты — header, footer, cta-sticky, breadcrumbs
+- [x] 4.4 Шаблоны страниц — 12 шаблонов (home, catalog, kitchen single, contacts, about, reviews, portfolio, project single, quiz, thanks, faq, privacy)
+- [x] 4.5 Формы и лидогенерация — forms.js (AJAX + маска + webhook), 4 типа форм
+- [x] 4.6 Квиз-калькулятор — quiz.js (4 шага), page-quiz.php
+- [x] 4.7 SEO — seo-schema.php (Organization, Product, FAQPage, AggregateRating), seo-meta.php (OG, preconnect)
+- [x] 4.8 Аналитика — analytics.js (Яндекс Метрика: формы, квиз, CTA, телефон, scroll depth)
+- [x] 4.9 Адаптивность — responsive.css (mobile-first, header/footer/grid/cards/quiz/hero)
+- [x] 4.10 CSS — design-tokens.css, base.css, components.css, responsive.css
+
 ### Что в процессе
-- (всё завершено, готовы к этапу 4)
+- QA-проверка и финальная документация этапа 4
 
 ### Что дальше
-- [ ] Этап 4: Реализация — сборка сайта кухнирема.рф на WordPress + Bricks Builder
+- [ ] Деплой темы на хостинг кухнирема.рф
+- [ ] Настройка Bricks Builder (визуальный импорт шаблонов)
+- [ ] Контент: загрузка 42 моделей из VK Market в CPT Kitchen
+- [ ] Контент: создание 10-15 проектов для портфолио из VK фото
+- [ ] Настройка RankMath Pro (meta-теги, карта сайта)
+- [ ] Подключение n8n webhooks к формам
+- [ ] Настройка Яндекс Метрики (12 целей)
 
 ### Ключевые данные Яндекс Метрики (90 дней: 2025-12-15 — 2026-03-15)
 - 7 287 визитов, 5 286 уников
@@ -89,6 +107,12 @@
 | `site-analysis/REBRAND-PLAN.md` | **План ребрендинга** — 10 разделов, roadmap |
 | `site-analysis/yandex-metrika-report.md` | Отчёт Яндекс Метрики (90 дней) |
 | `.github/workflows/yandex-metrika.yml` | Workflow Яндекс Метрики |
+| `site-build/wordpress/theme/` | **WordPress тема «Кухни Рема»** — полный каркас |
+| `site-build/wordpress/theme/functions.php` | Точка входа темы (enqueue, AJAX, theme setup) |
+| `site-build/wordpress/theme/inc/` | CPT, ACF Options, SEO, роли, хелперы (11 файлов) |
+| `site-build/wordpress/theme/templates/` | Шаблоны страниц (16 файлов) |
+| `site-build/wordpress/theme/assets/css/` | CSS: tokens, base, components, responsive |
+| `site-build/wordpress/theme/assets/js/` | JS: main, forms, quiz, analytics |
 
 ---
 
@@ -105,3 +129,21 @@
 - Данные Метрики добавлены в DISCOVERY-AUDIT.md (раздел 10)
 - Создан REBRAND-PLAN.md — 10 разделов, roadmap 5 фаз
 - Push-триггер убран из yandex-metrika.yml
+
+### Сессия 2026-03-16
+- **Этап 4: Реализация WordPress темы «Кухни Рема»** — полная сборка
+- Каркас: functions.php, style.css (Bricks child theme), 5 image sizes, 3 nav menus
+- 6 CPT с ACF полями: Kitchen (14), Project (10), Review (10), Team (4), Promotion (8), FAQ (3)
+- 6 ACF Options Pages: Контакты, Соцсети, Квиз, CTA, Партнёры, Рассрочка
+- Роль Content Manager + кастомный дашборд (admin-roles.php)
+- 12 хелпер-функций (helpers.php): цены, рейтинги, промо, FAQ, команда
+- Header (sticky, бургер-меню) + Footer (4 колонки, аккордеон мобайл)
+- 12 шаблонов страниц: home, catalog, single-kitchen, contacts, about, reviews, portfolio, single-project, quiz, thanks, faq, privacy
+- + breadcrumbs.php, cta-sticky.php
+- CSS: design-tokens.css, base.css, components.css, responsive.css
+- JS: main.js, forms.js (AJAX + маска), quiz.js (4 шага), analytics.js (Метрика)
+- SEO: seo-schema.php (Organization, Product, FAQPage, AggregateRating), seo-meta.php (OG, preconnect)
+- AJAX form handler с webhook к n8n + fallback email
+- Performance: remove emoji/embed/REST link/wlwmanifest/generator, WebP upload support
+- PHP lint: все файлы без ошибок
+- Итого: 37 файлов, ~7800 строк кода
