@@ -13,6 +13,7 @@ on:
           - stop
           - restart
           - health
+          - smoke-test
           - update-scripts
 
 jobs:
@@ -34,22 +35,38 @@ jobs:
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           SCP_CMD="scp -o StrictHostKeyChecking=no"
+          VPS="${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
 
           # Create dirs on VPS
-          $SSH_CMD "mkdir -p /opt/claude-code/{bin,env,etc,logs,workspace}"
+          $SSH_CMD "mkdir -p /opt/claude-code/{bin,env,etc,logs,workspace,backups,control-api}"
 
           # Copy scripts
-          $SCP_CMD vps-runtime/bin/*.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/bin/
-          $SCP_CMD vps-runtime/etc/tmux.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/etc/
-          $SCP_CMD vps-runtime/etc/nginx-webhook.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/etc/
+          $SCP_CMD vps-runtime/bin/*.sh $VPS:/opt/claude-code/bin/
+
+          # Copy configs
+          $SCP_CMD vps-runtime/etc/tmux.conf $VPS:/opt/claude-code/etc/
+          $SCP_CMD vps-runtime/etc/nginx-webhook.conf $VPS:/opt/claude-code/etc/
+          $SCP_CMD vps-runtime/etc/*.service $VPS:/opt/claude-code/etc/
+          $SCP_CMD vps-runtime/etc/*.timer $VPS:/opt/claude-code/etc/
+
+          # Copy control API
+          $SCP_CMD vps-runtime/control-api/server.js $VPS:/opt/claude-code/control-api/
+          $SCP_CMD vps-runtime/control-api/package.json $VPS:/opt/claude-code/control-api/
 
           # Make executable
           $SSH_CMD "chmod +x /opt/claude-code/bin/*.sh"
 
-          # Setup backup cron (idempotent)
-          $SSH_CMD "mkdir -p /opt/claude-code/backups && (crontab -l 2>/dev/null | grep -q backup-memory || (crontab -l 2>/dev/null; echo '*/30 * * * * /opt/claude-code/bin/backup-memory.sh >> /opt/claude-code/logs/backup.log 2>&1') | crontab -) && echo '✓ Backup cron configured'"
+          # Install systemd units from etc/
+          $SSH_CMD "cp /opt/claude-code/etc/*.service /etc/systemd/system/ 2>/dev/null; cp /opt/claude-code/etc/*.timer /etc/systemd/system/ 2>/dev/null; systemctl daemon-reload"
 
-          echo "✓ Scripts deployed"
+          # Enable services
+          $SSH_CMD "systemctl enable claude-code.service github-webhook.service control-api.service claude-code-health.timer 2>/dev/null || true"
+          $SSH_CMD "systemctl start claude-code-health.timer 2>/dev/null || true"
+
+          # Setup backup cron (idempotent)
+          $SSH_CMD "crontab -l 2>/dev/null | grep -q backup-memory || (crontab -l 2>/dev/null; echo '*/30 * * * * /opt/claude-code/bin/backup-memory.sh >> /opt/claude-code/logs/backup.log 2>&1') | crontab -"
+
+          echo "✓ Scripts, configs, systemd units, and control API deployed"
 
       - name: Bootstrap
         if: inputs.action == 'bootstrap'
@@ -61,7 +78,6 @@ jobs:
         if: inputs.action == 'bootstrap'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
-          # Update API key in env file if secret exists
           if [ -n "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
             $SSH_CMD "sed -i 's|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}|' /opt/claude-code/env/claude.env"
             echo "✓ ANTHROPIC_API_KEY set"
@@ -74,21 +90,31 @@ jobs:
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/start.sh"
+          # Start control API
+          $SSH_CMD "systemctl start control-api.service 2>/dev/null || true"
 
       - name: Stop
         if: inputs.action == 'stop'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/stop.sh"
+          $SSH_CMD "systemctl stop control-api.service 2>/dev/null || true"
 
       - name: Restart
         if: inputs.action == 'restart'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/restart.sh"
+          $SSH_CMD "systemctl restart control-api.service 2>/dev/null || true"
 
       - name: Health Check
         if: inputs.action == 'health' || inputs.action == 'bootstrap' || inputs.action == 'start' || inputs.action == 'restart'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/health.sh" || true
+
+      - name: Smoke Test
+        if: inputs.action == 'smoke-test' || inputs.action == 'bootstrap'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "/opt/claude-code/bin/smoke-test.sh" || true

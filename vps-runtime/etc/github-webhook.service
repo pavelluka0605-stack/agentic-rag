@@ -1,0 +1,20 @@
+[Unit]
+Description=GitHub Webhook Receiver → Memory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/claude-code/github-webhook
+EnvironmentFile=/opt/claude-code/github-webhook/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=10
+
+# Resource limits
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

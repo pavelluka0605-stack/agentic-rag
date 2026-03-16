@@ -1,0 +1,10 @@
+{
+  "name": "claude-code-control-api",
+  "version": "1.0.0",
+  "description": "Lightweight HTTP control API for Claude Code runtime",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

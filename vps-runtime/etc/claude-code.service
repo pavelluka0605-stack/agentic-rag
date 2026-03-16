@@ -1,0 +1,29 @@
+[Unit]
+Description=Claude Code Runtime (tmux session)
+After=network-online.target
+Wants=network-online.target
+Documentation=https://github.com/pavelluka0605-stack/agentic-rag
+
+[Service]
+Type=forking
+User=root
+EnvironmentFile=/opt/claude-code/env/claude.env
+ExecStartPre=/opt/claude-code/bin/verify.sh --quiet
+ExecStart=/opt/claude-code/bin/start.sh
+ExecStop=/opt/claude-code/bin/stop.sh
+ExecReload=/opt/claude-code/bin/restart.sh
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Keep tmux session alive after service manager exits
+KillMode=none
+RemainAfterExit=yes
+
+# Resource limits
+MemoryMax=4G
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target
