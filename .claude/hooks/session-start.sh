@@ -1,24 +1,38 @@
 #!/bin/bash
-# Hook: session-start — load context summary at session start
-# Triggered by: PreToolUse (first tool call)
+# =============================================================================
+# SessionStart — загрузка контекста при первом вызове инструмента
+#
+# Вызывается как PreToolUse hook. Определяет "первый вызов" через flag-файл.
+# При первом вызове — загружает bootstrap из памяти.
+# При последующих — пропускает (нулевой overhead).
+# =============================================================================
 
-MEMORY_DIR="$(cd "$(dirname "$0")/../memory" && pwd)"
+HOOKS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "=== Dev Memory Context ==="
+# Уникальный ID сессии (по PID родительского процесса claude)
+SESSION_FLAG="/tmp/claude-session-started-$$"
 
-for store in decisions errors patterns sessions; do
-  file="$MEMORY_DIR/${store}.jsonl"
-  if [ -f "$file" ]; then
-    count=$(wc -l < "$file" | tr -d ' ')
-    if [ "$count" -gt 0 ]; then
-      echo ""
-      echo "--- ${store} (${count} entries, last 3) ---"
-      tail -3 "$file" | while IFS= read -r line; do
-        echo "  $line"
-      done
-    fi
-  fi
-done
+# Если сессия уже инициализирована — выходим мгновенно
+if [ -f "$SESSION_FLAG" ]; then
+  exit 0
+fi
 
-echo ""
-echo "=== End Memory Context ==="
+# Помечаем сессию как начатую
+touch "$SESSION_FLAG"
+
+# Загружаем bootstrap контекст
+PROJECT=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo 'unknown')")
+
+BOOTSTRAP=$(node "$HOOKS_DIR/lib/session-bootstrap.js" "$PROJECT" 2>/dev/null)
+if [ -n "$BOOTSTRAP" ]; then
+  echo "$BOOTSTRAP"
+fi
+
+# Проверяем STATE.md
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+if [ -f "$ROOT/STATE.md" ]; then
+  echo ""
+  echo "📌 ОБЯЗАТЕЛЬНО: Прочитай STATE.md — там текущее состояние задач."
+fi
+
+exit 0
