@@ -122,6 +122,42 @@
   --transition-fast:        150ms ease;
   --transition-base:        250ms ease;
   --transition-slow:        400ms ease;
+
+  /* --------------------------------------------
+     Aliases (for cross-file compatibility)
+     -------------------------------------------- */
+  --color-bg:               var(--color-bg-light);
+  --color-text:             var(--color-text-primary);
+  --color-surface:          var(--color-surface-light);
+  --color-text-on-primary:  #FFFFFF;
+  --color-wood-dark:        var(--color-bg-dark);
+
+  --font-size-base:         var(--font-size-body);
+  --font-size-lg:           18px;
+  --font-size-xl:           20px;
+  --font-size-2xl:          24px;
+  --font-size-3xl:          30px;
+  --font-size-4xl:          36px;
+
+  --line-height-normal:     var(--line-height-body);
+
+  /* Numeric spacing aliases (used by some components) */
+  --space-2:                var(--spacing-sm);
+  --space-4:                var(--spacing-md);
+  --space-6:                var(--spacing-lg);
+  --space-8:                var(--spacing-xl);
+  --space-12:               var(--spacing-3xl);
+  --space-16:               var(--spacing-4xl);
+
+  /* Short-form spacing aliases */
+  --space-xs:               var(--spacing-xs);
+  --space-sm:               var(--spacing-sm);
+  --space-md:               var(--spacing-md);
+  --space-lg:               var(--spacing-lg);
+  --space-xl:               var(--spacing-xl);
+  --space-2xl:              var(--spacing-2xl);
+  --space-3xl:              var(--spacing-3xl);
+  --space-4xl:              var(--spacing-4xl);
 }
 
 /* ==========================================================================
