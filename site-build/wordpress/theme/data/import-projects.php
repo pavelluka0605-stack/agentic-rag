@@ -441,7 +441,8 @@ foreach ( $projects as $index => $project ) {
     // ACF fields
     update_field( 'project_client_name', $project['project_client_name'], $post_id );
     update_field( 'project_area', $project['project_area'], $post_id );
-    update_field( 'project_budget', $project['project_budget'], $post_id );
+    // project_budget stored in post excerpt (no dedicated ACF field)
+    wp_update_post( array( 'ID' => $post_id, 'post_excerpt' => $project['project_budget'] ) );
     update_field( 'project_duration', $project['project_duration'], $post_id );
 
     // Link to kitchen CPT (relationship field)
