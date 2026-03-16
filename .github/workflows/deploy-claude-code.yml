@@ -1,6 +1,13 @@
 name: Deploy Claude Code Runtime
 
 on:
+  push:
+    branches:
+      - 'claude/vps-dev-environment-*'
+    paths:
+      - 'vps-runtime/**'
+      - '.claude/mcp/**'
+      - '.claude/hooks/**'
   workflow_dispatch:
     inputs:
       action:
@@ -31,7 +38,7 @@ jobs:
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Deploy runtime scripts
-        if: inputs.action == 'bootstrap' || inputs.action == 'update-scripts'
+        if: inputs.action == 'bootstrap' || inputs.action == 'update-scripts' || github.event_name == 'push'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           SCP_CMD="scp -o StrictHostKeyChecking=no"
@@ -108,7 +115,7 @@ jobs:
           $SSH_CMD "systemctl restart control-api.service 2>/dev/null || true"
 
       - name: Health Check
-        if: inputs.action == 'health' || inputs.action == 'bootstrap' || inputs.action == 'start' || inputs.action == 'restart'
+        if: inputs.action == 'health' || inputs.action == 'bootstrap' || inputs.action == 'start' || inputs.action == 'restart' || github.event_name == 'push'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/health.sh" || true
