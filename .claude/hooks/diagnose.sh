@@ -64,6 +64,25 @@ if [ -f "$SETTINGS" ]; then
   done
 
   check "MCP server: memory" "$(python3 -c 'import json; d=json.load(open("'"$SETTINGS"'")); assert "memory" in d["mcpServers"]' 2>/dev/null && echo true || echo false)"
+
+  # Проверяем matchers
+  for matcher in Bash "Edit|Write" Agent; do
+    check "PreToolUse matcher: $matcher" "$(python3 -c '
+import json
+d=json.load(open("'"$SETTINGS"'"))
+matchers = [h["matcher"] for h in d["hooks"]["PreToolUse"]]
+assert "'"$matcher"'" in matchers
+' 2>/dev/null && echo true || echo false)"
+  done
+
+  for matcher in Bash "Edit|Write" Agent; do
+    check "PostToolUse matcher: $matcher" "$(python3 -c '
+import json
+d=json.load(open("'"$SETTINGS"'"))
+matchers = [h["matcher"] for h in d["hooks"]["PostToolUse"]]
+assert "'"$matcher"'" in matchers
+' 2>/dev/null && echo true || echo false)"
+  done
 fi
 
 # 3. MCP Memory Server
@@ -82,7 +101,7 @@ fi
 # 4. Hooks
 echo ""
 echo "4. Hooks"
-REQUIRED_HOOKS=(pre-bash.sh pre-edit.sh post-bash.sh session-end.sh diagnose.sh)
+REQUIRED_HOOKS=(pre-bash.sh pre-edit.sh pre-agent.sh post-bash.sh post-edit.sh post-agent.sh session-start.sh session-end.sh diagnose.sh)
 for hook in "${REQUIRED_HOOKS[@]}"; do
   check "$hook exists" "$([ -f "$HOOKS_DIR/$hook" ] && echo true || echo false)"
   check "$hook executable" "$([ -x "$HOOKS_DIR/$hook" ] && echo true || echo false)"
@@ -93,6 +112,8 @@ echo ""
 echo "5. Hook Helpers"
 check "lib/query-memory.js" "$([ -f "$HOOKS_DIR/lib/query-memory.js" ] && echo true || echo false)"
 check "lib/repair-loop.js" "$([ -f "$HOOKS_DIR/lib/repair-loop.js" ] && echo true || echo false)"
+check "lib/session-bootstrap.js" "$([ -f "$HOOKS_DIR/lib/session-bootstrap.js" ] && echo true || echo false)"
+check "lib/completion-check.js" "$([ -f "$HOOKS_DIR/lib/completion-check.js" ] && echo true || echo false)"
 
 # 6. Memory Database
 echo ""

@@ -18,6 +18,15 @@
             "command": "bash .claude/hooks/pre-edit.sh"
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/pre-agent.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -27,6 +36,24 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/post-bash.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-edit.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-agent.sh"
           }
         ]
       }
