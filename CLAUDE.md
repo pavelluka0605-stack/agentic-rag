@@ -88,6 +88,11 @@ agentic-rag/
 │   ├── scripts/           — скрипты деплоя и настройки
 │   ├── vk-longpoll/       — VK community long poll listener
 │   └── vk-user-longpoll/  — VK user long poll listener
+├── vps-runtime/
+│   ├── bin/               — скрипты запуска/остановки/мониторинга Claude Code
+│   ├── env/               — шаблоны env-файлов
+│   └── etc/               — конфиги (tmux)
+├── .claude/               — Claude Code dev environment (MCP, hooks, memory)
 └── CLAUDE.md              — ЭТА БАЗА ЗНАНИЙ
 ```
 
@@ -243,6 +248,54 @@ JSONL append-only logs + Node.js MCP server + Claude Code native hooks.
 bash .claude/hooks/diagnose.sh
 ```
 
+## VPS Runtime Layer (Claude Code)
+
+### Архитектура
+tmux + systemd + bash wrapper scripts.
+
+### Структура на VPS
+```
+/opt/claude-code/
+├── bin/
+│   ├── bootstrap.sh    # One-time VPS setup
+│   ├── start.sh        # Start tmux session (3 windows)
+│   ├── stop.sh         # Graceful stop
+│   ├── restart.sh      # Safe restart
+│   ├── connect.sh      # Attach to session
+│   └── health.sh       # Health check (8 checks)
+├── env/
+│   └── claude.env      # Environment (ANTHROPIC_API_KEY, etc.)
+├── etc/
+│   └── tmux.conf       # tmux config (100k scrollback, status bar)
+├── logs/
+│   ├── session-*.log   # Daily session logs
+│   └── events.log      # Start/stop events
+└── workspace/          # Git repos & working directories
+```
+
+### Команды
+```bash
+# Bootstrap (one-time)
+bash /opt/claude-code/bin/bootstrap.sh
+
+# Daily usage
+systemctl start claude-code     # Start session
+/opt/claude-code/bin/connect.sh  # Attach from SSH
+/opt/claude-code/bin/health.sh   # Check health
+
+# Inside tmux session
+claude                           # Start Claude Code
+claude --resume                  # Resume previous conversation
+
+# Windows: Ctrl-b n/p to switch
+#   0: workspace  — Claude Code here
+#   1: monitor    — health check every 30s
+#   2: logs       — live log tail
+```
+
+### GitHub Actions
+`deploy-claude-code.yml` — bootstrap, start, stop, restart, health, update-scripts
+
 ## История ключевых решений
 
 - Деплой через GitHub Actions → SSH на VPS
@@ -253,3 +306,4 @@ bash .claude/hooks/diagnose.sh
 - BlueSales для интеграции с CRM
 - OpenAI GPT-4o для AI автоответов на VK комментарии
 - **JSONL + Node MCP** для системы памяти dev environment
+- **tmux + systemd** для VPS runtime layer Claude Code

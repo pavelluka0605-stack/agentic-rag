@@ -1,0 +1,90 @@
+name: Deploy Claude Code Runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - bootstrap
+          - start
+          - stop
+          - restart
+          - health
+          - update-scripts
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy runtime scripts
+        if: inputs.action == 'bootstrap' || inputs.action == 'update-scripts'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          SCP_CMD="scp -o StrictHostKeyChecking=no"
+
+          # Create dirs on VPS
+          $SSH_CMD "mkdir -p /opt/claude-code/{bin,env,etc,logs,workspace}"
+
+          # Copy scripts
+          $SCP_CMD vps-runtime/bin/*.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/bin/
+          $SCP_CMD vps-runtime/etc/tmux.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/etc/
+
+          # Make executable
+          $SSH_CMD "chmod +x /opt/claude-code/bin/*.sh"
+
+          echo "✓ Scripts deployed"
+
+      - name: Bootstrap
+        if: inputs.action == 'bootstrap'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "bash /opt/claude-code/bin/bootstrap.sh --force"
+
+      - name: Set ANTHROPIC_API_KEY
+        if: inputs.action == 'bootstrap'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          # Update API key in env file if secret exists
+          if [ -n "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            $SSH_CMD "sed -i 's|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}|' /opt/claude-code/env/claude.env"
+            echo "✓ ANTHROPIC_API_KEY set"
+          else
+            echo "⚠ ANTHROPIC_API_KEY secret not set in GitHub"
+          fi
+
+      - name: Start
+        if: inputs.action == 'start' || inputs.action == 'bootstrap'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "/opt/claude-code/bin/start.sh"
+
+      - name: Stop
+        if: inputs.action == 'stop'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "/opt/claude-code/bin/stop.sh"
+
+      - name: Restart
+        if: inputs.action == 'restart'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "/opt/claude-code/bin/restart.sh"
+
+      - name: Health Check
+        if: inputs.action == 'health' || inputs.action == 'bootstrap' || inputs.action == 'start' || inputs.action == 'restart'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "/opt/claude-code/bin/health.sh" || true

@@ -147,3 +147,16 @@
 - Performance: remove emoji/embed/REST link/wlwmanifest/generator, WebP upload support
 - PHP lint: все файлы без ошибок
 - Итого: 37 файлов, ~7800 строк кода
+
+### Сессия 2026-03-16 (Dev Environment)
+- **Dev Memory System**: MCP memory server (Node.js) + JSONL stores + Claude Code hooks
+  - 6 MCP tools: add_decision, add_error, add_pattern, save_session, search_memory, get_context
+  - Self-diagnostics: 20 checks, все проходят
+  - `.claude/settings.json` с hooks и MCP config
+- **VPS Runtime Layer**: tmux + systemd + bash wrapper scripts
+  - bootstrap.sh: one-time VPS setup (tmux, node, claude CLI, systemd unit)
+  - start.sh: 3-window tmux session (workspace, monitor, logs)
+  - stop.sh, restart.sh, connect.sh, health.sh (8 health checks)
+  - tmux.conf: 100k scrollback, mouse, status bar
+  - deploy-claude-code.yml: GitHub Actions workflow для деплоя
+  - claude.env.example: шаблон environment variables
