@@ -198,16 +198,37 @@ get_header();
                 <?php while ( $kitchens->have_posts() ) : $kitchens->the_post(); ?>
 
                     <?php
-                    $gallery    = get_field( 'kitchen_gallery' );
-                    $dimensions = get_field( 'kitchen_dimensions' );
-                    $mat_terms  = wp_get_post_terms( get_the_ID(), 'kitchen_material', array( 'fields' => 'names' ) );
-                    $mat_label  = ( ! is_wp_error( $mat_terms ) && ! empty( $mat_terms ) ) ? $mat_terms[0] : '';
+                    $gallery     = get_field( 'kitchen_gallery' );
+                    $dimensions  = get_field( 'kitchen_dimensions' );
+                    $sale_price  = get_field( 'kitchen_sale_price' );
+                    $card_price  = get_field( 'kitchen_price' );
+                    $installment = get_field( 'kitchen_installment' );
+                    $mat_terms   = wp_get_post_terms( get_the_ID(), 'kitchen_material', array( 'fields' => 'names' ) );
+                    $mat_label   = ( ! is_wp_error( $mat_terms ) && ! empty( $mat_terms ) ) ? $mat_terms[0] : '';
+
+                    $is_on_sale = $sale_price && $sale_price < $card_price;
+                    $is_new     = ( get_the_date( 'U' ) > strtotime( '-30 days' ) );
                     ?>
 
                     <article class="card card--kitchen">
                         <a href="<?php the_permalink(); ?>" class="card--kitchen__link">
 
                             <div class="card--kitchen__image">
+
+                                <?php if ( $is_on_sale || $is_new || $installment ) : ?>
+                                    <div class="card--kitchen__badges">
+                                        <?php if ( $is_on_sale ) : ?>
+                                            <span class="badge badge--sale">Скидка</span>
+                                        <?php endif; ?>
+                                        <?php if ( $is_new ) : ?>
+                                            <span class="badge badge--new">Новинка</span>
+                                        <?php endif; ?>
+                                        <?php if ( $installment ) : ?>
+                                            <span class="badge badge--installment">Рассрочка</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+
                                 <?php if ( has_post_thumbnail() ) : ?>
                                     <?php the_post_thumbnail( 'kitchen-card', array( 'loading' => 'lazy' ) ); ?>
                                 <?php elseif ( ! empty( $gallery ) && isset( $gallery[0] ) ) : ?>

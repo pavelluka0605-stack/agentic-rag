@@ -94,6 +94,21 @@ function kuhni_rema_enqueue_assets() {
         );
     }
 
+    // Catalog & kitchen pages (archive, taxonomy, single, page-catalog template)
+    if (
+        is_post_type_archive( 'kitchen' ) ||
+        is_tax( array( 'kitchen_type', 'kitchen_style', 'kitchen_material' ) ) ||
+        is_singular( 'kitchen' ) ||
+        is_page_template( 'templates/page-catalog.php' )
+    ) {
+        wp_enqueue_style(
+            'kuhni-rema-catalog',
+            KUHNI_REMA_URI . '/assets/css/catalog.css',
+            array( 'kuhni-rema-components' ),
+            KUHNI_REMA_VERSION
+        );
+    }
+
     // Responsive (mobile-first overrides)
     wp_enqueue_style(
         'kuhni-rema-responsive',
