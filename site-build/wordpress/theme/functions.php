@@ -47,6 +47,13 @@ require_once KUHNI_REMA_DIR . '/inc/admin-roles.php';
 require_once KUHNI_REMA_DIR . '/inc/helpers.php';
 
 // =============================================================================
+// 4b. SEO (Schema.org + Meta tags)
+// =============================================================================
+
+require_once KUHNI_REMA_DIR . '/inc/seo-schema.php';
+require_once KUHNI_REMA_DIR . '/inc/seo-meta.php';
+
+// =============================================================================
 // 5. Enqueue Styles & Scripts
 // =============================================================================
 
