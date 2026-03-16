@@ -294,11 +294,14 @@ tmux + systemd + bash wrapper scripts.
 │   ├── stop.sh         # Graceful stop
 │   ├── restart.sh      # Safe restart
 │   ├── connect.sh      # Attach to session
-│   └── health.sh       # Health check (8 checks)
+│   ├── health.sh       # Health check (8 checks)
+│   ├── backup-memory.sh # Backup + pruning memory.db (cron)
+│   └── setup-https.sh  # HTTPS setup (nginx + certbot)
 ├── env/
 │   └── claude.env      # Environment (ANTHROPIC_API_KEY, etc.)
 ├── etc/
-│   └── tmux.conf       # tmux config (100k scrollback, status bar)
+│   ├── tmux.conf       # tmux config (100k scrollback, status bar)
+│   └── nginx-webhook.conf # Nginx reverse proxy config (HTTPS)
 ├── logs/
 │   ├── session-*.log   # Daily session logs
 │   └── events.log      # Start/stop events
@@ -333,6 +336,41 @@ claude --resume                  # Resume previous conversation
 ### GitHub Actions
 `deploy-claude-code.yml` — bootstrap, start, stop, restart, health, update-scripts
 
+### Backup & Pruning
+```bash
+# Cron (каждые 30 мин): backup memory.db + очистка старых записей
+*/30 * * * * /opt/claude-code/bin/backup-memory.sh >> /opt/claude-code/logs/backup.log 2>&1
+
+# Только backup
+/opt/claude-code/bin/backup-memory.sh --backup-only
+
+# Только pruning
+/opt/claude-code/bin/backup-memory.sh --prune-only
+```
+- Хранит до 48 бэкапов (24ч при 30-мин интервале), автоматическая ротация
+- Pruning: resolved incidents >90д, episodes >180д, github_events >60д
+- SQLite backup API (WAL-safe)
+
+### HTTPS Webhook (Nginx + Let's Encrypt)
+```bash
+# Setup (на VPS с root):
+bash /opt/claude-code/bin/setup-https.sh webhook.marbomebel.ru
+
+# Dry run:
+bash /opt/claude-code/bin/setup-https.sh webhook.marbomebel.ru --dry-run
+```
+- Nginx reverse proxy: HTTPS → localhost:3900 (GitHub webhook) / localhost:5678 (BlueSales)
+- Rate limiting: 30 req/min per IP
+- Auto-renewal: certbot cron daily 3am
+- SSL hardening: TLS 1.2+, HSTS
+
+### Unit Tests
+```bash
+cd .claude/mcp/memory-server && npm test
+```
+- 40 тестов для db.js (все 6 слоёв + search + prune + fingerprint)
+- Vitest (ESM-native)
+
 ## История ключевых решений
 
 - Деплой через GitHub Actions → SSH на VPS
@@ -344,3 +382,6 @@ claude --resume                  # Resume previous conversation
 - OpenAI GPT-4o для AI автоответов на VK комментарии
 - **JSONL + Node MCP** для системы памяти dev environment
 - **tmux + systemd** для VPS runtime layer Claude Code
+- **Nginx + Let's Encrypt** для HTTPS webhook endpoints
+- **SQLite backup + cron pruning** для защиты memory.db
+- **Vitest** для unit-тестирования memory server
