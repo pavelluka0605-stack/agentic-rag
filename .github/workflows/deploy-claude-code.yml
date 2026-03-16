@@ -8,6 +8,7 @@ on:
       - 'vps-runtime/**'
       - '.claude/mcp/**'
       - '.claude/hooks/**'
+      - '.github/workflows/deploy-claude-code.yml'
   workflow_dispatch:
     inputs:
       action:
