@@ -93,7 +93,7 @@ function kuhni_rema_render_jsonld( $data ) {
  * ------------------------------------------------------------- */
 function kuhni_rema_schema_organization() {
 
-	$phone    = kuhni_rema_get_option( 'company_phone', '+7 (XXX) XXX-XX-XX' );
+	$phone    = kuhni_rema_get_option( 'company_phone', '+7 (391) 216-97-59' );
 	$address  = kuhni_rema_get_option( 'company_address', '' );
 	$vk_url   = kuhni_rema_get_option( 'social_vk', '' );
 	$tg_url   = kuhni_rema_get_option( 'social_telegram', '' );
@@ -115,10 +115,11 @@ function kuhni_rema_schema_organization() {
 	}
 
 	$schema = array(
-		'@context' => 'https://schema.org',
-		'@type'    => 'Organization',
-		'name'     => 'Кухни Рема',
-		'url'      => 'https://кухнирема.рф',
+		'@context'  => 'https://schema.org',
+		'@type'     => 'Organization',
+		'@id'       => 'https://кухнирема.рф/#organization',
+		'name'      => 'Кухни Рема',
+		'url'       => 'https://кухнирема.рф',
 		'telephone' => $phone,
 	);
 
@@ -133,8 +134,8 @@ function kuhni_rema_schema_organization() {
 		$schema['address'] = array(
 			'@type'           => 'PostalAddress',
 			'streetAddress'   => $address,
-			'addressLocality' => kuhni_rema_get_option( 'company_city', 'Москва' ),
-			'addressRegion'   => kuhni_rema_get_option( 'company_region', 'Москва' ),
+			'addressLocality' => kuhni_rema_get_option( 'company_city', 'Красноярск' ),
+			'addressRegion'   => kuhni_rema_get_option( 'company_region', 'Красноярский край' ),
 			'postalCode'      => kuhni_rema_get_option( 'company_postal_code', '' ),
 			'addressCountry'  => 'RU',
 		);
@@ -152,7 +153,7 @@ function kuhni_rema_schema_organization() {
  * ------------------------------------------------------------- */
 function kuhni_rema_schema_local_business() {
 
-	$phone    = kuhni_rema_get_option( 'company_phone', '+7 (XXX) XXX-XX-XX' );
+	$phone    = kuhni_rema_get_option( 'company_phone', '+7 (391) 216-97-59' );
 	$address  = kuhni_rema_get_option( 'company_address', '' );
 	$vk_url   = kuhni_rema_get_option( 'social_vk', '' );
 	$tg_url   = kuhni_rema_get_option( 'social_telegram', '' );
@@ -179,18 +180,22 @@ function kuhni_rema_schema_local_business() {
 	$schema = array(
 		'@context'  => 'https://schema.org',
 		'@type'     => 'FurnitureStore',
+		'@id'       => 'https://кухнирема.рф/#organization',
 		'name'      => 'Кухни Рема',
 		'url'       => 'https://кухнирема.рф',
 		'telephone' => $phone,
-		'image'     => $logo_url ? $logo_url : '',
 	);
+
+	if ( $logo_url ) {
+		$schema['image'] = $logo_url;
+	}
 
 	if ( $address ) {
 		$schema['address'] = array(
 			'@type'           => 'PostalAddress',
 			'streetAddress'   => $address,
-			'addressLocality' => kuhni_rema_get_option( 'company_city', 'Москва' ),
-			'addressRegion'   => kuhni_rema_get_option( 'company_region', 'Москва' ),
+			'addressLocality' => kuhni_rema_get_option( 'company_city', 'Красноярск' ),
+			'addressRegion'   => kuhni_rema_get_option( 'company_region', 'Красноярский край' ),
 			'postalCode'      => kuhni_rema_get_option( 'company_postal_code', '' ),
 			'addressCountry'  => 'RU',
 		);
@@ -207,7 +212,52 @@ function kuhni_rema_schema_local_business() {
 	if ( $hours ) {
 		// ACF field stores comma-separated specs, e.g. "Mo-Fr 09:00-19:00, Sa 10:00-17:00".
 		$specs = array_map( 'trim', explode( ',', $hours ) );
-		$schema['openingHours'] = $specs;
+		$opening_hours_spec = array();
+		foreach ( $specs as $spec ) {
+			$parts = preg_split( '/\s+/', $spec, 2 );
+			if ( count( $parts ) === 2 ) {
+				$days_part  = $parts[0];
+				$time_part  = $parts[1];
+				$times      = explode( '-', $time_part );
+				$open_time  = isset( $times[0] ) ? $times[0] : '09:00';
+				$close_time = isset( $times[1] ) ? $times[1] : '18:00';
+
+				// Expand day range (e.g. "Mo-Fr") or single day (e.g. "Sa").
+				$day_map = array(
+					'Mo' => 'Monday', 'Tu' => 'Tuesday', 'We' => 'Wednesday',
+					'Th' => 'Thursday', 'Fr' => 'Friday', 'Sa' => 'Saturday', 'Su' => 'Sunday',
+				);
+				$day_keys = array_keys( $day_map );
+
+				if ( false !== strpos( $days_part, '-' ) ) {
+					$range     = explode( '-', $days_part );
+					$start_idx = array_search( $range[0], $day_keys, true );
+					$end_idx   = array_search( $range[1], $day_keys, true );
+					if ( false !== $start_idx && false !== $end_idx ) {
+						for ( $i = $start_idx; $i <= $end_idx; $i++ ) {
+							$opening_hours_spec[] = array(
+								'@type'     => 'OpeningHoursSpecification',
+								'dayOfWeek' => $day_map[ $day_keys[ $i ] ],
+								'opens'     => $open_time,
+								'closes'    => $close_time,
+							);
+						}
+					}
+				} else {
+					if ( isset( $day_map[ $days_part ] ) ) {
+						$opening_hours_spec[] = array(
+							'@type'     => 'OpeningHoursSpecification',
+							'dayOfWeek' => $day_map[ $days_part ],
+							'opens'     => $open_time,
+							'closes'    => $close_time,
+						);
+					}
+				}
+			}
+		}
+		if ( ! empty( $opening_hours_spec ) ) {
+			$schema['openingHoursSpecification'] = $opening_hours_spec;
+		}
 	}
 
 	if ( ! empty( $same_as ) ) {
@@ -224,16 +274,34 @@ function kuhni_rema_schema_local_business() {
  * ------------------------------------------------------------- */
 function kuhni_rema_schema_product() {
 
+	global $post;
+
 	$post_id     = get_the_ID();
 	$title       = get_the_title( $post_id );
 	$description = get_the_excerpt( $post_id );
 	$permalink   = get_permalink( $post_id );
 	$image       = get_the_post_thumbnail_url( $post_id, 'large' );
 
+	// Fallback image: site logo.
+	if ( ! $image ) {
+		$logo_url = kuhni_rema_get_option( 'company_logo', '' );
+		if ( ! $logo_url ) {
+			$custom_logo_id = get_theme_mod( 'custom_logo' );
+			if ( $custom_logo_id ) {
+				$logo_url = wp_get_attachment_image_url( $custom_logo_id, 'full' );
+			}
+		}
+		$image = $logo_url;
+	}
+
 	// ACF fields on the kitchen CPT.
-	$price = '';
+	$price    = '';
+	$material = '';
+	$category = '';
 	if ( function_exists( 'get_field' ) ) {
-		$price = get_field( 'kitchen_price', $post_id );
+		$price    = get_field( 'kitchen_price', $post_id );
+		$material = get_field( 'kitchen_facade_material', $post_id );
+		$category = get_field( 'kitchen_type', $post_id );
 	}
 
 	$schema = array(
@@ -242,6 +310,7 @@ function kuhni_rema_schema_product() {
 		'name'        => $title,
 		'description' => $description,
 		'url'         => $permalink,
+		'sku'         => 'KR-' . $post->post_name,
 		'brand'       => array(
 			'@type' => 'Brand',
 			'name'  => 'Кухни Рема',
@@ -252,13 +321,44 @@ function kuhni_rema_schema_product() {
 		$schema['image'] = $image;
 	}
 
+	if ( $material ) {
+		$schema['material'] = $material;
+	}
+
+	if ( $category ) {
+		$schema['category'] = $category;
+	}
+
 	if ( $price ) {
 		$schema['offers'] = array(
-			'@type'         => 'Offer',
-			'price'         => (float) $price,
-			'priceCurrency' => 'RUB',
-			'availability'  => 'https://schema.org/InStock',
-			'url'           => $permalink,
+			'@type'          => 'Offer',
+			'price'          => (float) $price,
+			'priceCurrency'  => 'RUB',
+			'availability'   => 'https://schema.org/InStock',
+			'itemCondition'  => 'https://schema.org/NewCondition',
+			'url'            => $permalink,
+			'seller'         => array(
+				'@type' => 'Organization',
+				'@id'   => 'https://кухнирема.рф/#organization',
+				'name'  => 'Кухни Рема',
+			),
+		);
+	} else {
+		$schema['offers'] = array(
+			'@type'          => 'Offer',
+			'availability'   => 'https://schema.org/InStock',
+			'itemCondition'  => 'https://schema.org/NewCondition',
+			'priceSpecification' => array(
+				'@type' => 'PriceSpecification',
+				'price' => 0,
+				'priceCurrency' => 'RUB',
+			),
+			'url'            => $permalink,
+			'seller'         => array(
+				'@type' => 'Organization',
+				'@id'   => 'https://кухнирема.рф/#organization',
+				'name'  => 'Кухни Рема',
+			),
 		);
 	}
 
@@ -326,18 +426,26 @@ function kuhni_rema_schema_aggregate_rating() {
 		return;
 	}
 
-	$total  = count( $reviews );
+	$total  = 0;
 	$sum    = 0;
 
 	foreach ( $reviews as $review ) {
-		$rating = 5; // Default rating.
+		$rating = 0;
 		if ( function_exists( 'get_field' ) ) {
 			$r = get_field( 'review_rating', $review->ID );
 			if ( $r ) {
 				$rating = (int) $r;
 			}
 		}
-		$sum += $rating;
+		// Only count reviews that have an explicit rating value.
+		if ( $rating > 0 ) {
+			$sum += $rating;
+			$total++;
+		}
+	}
+
+	if ( $total === 0 ) {
+		return;
 	}
 
 	$average = round( $sum / $total, 1 );

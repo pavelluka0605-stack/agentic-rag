@@ -10,13 +10,16 @@
    * Safe Metrika Wrapper
    * ----------------------------------------------------- */
   function getCounterId() {
-    // Yandex Metrika stores counter IDs in Ya._metrika.counters or similar.
-    // Try common patterns to find the counter ID.
+    // Primary source: explicit config set by the theme
+    if (window.kuhniRema && window.kuhniRema.ymCounterId) {
+      return window.kuhniRema.ymCounterId;
+    }
+
+    // Fallback: Yandex Metrika internal structures
     if (window.Ya && window.Ya._metrika && window.Ya._metrika.counter) {
       return window.Ya._metrika.counter.id;
     }
 
-    // Check for counters array
     if (window.Ya && window.Ya._metrika && window.Ya._metrika.counters) {
       var counters = window.Ya._metrika.counters;
       if (counters.length > 0) {
@@ -24,7 +27,7 @@
       }
     }
 
-    // Fallback: look for ym counter data in the page
+    // Last resort: parse counter ID from inline scripts
     var scripts = document.querySelectorAll('script');
     for (var i = 0; i < scripts.length; i++) {
       var text = scripts[i].textContent;
@@ -166,20 +169,23 @@
         fired[100] = true;
         ymGoal('scroll_depth_100');
       }
+
+      // Remove listener once all thresholds have fired
+      if (fired[25] && fired[50] && fired[75] && fired[100]) {
+        window.removeEventListener('scroll', scrollHandler);
+      }
     }
 
-    window.addEventListener(
-      'scroll',
-      function () {
-        if (ticking) return;
-        ticking = true;
-        requestAnimationFrame(function () {
-          checkScrollDepth();
-          ticking = false;
-        });
-      },
-      { passive: true }
-    );
+    var scrollHandler = function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        checkScrollDepth();
+        ticking = false;
+      });
+    };
+
+    window.addEventListener('scroll', scrollHandler, { passive: true });
 
     // Check once on load for short pages
     checkScrollDepth();

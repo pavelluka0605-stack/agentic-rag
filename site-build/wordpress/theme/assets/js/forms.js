@@ -35,6 +35,8 @@
 
     var errorEl = document.createElement('div');
     errorEl.className = 'form-error';
+    errorEl.setAttribute('role', 'alert');
+    errorEl.setAttribute('aria-live', 'polite');
     errorEl.textContent = message;
     errorEl.style.color = '#d32f2f';
     errorEl.style.marginTop = '12px';
@@ -94,6 +96,11 @@
       // If starts without 7, prepend 7
       if (value.length > 0 && value[0] !== '7') {
         value = '7' + value;
+      }
+
+      // Remove doubled country code (e.g. pasting "+7 7..." or "77...")
+      if (value.length > 10 && value[0] === '7' && value[1] === '7') {
+        value = value.substring(1);
       }
 
       var formatted = '';
@@ -156,6 +163,15 @@
       var files = fileInput.files;
       if (!files || !files.length) return;
 
+      var maxSize = 10 * 1024 * 1024; // 10MB
+      for (var j = 0; j < files.length; j++) {
+        if (files[j].size > maxSize) {
+          alert('Файл "' + files[j].name + '" превышает 10 МБ. Пожалуйста, выберите файл меньшего размера.');
+          fileInput.value = '';
+          return;
+        }
+      }
+
       for (var i = 0; i < files.length; i++) {
         var file = files[i];
         var item = document.createElement('div');
@@ -202,6 +218,10 @@
     e.preventDefault();
 
     var form = e.target;
+
+    // Double-submit prevention
+    if (form.dataset.submitting === 'true') return;
+
     var kuhniRema = window.kuhniRema;
 
     if (!kuhniRema || !kuhniRema.ajaxUrl) {
@@ -257,10 +277,18 @@
     // AJAX request
     var xhr = new XMLHttpRequest();
     xhr.open('POST', kuhniRema.ajaxUrl, true);
+    xhr.timeout = 15000;
+
+    xhr.ontimeout = function () {
+      form.dataset.submitting = 'false';
+      if (submitBtn) setLoading(submitBtn, false);
+      showError(form, 'Превышено время ожидания. Попробуйте ещё раз.');
+    };
 
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4) return;
 
+      form.dataset.submitting = 'false';
       if (submitBtn) setLoading(submitBtn, false);
 
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -296,6 +324,7 @@
       }
     };
 
+    form.dataset.submitting = 'true';
     xhr.send(formData);
   }
 

@@ -21,11 +21,13 @@ function kuhni_rema_meta_output() {
 
 	kuhni_rema_meta_viewport();
 	kuhni_rema_meta_format_detection();
+	kuhni_rema_meta_theme_color();
 	kuhni_rema_meta_preconnect();
-	kuhni_rema_meta_dns_prefetch();
 	kuhni_rema_meta_yandex_verification();
+	kuhni_rema_meta_google_verification();
 	kuhni_rema_meta_canonical();
 	kuhni_rema_meta_og();
+	kuhni_rema_meta_twitter();
 }
 
 /* ---------------------------------------------------------------
@@ -67,20 +69,6 @@ function kuhni_rema_meta_preconnect() {
 	}
 }
 
-/* ---------------------------------------------------------------
- * DNS prefetch
- * ------------------------------------------------------------- */
-function kuhni_rema_meta_dns_prefetch() {
-	$hosts = array(
-		'//mc.yandex.ru',
-		'//fonts.googleapis.com',
-		'//fonts.gstatic.com',
-	);
-
-	foreach ( $hosts as $host ) {
-		echo '<link rel="dns-prefetch" href="' . esc_attr( $host ) . '">' . "\n";
-	}
-}
 
 /* ---------------------------------------------------------------
  * Yandex verification meta tag
@@ -158,7 +146,7 @@ function kuhni_rema_meta_og() {
 	if ( is_singular() ) {
 		$og['og:url'] = get_permalink();
 	} else {
-		$og['og:url'] = home_url( add_query_arg( array() ) );
+		$og['og:url'] = home_url( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
 	}
 
 	// Title.
@@ -198,6 +186,88 @@ function kuhni_rema_meta_og() {
 	foreach ( $og as $property => $content ) {
 		if ( $content ) {
 			echo '<meta property="' . esc_attr( $property ) . '" content="' . esc_attr( $content ) . '">' . "\n";
+			// Add image dimensions after og:image.
+			if ( 'og:image' === $property ) {
+				echo '<meta property="og:image:width" content="1200">' . "\n";
+				echo '<meta property="og:image:height" content="630">' . "\n";
+			}
 		}
+	}
+}
+
+/* ---------------------------------------------------------------
+ * Twitter Card meta tags — only when RankMath/Yoast is NOT active
+ * ------------------------------------------------------------- */
+function kuhni_rema_meta_twitter() {
+
+	// Skip if RankMath or Yoast handle Twitter cards.
+	if ( function_exists( 'rank_math' ) || defined( 'WPSEO_VERSION' ) ) {
+		return;
+	}
+
+	$title       = wp_get_document_title();
+	$description = '';
+	$image       = '';
+
+	if ( is_singular() ) {
+		$excerpt = get_the_excerpt();
+		if ( $excerpt ) {
+			$description = wp_trim_words( $excerpt, 30, '...' );
+		}
+		if ( has_post_thumbnail() ) {
+			$image = get_the_post_thumbnail_url( get_the_ID(), 'large' );
+		}
+	} else {
+		$description = get_bloginfo( 'description' );
+	}
+
+	// Fallback image.
+	if ( ! $image ) {
+		$fallback_image = '';
+		if ( function_exists( 'get_field' ) ) {
+			$fallback_image = get_field( 'og_default_image', 'option' );
+		}
+		if ( ! $fallback_image ) {
+			$custom_logo_id = get_theme_mod( 'custom_logo' );
+			if ( $custom_logo_id ) {
+				$fallback_image = wp_get_attachment_image_url( $custom_logo_id, 'full' );
+			}
+		}
+		$image = $fallback_image;
+	}
+
+	echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
+
+	if ( $title ) {
+		echo '<meta name="twitter:title" content="' . esc_attr( $title ) . '">' . "\n";
+	}
+	if ( $description ) {
+		echo '<meta name="twitter:description" content="' . esc_attr( $description ) . '">' . "\n";
+	}
+	if ( $image ) {
+		echo '<meta name="twitter:image" content="' . esc_attr( $image ) . '">' . "\n";
+	}
+}
+
+/* ---------------------------------------------------------------
+ * Theme color
+ * ------------------------------------------------------------- */
+function kuhni_rema_meta_theme_color() {
+	echo '<meta name="theme-color" content="#1a1a1a">' . "\n";
+}
+
+/* ---------------------------------------------------------------
+ * Google Site Verification
+ * ------------------------------------------------------------- */
+function kuhni_rema_meta_google_verification() {
+
+	$code = '';
+
+	if ( function_exists( 'get_field' ) ) {
+		$code = get_field( 'google_verification', 'option' );
+	}
+
+	if ( $code ) {
+		echo '<meta name="google-site-verification" content="' . esc_attr( $code ) . '">' . "\n";
 	}
 }

@@ -25,23 +25,23 @@
    * Mobile Menu
    * ----------------------------------------------------- */
   function initMobileMenu() {
-    var burgerBtn = document.querySelector('.burger-btn');
+    var burgerBtn = document.querySelector('.header__burger');
     if (!burgerBtn) return;
 
     var body = document.body;
 
     function openMenu() {
-      body.classList.add('burger-menu');
+      body.classList.add('menu-open');
       burgerBtn.setAttribute('aria-expanded', 'true');
     }
 
     function closeMenu() {
-      body.classList.remove('burger-menu');
+      body.classList.remove('menu-open');
       burgerBtn.setAttribute('aria-expanded', 'false');
     }
 
     function toggleMenu() {
-      if (body.classList.contains('burger-menu')) {
+      if (body.classList.contains('menu-open')) {
         closeMenu();
       } else {
         openMenu();
@@ -55,21 +55,20 @@
 
     // Close on Escape
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && body.classList.contains('burger-menu')) {
+      if (e.key === 'Escape' && body.classList.contains('menu-open')) {
         closeMenu();
       }
     });
 
-    // Close when clicking overlay
-    var overlay = document.querySelector('.menu-overlay');
-    if (overlay) {
-      overlay.addEventListener('click', function () {
-        closeMenu();
-      });
-    }
+    // Close when clicking outside the mobile nav or burger button
+    document.addEventListener('click', function (e) {
+      if (!body.classList.contains('menu-open')) return;
+      if (e.target.closest('.header__mobile-nav') || e.target.closest('.header__burger')) return;
+      closeMenu();
+    });
 
     // Close when clicking any nav link inside mobile menu
-    var navLinks = document.querySelectorAll('.mobile-nav a');
+    var navLinks = document.querySelectorAll('.header__mobile-nav a');
     for (var i = 0; i < navLinks.length; i++) {
       navLinks[i].addEventListener('click', function () {
         closeMenu();
@@ -110,6 +109,7 @@
 
       var hash = link.getAttribute('href');
       if (!hash || hash === '#') return;
+      if (!/^#[a-zA-Z0-9_-]+$/.test(hash)) return;
 
       var target = document.querySelector(hash);
       if (!target) return;
@@ -127,7 +127,7 @@
 
       // Update URL hash without jumping
       if (history.pushState) {
-        history.pushState(null, null, hash);
+        history.pushState(null, '', hash);
       }
     });
   }
@@ -154,9 +154,9 @@
       var isMobile = window.innerWidth < MOBILE_BREAKPOINT;
 
       if (isMobile && scrollY > SCROLL_THRESHOLD) {
-        ctaEl.classList.add('cta-sticky--visible');
+        ctaEl.classList.add('is-visible');
       } else {
-        ctaEl.classList.remove('cta-sticky--visible');
+        ctaEl.classList.remove('is-visible');
       }
     });
 
@@ -251,6 +251,21 @@
   }
 
   /* -------------------------------------------------------
+   * Footer Accordion
+   * ----------------------------------------------------- */
+  function initFooterAccordion() {
+    var toggles = document.querySelectorAll('.footer__accordion-toggle');
+    for (var i = 0; i < toggles.length; i++) {
+      toggles[i].addEventListener('click', function () {
+        var accordion = this.closest('[data-accordion]');
+        if (accordion) {
+          accordion.classList.toggle('is-open');
+        }
+      });
+    }
+  }
+
+  /* -------------------------------------------------------
    * Init on DOMContentLoaded
    * ----------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
@@ -259,5 +274,6 @@
     initSmoothScroll();
     initStickyCTA();
     initRecentlyViewed();
+    initFooterAccordion();
   });
 })();

@@ -75,20 +75,37 @@
       '.quiz__step[data-step="1"] .quiz__option'
     );
 
+    function selectOption(option) {
+      // Deselect all
+      for (var j = 0; j < options.length; j++) {
+        options[j].classList.remove('quiz__option--selected');
+        options[j].setAttribute('aria-checked', 'false');
+        var radio = options[j].querySelector('input[type="radio"]');
+        if (radio) radio.checked = false;
+      }
+      // Select chosen
+      option.classList.add('quiz__option--selected');
+      option.setAttribute('aria-checked', 'true');
+      var radio = option.querySelector('input[type="radio"]');
+      if (radio) {
+        radio.checked = true;
+        self.data.layout = radio.value;
+      }
+    }
+
     for (var i = 0; i < options.length; i++) {
+      options[i].setAttribute('tabindex', '0');
+      options[i].setAttribute('role', 'radio');
+      options[i].setAttribute('aria-checked', 'false');
+
       options[i].addEventListener('click', function () {
-        // Deselect all
-        for (var j = 0; j < options.length; j++) {
-          options[j].classList.remove('quiz__option--selected');
-          var radio = options[j].querySelector('input[type="radio"]');
-          if (radio) radio.checked = false;
-        }
-        // Select clicked
-        this.classList.add('quiz__option--selected');
-        var radio = this.querySelector('input[type="radio"]');
-        if (radio) {
-          radio.checked = true;
-          self.data.layout = radio.value;
+        selectOption(this);
+      });
+
+      options[i].addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          selectOption(this);
         }
       });
     }
@@ -103,18 +120,35 @@
       '.quiz__step[data-step="3"] .quiz__option'
     );
 
+    function selectOption(option) {
+      for (var j = 0; j < options.length; j++) {
+        options[j].classList.remove('quiz__option--selected');
+        options[j].setAttribute('aria-checked', 'false');
+        var radio = options[j].querySelector('input[type="radio"]');
+        if (radio) radio.checked = false;
+      }
+      option.classList.add('quiz__option--selected');
+      option.setAttribute('aria-checked', 'true');
+      var radio = option.querySelector('input[type="radio"]');
+      if (radio) {
+        radio.checked = true;
+        self.data.contact_method = radio.value;
+      }
+    }
+
     for (var i = 0; i < options.length; i++) {
+      options[i].setAttribute('tabindex', '0');
+      options[i].setAttribute('role', 'radio');
+      options[i].setAttribute('aria-checked', 'false');
+
       options[i].addEventListener('click', function () {
-        for (var j = 0; j < options.length; j++) {
-          options[j].classList.remove('quiz__option--selected');
-          var radio = options[j].querySelector('input[type="radio"]');
-          if (radio) radio.checked = false;
-        }
-        this.classList.add('quiz__option--selected');
-        var radio = this.querySelector('input[type="radio"]');
-        if (radio) {
-          radio.checked = true;
-          self.data.contact_method = radio.value;
+        selectOption(this);
+      });
+
+      options[i].addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          selectOption(this);
         }
       });
     }
@@ -275,6 +309,7 @@
 
     var errorEl = document.createElement('div');
     errorEl.className = 'quiz__error';
+    errorEl.setAttribute('role', 'alert');
     errorEl.textContent = message;
     errorEl.style.color = '#d32f2f';
     errorEl.style.marginTop = '12px';
@@ -394,9 +429,17 @@
     // AJAX
     var xhr = new XMLHttpRequest();
     xhr.open('POST', kuhniRema.ajaxUrl, true);
+    xhr.timeout = 15000;
+
+    xhr.ontimeout = function () {
+      self.showStepError(TOTAL_STEPS, 'Превышено время ожидания. Попробуйте ещё раз.');
+      self.resetSubmitBtn();
+    };
 
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4) return;
+
+      self.clearStepErrors(TOTAL_STEPS);
 
       if (xhr.status >= 200 && xhr.status < 300) {
         var response;

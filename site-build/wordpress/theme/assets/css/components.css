@@ -17,7 +17,7 @@
   border: none;
   border-radius: var(--radius-md);
   font-family: var(--font-heading);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   font-size: 16px;
   line-height: 1;
   text-decoration: none;
@@ -29,7 +29,7 @@
 /* Primary */
 .btn--primary {
   background-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 .btn--primary:hover,
@@ -40,7 +40,7 @@
 /* Secondary */
 .btn--secondary {
   background-color: var(--color-secondary);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 .btn--secondary:hover,
@@ -58,7 +58,7 @@
 .btn--ghost:hover,
 .btn--ghost:focus-visible {
   background-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 /* Icon-only */
@@ -120,7 +120,7 @@
 
 .card__price {
   font-family: var(--font-heading);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   font-size: 20px;
   color: var(--color-primary);
 }
@@ -196,7 +196,7 @@
 
 .form-label {
   display: block;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   margin-bottom: var(--spacing-xs);
   font-size: 14px;
 }
@@ -210,7 +210,7 @@
   border-radius: var(--radius-md);
   font-size: 16px;
   font-family: var(--font-body);
-  background-color: #fff;
+  background-color: var(--color-surface-light);
   transition: var(--transition-fast);
   box-sizing: border-box;
 }
@@ -250,20 +250,20 @@
   padding: 4px 12px;
   border-radius: var(--radius-full);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   line-height: 1.4;
 }
 
 .badge--sale {
-  background-color: #D32F2F;
-  color: #fff;
+  background-color: var(--color-error);
+  color: var(--color-text-on-dark);
 }
 
 .badge--new {
   background-color: var(--color-secondary);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 .badge--hit {
@@ -273,17 +273,17 @@
 
 .badge--installment {
   background-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 .badge--guarantee {
   background-color: var(--color-secondary);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 .badge--render {
   background-color: var(--color-text-muted);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 
@@ -304,7 +304,7 @@
 
 .cta-block--primary {
   background-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-on-dark);
 }
 
 .cta-block__title {
@@ -391,7 +391,7 @@
 }
 
 .advantage__title {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   margin-bottom: var(--spacing-sm);
 }
 
