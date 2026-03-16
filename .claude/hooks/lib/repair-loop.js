@@ -85,12 +85,12 @@ if (attempt >= 3) {
   lines.push("   3. Пометь как BLOCKED и двигайся дальше");
   lines.push("");
 
-  // Помечаем в памяти
-  const fp = db.fingerprint(errorMessage);
-  const existing = db.db.prepare("SELECT id FROM incidents WHERE fingerprint = ?").get(fp);
-  if (existing) {
-    db.db.prepare("UPDATE incidents SET status = 'investigating', probable_cause = COALESCE(probable_cause, '') || ? WHERE id = ?")
-      .run(`\n[attempt ${attempt}] Достигнут лимит попыток. Последняя команда: ${failedCommand || 'unknown'}`, existing.id);
+  // Помечаем в памяти через публичный API
+  const similar = db.findSimilarIncidents(errorMessage, 1);
+  if (similar.length > 0) {
+    db.updateIncidentStatus(similar[0].id, "investigating", {
+      probable_cause: `\n[attempt ${attempt}] Достигнут лимит попыток. Последняя команда: ${failedCommand || 'unknown'}`
+    });
   }
 } else {
   // Рекомендуем фикс

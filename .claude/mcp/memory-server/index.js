@@ -275,6 +275,72 @@ server.tool(
 );
 
 // =============================================================================
+// UPDATE / DELETE / PRUNE — управление записями
+// =============================================================================
+
+server.tool(
+  "incident_update_status",
+  "Обновить статус инцидента (open, investigating, fixed, wontfix, duplicate)",
+  {
+    id: z.number().describe("ID инцидента"),
+    status: z.enum(["open", "investigating", "fixed", "wontfix", "duplicate"]),
+    probable_cause: z.string().optional(),
+    verified_fix: z.string().optional(),
+  },
+  async ({ id, status, ...extra }) => ok(db.updateIncidentStatus(id, status, extra))
+);
+
+server.tool(
+  "solution_update",
+  "Обновить решение (title, description, code, tags, verified)",
+  {
+    id: z.number().describe("ID решения"),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    code: z.string().optional(),
+    commands: z.array(z.string()).optional(),
+    tags: z.array(z.string()).optional(),
+    verified: z.boolean().optional(),
+  },
+  async ({ id, ...updates }) => ok(db.updateSolution(id, updates))
+);
+
+server.tool(
+  "policy_update",
+  "Обновить правило (title, content, category, active, verified)",
+  {
+    id: z.number().describe("ID правила"),
+    title: z.string().optional(),
+    content: z.string().optional(),
+    category: z.enum(["rule", "constraint", "convention", "limitation"]).optional(),
+    active: z.boolean().optional(),
+    verified: z.boolean().optional(),
+  },
+  async ({ id, ...updates }) => ok(db.updatePolicy(id, updates))
+);
+
+server.tool(
+  "memory_delete",
+  "Удалить запись из любого слоя памяти",
+  {
+    table: z.enum(["policies", "episodes", "incidents", "solutions", "decisions", "contexts"]).describe("Таблица"),
+    id: z.number().describe("ID записи"),
+  },
+  async ({ table, id }) => ok(db.deleteEntry(table, id))
+);
+
+server.tool(
+  "memory_prune",
+  "Очистить старые записи из указанной таблицы",
+  {
+    table: z.enum(["incidents", "episodes", "contexts", "github_events"]).describe("Таблица для очистки"),
+    days: z.number().optional().default(90).describe("Удалить записи старше N дней"),
+    status: z.string().optional().describe("Только с этим статусом (для incidents)"),
+  },
+  async (args) => ok(db.pruneOld(args))
+);
+
+// =============================================================================
 // CROSS-LAYER TOOLS — поиск, bootstrap, статистика
 // =============================================================================
 

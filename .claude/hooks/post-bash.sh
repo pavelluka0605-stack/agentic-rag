@@ -124,16 +124,19 @@ if [ -f "$REPAIR_COUNT_FILE" ]; then
   ATTEMPTS=$((ATTEMPTS + 1))
   echo "$ATTEMPTS" > "$REPAIR_COUNT_FILE"
 
-  if [ "$ATTEMPTS" -ge 3 ]; then
-    echo ""
-    echo "🛑 СТОП: $ATTEMPTS неудачных попыток с этой ошибкой."
-    echo "Не повторяй тот же подход. Варианты:"
-    echo "  1. Принципиально другой подход"
-    echo "  2. Спроси пользователя"
-    echo "  3. Пометь как blocked и двигайся дальше"
+  if [ "$ATTEMPTS" -ge 2 ]; then
+    # Вызываем repair-loop.js для анализа
+    REPAIR_OUTPUT=$(node "$HOOKS_DIR/lib/repair-loop.js" "$ERROR_MSG" "$CMD" "$ATTEMPTS" 2>/dev/null)
+    if [ -n "$REPAIR_OUTPUT" ]; then
+      echo ""
+      echo "$REPAIR_OUTPUT"
+    fi
   fi
 else
   echo "1" > "$REPAIR_COUNT_FILE"
 fi
+
+# ── 5. Очистка старых temp-файлов repair loop ─────────────────────────────
+find /tmp -maxdepth 1 -name "claude-repair-*" -mtime +1 -delete 2>/dev/null
 
 exit 0

@@ -27,7 +27,7 @@ try {
   db = new MemoryDB(DB_PATH);
 } catch (e) {
   console.error(`[memory] DB not available: ${e.message}`);
-  process.exit(0); // Не блокируем hook при отсутствии БД
+  process.exit(1); // Сообщаем hook что память недоступна
 }
 
 const [,, command, ...args] = process.argv;

@@ -63,7 +63,7 @@ fi
 
 # ── 2. Retrieval похожих ошибок из памяти ────────────────────────────────────
 
-if [ ${#CMD} -gt 20 ] && [ -n "$WARNINGS" ]; then
+if [ ${#CMD} -gt 20 ]; then
   SIMILAR=$(node "$HOOKS_DIR/lib/query-memory.js" similar-incidents "$CMD" 2>/dev/null | head -30)
   if [ -n "$SIMILAR" ] && [ "$SIMILAR" != "[]" ]; then
     WARNINGS="${WARNINGS}\n📋 Похожие прошлые инциденты:\n${SIMILAR}\n"
