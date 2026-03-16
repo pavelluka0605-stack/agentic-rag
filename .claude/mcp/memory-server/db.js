@@ -31,7 +31,72 @@ export class MemoryDB {
 
   fingerprint(text) {
     const normalized = (text || "").toLowerCase().replace(/\s+/g, " ").trim();
+    if (!normalized) return crypto.createHash("sha256").update("__empty__").digest("hex").slice(0, 16);
     return crypto.createHash("sha256").update(normalized).digest("hex").slice(0, 16);
+  }
+
+  // ── Update / Delete / Prune ────────────────────────────────────────────────
+
+  updateIncidentStatus(id, status, extra = {}) {
+    const fields = ["status = ?", "updated_at = datetime('now')"];
+    const params = [status];
+    if (extra.probable_cause) { fields.push("probable_cause = COALESCE(probable_cause, '') || ?"); params.push(extra.probable_cause); }
+    if (extra.verified_fix) { fields.push("verified_fix = ?"); params.push(extra.verified_fix); }
+    params.push(id);
+    this.db.prepare(`UPDATE incidents SET ${fields.join(", ")} WHERE id = ?`).run(...params);
+    return this.db.prepare("SELECT * FROM incidents WHERE id = ?").get(id);
+  }
+
+  updateSolution(id, updates) {
+    const fields = ["updated_at = datetime('now')"];
+    const params = [];
+    for (const key of ["title", "description", "code", "commands", "tags", "verified"]) {
+      if (updates[key] !== undefined) {
+        fields.push(`${key} = ?`);
+        params.push(typeof updates[key] === "object" ? JSON.stringify(updates[key]) : updates[key]);
+      }
+    }
+    if (fields.length === 1) return this.db.prepare("SELECT * FROM solutions WHERE id = ?").get(id);
+    params.push(id);
+    this.db.prepare(`UPDATE solutions SET ${fields.join(", ")} WHERE id = ?`).run(...params);
+    return this.db.prepare("SELECT * FROM solutions WHERE id = ?").get(id);
+  }
+
+  updatePolicy(id, updates) {
+    const fields = ["updated_at = datetime('now')"];
+    const params = [];
+    for (const key of ["title", "content", "category", "active", "verified"]) {
+      if (updates[key] !== undefined) {
+        fields.push(`${key} = ?`);
+        params.push(updates[key]);
+      }
+    }
+    if (fields.length === 1) return this.db.prepare("SELECT * FROM policies WHERE id = ?").get(id);
+    params.push(id);
+    this.db.prepare(`UPDATE policies SET ${fields.join(", ")} WHERE id = ?`).run(...params);
+    return this.db.prepare("SELECT * FROM policies WHERE id = ?").get(id);
+  }
+
+  deleteEntry(table, id) {
+    const allowed = ["policies", "episodes", "incidents", "solutions", "decisions", "contexts"];
+    if (!allowed.includes(table)) throw new Error(`Cannot delete from table: ${table}`);
+    const row = this.db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+    if (!row) return { deleted: false, reason: "not found" };
+    this.db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+    return { deleted: true, id, table };
+  }
+
+  pruneOld({ table, days = 90, status } = {}) {
+    const allowed = ["incidents", "episodes", "contexts", "github_events"];
+    if (!allowed.includes(table)) throw new Error(`Cannot prune table: ${table}`);
+    let sql = `DELETE FROM ${table} WHERE updated_at < datetime('now', '-' || ? || ' days')`;
+    const params = [days];
+    if (status && table === "incidents") {
+      sql += " AND status = ?";
+      params.push(status);
+    }
+    const result = this.db.prepare(sql).run(...params);
+    return { table, deleted: result.changes, older_than_days: days };
   }
 
   // ── Policy Memory ────────────────────────────────────────────────────────
