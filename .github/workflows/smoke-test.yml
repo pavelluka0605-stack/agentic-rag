@@ -1,0 +1,117 @@
+name: "Smoke Test — кухнирема.рф"
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to test (default: production)"
+        required: false
+        default: "https://xn--e1afaihifegddo7k.xn--p1ai"
+        type: string
+  workflow_run:
+    workflows: ["Deploy WordPress Theme — Кухни Рема"]
+    types:
+      - completed
+
+# ─── Secrets required ───
+# TG_BOT_TOKEN, TG_CHAT_ID
+
+jobs:
+  smoke-test:
+    name: "Run Smoke Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only run after successful deploy (or manual trigger)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine base URL
+        id: url
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "base_url=${{ inputs.base_url }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_url=https://xn--e1afaihifegddo7k.xn--p1ai" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run smoke tests
+        id: smoke
+        run: |
+          chmod +x site-build/deploy/smoke-test.sh
+
+          # Run tests, capture output
+          set +e
+          site-build/deploy/smoke-test.sh "${{ steps.url.outputs.base_url }}" 2>&1 | tee /tmp/smoke-results.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+
+          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+
+          # Write to job summary
+          {
+            echo '```'
+            cat /tmp/smoke-results.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit $EXIT_CODE
+
+      - name: Notify Telegram — success
+        if: ${{ success() }}
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          # Count results from output
+          PASS_COUNT=$(grep -c "PASS |" /tmp/smoke-results.txt 2>/dev/null || echo "?")
+          TOTAL_LINE=$(grep "Total:" /tmp/smoke-results.txt 2>/dev/null | head -1 || echo "")
+
+          MSG=$(cat <<EOF
+          ✅ Smoke Test — ALL PASSED
+
+          URL: ${{ steps.url.outputs.base_url }}
+          Tests: ${TOTAL_LINE:-${PASS_COUNT} passed}
+          Trigger: ${{ github.event_name }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          )
+          curl -s --max-time 15 "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
+
+      - name: Notify Telegram — failure
+        if: ${{ failure() }}
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          # Extract failed tests
+          FAILURES=$(grep "FAIL |" /tmp/smoke-results.txt 2>/dev/null | head -10 || echo "See workflow run")
+          TOTAL_LINE=$(grep "Total:" /tmp/smoke-results.txt 2>/dev/null | head -1 || echo "")
+
+          MSG=$(cat <<EOF
+          ❌ Smoke Test — FAILED
+
+          URL: ${{ steps.url.outputs.base_url }}
+          ${TOTAL_LINE}
+
+          Failed tests:
+          ${FAILURES}
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          )
+          curl -s --max-time 15 "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-results
+          path: /tmp/smoke-results.txt
+          retention-days: 7

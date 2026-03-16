@@ -1,0 +1,262 @@
+# =============================================================================
+# .htaccess for xn--e1afaihifegddo7k.xn--p1ai (Apache fallback)
+# Primary web server is Nginx. This file is a fallback if Apache is used.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# SECTION 1: Force HTTPS + canonical domain
+# ---------------------------------------------------------------------------
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+
+# Redirect HTTP to HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# Redirect www to non-www
+RewriteCond %{HTTP_HOST} ^www\.xn--e1afaihifegddo7k\.xn--p1ai$ [NC]
+RewriteRule ^(.*)$ https://xn--e1afaihifegddo7k.xn--p1ai/$1 [R=301,L]
+
+# ---------------------------------------------------------------------------
+# SECTION 2: Cross-domain redirects (mebelit.site -> kuhnirema)
+# ---------------------------------------------------------------------------
+
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^straight/?$ https://xn--e1afaihifegddo7k.xn--p1ai/pryamye-kuhni/ [R=301,L]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^corner/?$ https://xn--e1afaihifegddo7k.xn--p1ai/uglovye-kuhni/ [R=301,L]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^quiz/?$ https://xn--e1afaihifegddo7k.xn--p1ai/kalkulyator/ [R=301,L]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^catalog/?$ https://xn--e1afaihifegddo7k.xn--p1ai/uglovye-kuhni/ [R=301,L]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^about/?$ https://xn--e1afaihifegddo7k.xn--p1ai/o-kompanii/ [R=301,L]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^contacts/?$ https://xn--e1afaihifegddo7k.xn--p1ai/kontakty/ [R=301,L]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^portfolio/?$ https://xn--e1afaihifegddo7k.xn--p1ai/portfolio/ [R=301,L]
+
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^privacy-policy/?$ https://xn--e1afaihifegddo7k.xn--p1ai/politika-konfidencialnosti/ [R=301,L]
+
+# Catch-all: any other mebelit.site URL -> homepage
+RewriteCond %{HTTP_HOST} ^(www\.)?mebelit\.site$ [NC]
+RewriteRule ^(.*)$ https://xn--e1afaihifegddo7k.xn--p1ai/ [R=301,L]
+
+# ---------------------------------------------------------------------------
+# SECTION 3: Old URL path redirects (same domain)
+# ---------------------------------------------------------------------------
+
+RewriteRule ^straight/?(.*)$ /pryamye-kuhni/ [R=301,L]
+RewriteRule ^corner/?(.*)$ /uglovye-kuhni/ [R=301,L]
+RewriteRule ^quiz/?(.*)$ /kalkulyator/ [R=301,L]
+RewriteRule ^catalog/?(.*)$ /uglovye-kuhni/ [R=301,L]
+RewriteRule ^about/?$ /o-kompanii/ [R=301,L]
+RewriteRule ^contacts/?$ /kontakty/ [R=301,L]
+
+# ---------------------------------------------------------------------------
+# SECTION 4: Trailing slash enforcement
+# ---------------------------------------------------------------------------
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_URI} !(.*)/$
+RewriteCond %{REQUEST_URI} !\.(jpg|jpeg|png|gif|webp|svg|css|js|ico|pdf|xml|txt|woff|woff2)$
+RewriteRule ^(.*)$ /$1/ [R=301,L]
+
+# ---------------------------------------------------------------------------
+# SECTION 5: WordPress rewrite rules
+# ---------------------------------------------------------------------------
+
+# BEGIN WordPress
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+# END WordPress
+
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# SECTION 6: Security — file protection
+# ---------------------------------------------------------------------------
+
+# Block access to wp-config.php
+<Files wp-config.php>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Deny from all
+    </IfModule>
+</Files>
+
+# Block access to .htaccess itself
+<Files .htaccess>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Deny from all
+    </IfModule>
+</Files>
+
+# Block xmlrpc.php (prevents brute-force and DDoS attacks)
+<Files xmlrpc.php>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Deny from all
+    </IfModule>
+</Files>
+
+# Block access to readme.html and license.txt (version disclosure)
+<FilesMatch "^(readme\.html|license\.txt)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Block PHP execution in uploads directory
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^wp-content/uploads/.*\.php$ - [F,L]
+</IfModule>
+
+# Block access to hidden files (.git, .env, etc.)
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule (^\.|/\.) - [F]
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# SECTION 7: Security headers
+# ---------------------------------------------------------------------------
+
+<IfModule mod_headers.c>
+    # Prevent clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Prevent MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # XSS protection
+    Header always set X-XSS-Protection "1; mode=block"
+
+    # Referrer policy (preserves referral data for analytics)
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # HSTS — force HTTPS for 1 year
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+    # Permissions policy
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+    # Hide PHP version
+    Header always unset X-Powered-By
+    Header unset X-Powered-By
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# SECTION 8: Compression (page speed)
+# ---------------------------------------------------------------------------
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/atom+xml
+    AddOutputFilterByType DEFLATE image/svg+xml
+    AddOutputFilterByType DEFLATE font/woff
+    AddOutputFilterByType DEFLATE font/woff2
+    AddOutputFilterByType DEFLATE application/font-woff
+    AddOutputFilterByType DEFLATE application/font-woff2
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# SECTION 9: Browser caching
+# ---------------------------------------------------------------------------
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault "access plus 1 month"
+
+    # Images
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/x-icon "access plus 1 year"
+    ExpiresByType image/avif "access plus 1 year"
+
+    # Fonts
+    ExpiresByType application/x-font-woff "access plus 1 year"
+    ExpiresByType application/x-font-woff2 "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+    ExpiresByType font/ttf "access plus 1 year"
+    ExpiresByType font/otf "access plus 1 year"
+    ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+
+    # CSS and JS
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType text/javascript "access plus 1 month"
+
+    # HTML
+    ExpiresByType text/html "access plus 0 seconds"
+
+    # Data interchange
+    ExpiresByType application/json "access plus 0 seconds"
+    ExpiresByType application/xml "access plus 0 seconds"
+    ExpiresByType text/xml "access plus 0 seconds"
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# SECTION 10: Misc performance
+# ---------------------------------------------------------------------------
+
+# Disable server signature
+ServerSignature Off
+
+# Disable directory browsing
+Options -Indexes
+
+# Disable ETag (use Cache-Control / Expires instead)
+<IfModule mod_headers.c>
+    Header unset ETag
+</IfModule>
+FileETag None
+
+# Set upload limits (if mod_php)
+<IfModule mod_php.c>
+    php_value upload_max_filesize 20M
+    php_value post_max_size 25M
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+</IfModule>
