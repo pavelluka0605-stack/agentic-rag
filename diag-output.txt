@@ -1,5 +1,5 @@
 ========================================
-=== VPS FULL DIAGNOSTIC Mon Mar 16 03:45:48 UTC 2026 ===
+=== VPS FULL DIAGNOSTIC Mon Mar 16 04:56:33 UTC 2026 ===
 ========================================
 
 === 1. Service worker files in /opt/claude-chat/public/ ===
@@ -745,7 +745,7 @@ app.listen(PORT, '0.0.0.0', () => {
 │ namespace         │ default                               │
 │ version           │ 1.0.0                                 │
 │ restarts          │ 0                                     │
-│ uptime            │ 16h                                   │
+│ uptime            │ 18h                                   │
 │ script path       │ /opt/claude-chat/server.js            │
 │ script args       │ N/A                                   │
 │ error log path    │ /root/.pm2/logs/claude-chat-error.log │
@@ -774,11 +774,11 @@ app.listen(PORT, '0.0.0.0', () => {
 
  Code metrics value 
 ┌────────────────────────┬───────────┐
-│ Used Heap Size         │ 14.70 MiB │
-│ Heap Usage             │ 75.89 %   │
+│ Used Heap Size         │ 15.66 MiB │
+│ Heap Usage             │ 80.81 %   │
 │ Heap Size              │ 19.38 MiB │
-│ Event Loop Latency p95 │ 1.33 ms   │
-│ Event Loop Latency     │ 0.47 ms   │
+│ Event Loop Latency p95 │ 1.40 ms   │
+│ Event Loop Latency     │ 0.46 ms   │
 │ Active handles         │ 4         │
 │ Active requests        │ 0         │
 │ HTTP                   │ 0 req/min │
@@ -803,8 +803,8 @@ app.listen(PORT, '0.0.0.0', () => {
 
 === 7. ALL Docker containers ===
 CONTAINER ID   IMAGE                         COMMAND                  CREATED        STATUS                 PORTS                                                                          NAMES
-e292f6cbdd5a   wordpress:6.7-php8.2-apache   "docker-entrypoint.s…"   26 hours ago   Up 26 hours            0.0.0.0:8080->80/tcp, [::]:8080->80/tcp                                        mebelit-wp-wordpress-1
-ef1604097c60   mysql:8.0                     "docker-entrypoint.s…"   26 hours ago   Up 26 hours            0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp                         mebelit-wp-db-1
+e292f6cbdd5a   wordpress:6.7-php8.2-apache   "docker-entrypoint.s…"   27 hours ago   Up 27 hours            0.0.0.0:8080->80/tcp, [::]:8080->80/tcp                                        mebelit-wp-wordpress-1
+ef1604097c60   mysql:8.0                     "docker-entrypoint.s…"   27 hours ago   Up 27 hours            0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp                         mebelit-wp-db-1
 bfdfe0129de2   9f9e493a5f9e                  "tini -- /docker-ent…"   2 days ago     Created                                                                                               n8n-traefik-n8n-1
 581a07387d54   traefik                       "/entrypoint.sh --ap…"   2 days ago     Up 2 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp   n8n-traefik-traefik-1
 b77d63637705   pgvector/pgvector:pg16        "docker-entrypoint.s…"   6 days ago     Up 6 days              5432/tcp                                                                       n8n-postgres-1
@@ -899,7 +899,7 @@ Traefik container: 581a07387d54
 < access-control-allow-origin: *
 < cache-control: no-cache, no-store, must-revalidate
 < content-type: text/html; charset=utf-8
-< date: Mon, 16 Mar 2026 03:45:49 GMT
+< date: Mon, 16 Mar 2026 04:56:34 GMT
 < etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 < expires: 0
 < pragma: no-cache
@@ -933,7 +933,7 @@ MATCH: Same content
 ; <<>> DiG 9.18.39-0ubuntu0.24.04.2-Ubuntu <<>> chat.marbomebel.ru
 ;; global options: +cmd
 ;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 6978
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 38763
 ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
 
 ;; OPT PSEUDOSECTION:
@@ -942,11 +942,11 @@ MATCH: Same content
 ;chat.marbomebel.ru.		IN	A
 
 ;; ANSWER SECTION:
-chat.marbomebel.ru.	5342	IN	A	72.56.127.126
+chat.marbomebel.ru.	1098	IN	A	72.56.127.126
 
-;; Query time: 1 msec
+;; Query time: 0 msec
 ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
-;; WHEN: Mon Mar 16 03:45:49 UTC 2026
+;; WHEN: Mon Mar 16 04:56:34 UTC 2026
 ;; MSG SIZE  rcvd: 63
 
 
@@ -961,7 +961,7 @@ access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
 content-type: text/html; charset=utf-8
-date: Mon, 16 Mar 2026 03:45:50 GMT
+date: Mon, 16 Mar 2026 04:56:34 GMT
 etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 expires: 0
 pragma: no-cache
