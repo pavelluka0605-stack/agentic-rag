@@ -886,7 +886,8 @@ foreach ( $kitchens as $index => $kitchen ) {
     // ACF fields
     update_field( 'kitchen_price', $price, $post_id );
     update_field( 'kitchen_dimensions', $dimensions, $post_id );
-    update_field( 'kitchen_description', $clean_desc, $post_id );
+    // Store description as post_content (kitchen CPT supports 'editor')
+    wp_update_post( array( 'ID' => $post_id, 'post_content' => $clean_desc ) );
     update_field( 'kitchen_installment', $installment, $post_id );
     update_field( 'kitchen_sort_order', $sort_order, $post_id );
 

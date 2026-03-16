@@ -6,7 +6,7 @@
  *   wp eval-file data/import-faq.php
  *   wp eval-file data/import-faq.php --dry-run
  *
- * Requires: ACF plugin active, CPT "faq", taxonomy "faq_category"
+ * Requires: ACF plugin active, CPT "faq"
  */
 
 $dry_run = in_array( '--dry-run', $args ?? [] )
@@ -18,30 +18,17 @@ if ( $dry_run ) {
 }
 
 /* ---------------------------------------------------------------
- * 1. Ensure taxonomy terms exist
+ * 1. Category mapping (ACF select field values)
+ *    faq_category is an ACF select field, not a taxonomy.
+ *    CPT choices: general, prices, materials, delivery, warranty
  * -------------------------------------------------------------- */
-$categories = [
-    'zakazat'   => 'Как заказать',
-    'materialy' => 'Материалы и качество',
-    'ceny'      => 'Цены и оплата',
-    'dostavka'  => 'Доставка и установка',
-    'garantiya' => 'Гарантия и сервис',
+$category_map = [
+    'zakazat'   => 'general',
+    'materialy' => 'materials',
+    'ceny'      => 'prices',
+    'dostavka'  => 'delivery',
+    'garantiya' => 'warranty',
 ];
-
-foreach ( $categories as $slug => $name ) {
-    if ( ! term_exists( $slug, 'faq_category' ) ) {
-        if ( $dry_run ) {
-            WP_CLI::log( "[dry-run] Would create term: {$name} ({$slug})" );
-        } else {
-            $result = wp_insert_term( $name, 'faq_category', [ 'slug' => $slug ] );
-            if ( is_wp_error( $result ) ) {
-                WP_CLI::warning( "Failed to create term {$slug}: " . $result->get_error_message() );
-            } else {
-                WP_CLI::log( "Created term: {$name} ({$slug})" );
-            }
-        }
-    }
-}
 
 /* ---------------------------------------------------------------
  * 2. FAQ data — 18 items
@@ -162,12 +149,11 @@ WP_CLI::log( "Importing {$total} FAQ items..." );
 foreach ( $faqs as $i => $faq ) {
     $num = $i + 1;
 
-    // Check for duplicate by question text
+    // Check for duplicate by post title (question = post_title in FAQ CPT)
     $existing = get_posts( [
         'post_type'   => 'faq',
         'post_status' => 'any',
-        'meta_key'    => 'faq_question',
-        'meta_value'  => $faq['question'],
+        'title'       => $faq['question'],
         'numberposts' => 1,
     ] );
 
@@ -197,13 +183,10 @@ foreach ( $faqs as $i => $faq ) {
         continue;
     }
 
-    // ACF fields
-    update_field( 'faq_question', $faq['question'], $post_id );
-    update_field( 'faq_answer',   $faq['answer'],   $post_id );
-    update_field( 'faq_category', $faq['category'],  $post_id );
-
-    // Assign taxonomy term
-    wp_set_object_terms( $post_id, $faq['category'], 'faq_category' );
+    // ACF fields (question is already in post_title; faq_category is ACF select, not taxonomy)
+    update_field( 'faq_answer',   $faq['answer'],                       $post_id );
+    update_field( 'faq_category', $category_map[ $faq['category'] ],    $post_id );
+    update_field( 'faq_sort_order', $num,                               $post_id );
 
     WP_CLI::log( "[{$num}/{$total}] Created (ID {$post_id}): {$faq['question']}" );
     $created++;

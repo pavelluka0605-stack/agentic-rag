@@ -190,7 +190,7 @@ foreach ( $reviews as $i => $review ) {
         'meta_query'  => [
             'relation' => 'AND',
             [
-                'key'   => 'review_author_name',
+                'key'   => 'review_client_name',
                 'value' => $review['author'],
             ],
             [
@@ -229,13 +229,14 @@ foreach ( $reviews as $i => $review ) {
     }
 
     // ACF fields
-    update_field( 'review_author_name',   $review['author'],        $post_id );
+    update_field( 'review_client_name',    $review['author'],        $post_id );
     update_field( 'review_rating',        $review['rating'],        $post_id );
     update_field( 'review_text',          $review['text'],          $post_id );
     update_field( 'review_source',        $review['source'],        $post_id );
     update_field( 'review_source_url',    $review['source_url'],    $post_id );
     update_field( 'review_date',          $review['date'],          $post_id );
-    update_field( 'review_kitchen_model', $review['kitchen_model'], $post_id );
+    // kitchen_model stored in post excerpt (no dedicated ACF field; review_project links to project CPT)
+    wp_update_post( array( 'ID' => $post_id, 'post_excerpt' => $review['kitchen_model'] ) );
 
     WP_CLI::log( "[{$num}/{$total}] Created (ID {$post_id}): {$review['author']} — {$review['kitchen_model']} ({$review['source']}, {$review['rating']}★)" );
     $created++;
