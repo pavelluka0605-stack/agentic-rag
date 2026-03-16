@@ -179,33 +179,4 @@ $lng            = kuhni_rema_option( 'global_lng' );
 
 </main><!-- .page-contacts -->
 
-<!-- Schema.org LocalBusiness -->
-<script type="application/ld+json">
-<?php
-echo wp_json_encode( array(
-    '@context'    => 'https://schema.org',
-    '@type'       => 'LocalBusiness',
-    'name'        => 'Кухни Рема',
-    'description' => 'Кухни на заказ в Красноярске с точностью до 1 см. Собственное производство.',
-    'url'         => home_url( '/' ),
-    'telephone'   => $phone ? preg_replace( '/[^+0-9]/', '', $phone ) : '',
-    'email'       => $email ?: '',
-    'address'     => array(
-        '@type'           => 'PostalAddress',
-        'streetAddress'   => $address ?: '',
-        'addressLocality' => 'Красноярск',
-        'addressRegion'   => 'Красноярский край',
-        'addressCountry'  => 'RU',
-    ),
-    'geo'         => ( $lat && $lng ) ? array(
-        '@type'     => 'GeoCoordinates',
-        'latitude'  => (float) $lat,
-        'longitude' => (float) $lng,
-    ) : null,
-    'openingHours' => $working_hours ?: '',
-    'image'        => get_site_icon_url(),
-), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
-?>
-</script>
-
 <?php get_footer(); ?>

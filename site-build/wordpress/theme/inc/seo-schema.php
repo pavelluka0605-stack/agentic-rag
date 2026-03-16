@@ -58,23 +58,6 @@ function kuhni_rema_is_page_template( $slug ) {
 }
 
 /**
- * Helper: get ACF option field with fallback.
- *
- * @param string $field   ACF field name.
- * @param mixed  $default Default value.
- * @return mixed
- */
-function kuhni_rema_get_option( $field, $default = '' ) {
-	if ( function_exists( 'get_field' ) ) {
-		$value = get_field( $field, 'option' );
-		if ( $value ) {
-			return $value;
-		}
-	}
-	return $default;
-}
-
-/**
  * Output a JSON-LD script block.
  *
  * @param array $data Schema data array.
@@ -93,17 +76,15 @@ function kuhni_rema_render_jsonld( $data ) {
  * ------------------------------------------------------------- */
 function kuhni_rema_schema_organization() {
 
-	$phone    = kuhni_rema_get_option( 'company_phone', '+7 (391) 216-97-59' );
-	$address  = kuhni_rema_get_option( 'company_address', '' );
-	$vk_url   = kuhni_rema_get_option( 'social_vk', '' );
-	$tg_url   = kuhni_rema_get_option( 'social_telegram', '' );
-	$logo_url = kuhni_rema_get_option( 'company_logo', '' );
+	$phone    = kuhni_rema_option( 'global_phone_main' ) ?: '+7 (391) 216-97-59';
+	$address  = kuhni_rema_option( 'global_address' );
+	$vk_url   = kuhni_rema_option( 'social_vk_url' );
+	$tg_url   = kuhni_rema_option( 'social_tg_url' );
 
-	if ( ! $logo_url ) {
-		$custom_logo_id = get_theme_mod( 'custom_logo' );
-		if ( $custom_logo_id ) {
-			$logo_url = wp_get_attachment_image_url( $custom_logo_id, 'full' );
-		}
+	$logo_url = '';
+	$custom_logo_id = get_theme_mod( 'custom_logo' );
+	if ( $custom_logo_id ) {
+		$logo_url = wp_get_attachment_image_url( $custom_logo_id, 'full' );
 	}
 
 	$same_as = array();
@@ -134,9 +115,9 @@ function kuhni_rema_schema_organization() {
 		$schema['address'] = array(
 			'@type'           => 'PostalAddress',
 			'streetAddress'   => $address,
-			'addressLocality' => kuhni_rema_get_option( 'company_city', 'Красноярск' ),
-			'addressRegion'   => kuhni_rema_get_option( 'company_region', 'Красноярский край' ),
-			'postalCode'      => kuhni_rema_get_option( 'company_postal_code', '' ),
+			'addressLocality' => 'Красноярск',
+			'addressRegion'   => 'Красноярский край',
+			'postalCode'      => '660020',
 			'addressCountry'  => 'RU',
 		);
 	}
@@ -153,20 +134,18 @@ function kuhni_rema_schema_organization() {
  * ------------------------------------------------------------- */
 function kuhni_rema_schema_local_business() {
 
-	$phone    = kuhni_rema_get_option( 'company_phone', '+7 (391) 216-97-59' );
-	$address  = kuhni_rema_get_option( 'company_address', '' );
-	$vk_url   = kuhni_rema_get_option( 'social_vk', '' );
-	$tg_url   = kuhni_rema_get_option( 'social_telegram', '' );
-	$logo_url = kuhni_rema_get_option( 'company_logo', '' );
-	$lat      = kuhni_rema_get_option( 'geo_latitude', '' );
-	$lng      = kuhni_rema_get_option( 'geo_longitude', '' );
-	$hours    = kuhni_rema_get_option( 'opening_hours', '' ); // e.g. "Mo-Fr 09:00-19:00, Sa 10:00-17:00"
+	$phone    = kuhni_rema_option( 'global_phone_main' ) ?: '+7 (391) 216-97-59';
+	$address  = kuhni_rema_option( 'global_address' );
+	$vk_url   = kuhni_rema_option( 'social_vk_url' );
+	$tg_url   = kuhni_rema_option( 'social_tg_url' );
+	$lat      = kuhni_rema_option( 'global_lat' );
+	$lng      = kuhni_rema_option( 'global_lng' );
+	$hours    = kuhni_rema_option( 'global_working_hours' ); // e.g. "Mo-Fr 09:00-19:00, Sa 10:00-17:00"
 
-	if ( ! $logo_url ) {
-		$custom_logo_id = get_theme_mod( 'custom_logo' );
-		if ( $custom_logo_id ) {
-			$logo_url = wp_get_attachment_image_url( $custom_logo_id, 'full' );
-		}
+	$logo_url = '';
+	$custom_logo_id = get_theme_mod( 'custom_logo' );
+	if ( $custom_logo_id ) {
+		$logo_url = wp_get_attachment_image_url( $custom_logo_id, 'full' );
 	}
 
 	$same_as = array();
@@ -194,9 +173,9 @@ function kuhni_rema_schema_local_business() {
 		$schema['address'] = array(
 			'@type'           => 'PostalAddress',
 			'streetAddress'   => $address,
-			'addressLocality' => kuhni_rema_get_option( 'company_city', 'Красноярск' ),
-			'addressRegion'   => kuhni_rema_get_option( 'company_region', 'Красноярский край' ),
-			'postalCode'      => kuhni_rema_get_option( 'company_postal_code', '' ),
+			'addressLocality' => 'Красноярск',
+			'addressRegion'   => 'Красноярский край',
+			'postalCode'      => '660020',
 			'addressCountry'  => 'RU',
 		);
 	}
@@ -264,7 +243,7 @@ function kuhni_rema_schema_local_business() {
 		$schema['sameAs'] = $same_as;
 	}
 
-	$schema['priceRange'] = kuhni_rema_get_option( 'price_range', '$$' );
+	$schema['priceRange'] = '$$';
 
 	kuhni_rema_render_jsonld( $schema );
 }
@@ -284,14 +263,10 @@ function kuhni_rema_schema_product() {
 
 	// Fallback image: site logo.
 	if ( ! $image ) {
-		$logo_url = kuhni_rema_get_option( 'company_logo', '' );
-		if ( ! $logo_url ) {
-			$custom_logo_id = get_theme_mod( 'custom_logo' );
-			if ( $custom_logo_id ) {
-				$logo_url = wp_get_attachment_image_url( $custom_logo_id, 'full' );
-			}
+		$custom_logo_id = get_theme_mod( 'custom_logo' );
+		if ( $custom_logo_id ) {
+			$image = wp_get_attachment_image_url( $custom_logo_id, 'full' );
 		}
-		$image = $logo_url;
 	}
 
 	// ACF fields on the kitchen CPT.

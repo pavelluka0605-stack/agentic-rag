@@ -129,26 +129,4 @@ $all_faqs_schema = array();
     </section>
 </main>
 
-<!-- Schema.org FAQPage JSON-LD -->
-<?php if ( ! empty( $all_faqs_schema ) ) : ?>
-<script type="application/ld+json">
-<?php
-echo wp_json_encode( array(
-    '@context'   => 'https://schema.org',
-    '@type'      => 'FAQPage',
-    'mainEntity' => array_map( function( $faq ) {
-        return array(
-            '@type' => 'Question',
-            'name'  => $faq['question'],
-            'acceptedAnswer' => array(
-                '@type' => 'Answer',
-                'text'  => $faq['answer'],
-            ),
-        );
-    }, $all_faqs_schema ),
-), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
-?>
-</script>
-<?php endif; ?>
-
 <?php get_footer(); ?>

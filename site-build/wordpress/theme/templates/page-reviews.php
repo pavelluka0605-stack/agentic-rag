@@ -172,25 +172,4 @@ $source_labels = array(
 
 </main><!-- .page-reviews -->
 
-<!-- Schema.org AggregateRating -->
-<?php if ( $review_count > 0 ) : ?>
-<script type="application/ld+json">
-<?php
-echo wp_json_encode( array(
-    '@context'        => 'https://schema.org',
-    '@type'           => 'LocalBusiness',
-    'name'            => 'Кухни Рема',
-    'url'             => home_url( '/' ),
-    'aggregateRating' => array(
-        '@type'       => 'AggregateRating',
-        'ratingValue' => $average_rating,
-        'bestRating'  => 5,
-        'worstRating' => 1,
-        'reviewCount' => $review_count,
-    ),
-), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
-?>
-</script>
-<?php endif; ?>
-
 <?php get_footer(); ?>
