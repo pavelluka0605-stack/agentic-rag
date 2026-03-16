@@ -13,12 +13,13 @@ if ( is_page( array( 'kalkulyator', 'spasibo' ) ) ) {
     return;
 }
 
-$btn_text = kuhni_rema_option( 'cta_sticky_mobile', 'btn_text' );
+$cta_data = kuhni_rema_option( 'cta_sticky_mobile' );
+$btn_text = is_array( $cta_data ) && ! empty( $cta_data['btn_text'] ) ? $cta_data['btn_text'] : '';
 if ( empty( $btn_text ) ) {
     $btn_text = 'Рассчитать стоимость';
 }
 
-$phone_raw = kuhni_rema_option( 'contacts', 'phone' );
+$phone_raw = kuhni_rema_option( 'global_phone_main' );
 $phone_href = $phone_raw ? preg_replace( '/[^\d+]/', '', $phone_raw ) : '';
 ?>
 

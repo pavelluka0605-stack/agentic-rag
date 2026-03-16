@@ -436,38 +436,5 @@ if ( ! empty( $gallery ) && isset( $gallery[0]['url'] ) ) {
 
 </article><!-- .kitchen-single -->
 
-<?php // ================================================================== ?>
-<?php // Block 8 — Schema.org Product JSON-LD                              ?>
-<?php // ================================================================== ?>
-
-<?php if ( $schema_price ) : ?>
-<script type="application/ld+json">
-<?php
-echo wp_json_encode( array(
-    '@context'    => 'https://schema.org',
-    '@type'       => 'Product',
-    'name'        => get_the_title(),
-    'image'       => $schema_image ?: '',
-    'description' => wp_strip_all_tags( get_the_excerpt() ?: get_the_content() ),
-    'brand'       => array(
-        '@type' => 'Brand',
-        'name'  => 'Кухни Рема',
-    ),
-    'offers'      => array(
-        '@type'         => 'Offer',
-        'url'           => get_permalink(),
-        'priceCurrency' => 'RUB',
-        'price'         => (string) $schema_price,
-        'availability'  => 'https://schema.org/InStock',
-        'seller'        => array(
-            '@type' => 'Organization',
-            'name'  => 'Кухни Рема',
-        ),
-    ),
-), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT );
-?>
-</script>
-<?php endif; ?>
-
 <?php
 get_footer();
