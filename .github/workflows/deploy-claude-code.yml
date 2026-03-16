@@ -41,9 +41,13 @@ jobs:
           # Copy scripts
           $SCP_CMD vps-runtime/bin/*.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/bin/
           $SCP_CMD vps-runtime/etc/tmux.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/etc/
+          $SCP_CMD vps-runtime/etc/nginx-webhook.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/etc/
 
           # Make executable
           $SSH_CMD "chmod +x /opt/claude-code/bin/*.sh"
+
+          # Setup backup cron (idempotent)
+          $SSH_CMD "mkdir -p /opt/claude-code/backups && (crontab -l 2>/dev/null | grep -q backup-memory || (crontab -l 2>/dev/null; echo '*/30 * * * * /opt/claude-code/bin/backup-memory.sh >> /opt/claude-code/logs/backup.log 2>&1') | crontab -) && echo '✓ Backup cron configured'"
 
           echo "✓ Scripts deployed"
 
