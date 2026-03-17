@@ -76,13 +76,13 @@ jobs:
           $SSH_CMD "mkdir -p /opt/claude-code/memory"
 
           # Write control-api.env with secrets (expand vars locally, write to remote)
-          cat > /tmp/control-api.env <<EOF
-OPENAI_API_KEY=${OPENAI_API_KEY:-}
-TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
-TG_CHAT_ID=${TG_CHAT_ID:-}
-CONTROL_API_TOKEN=${CONTROL_API_TOKEN:-}
-MEMORY_SERVER_PATH=/opt/claude-code/memory-server
-EOF
+          printf '%s\n' \
+            "OPENAI_API_KEY=${OPENAI_API_KEY:-}" \
+            "TG_BOT_TOKEN=${TG_BOT_TOKEN:-}" \
+            "TG_CHAT_ID=${TG_CHAT_ID:-}" \
+            "CONTROL_API_TOKEN=${CONTROL_API_TOKEN:-}" \
+            "MEMORY_SERVER_PATH=/opt/claude-code/memory-server" \
+            > /tmp/control-api.env
           $SCP_CMD /tmp/control-api.env $VPS:/opt/claude-code/env/control-api.env
           $SSH_CMD "chmod 600 /opt/claude-code/env/control-api.env"
           rm -f /tmp/control-api.env
