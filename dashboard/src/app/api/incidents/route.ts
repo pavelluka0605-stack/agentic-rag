@@ -1,0 +1,26 @@
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { getIncidents } from '@/lib/db'
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = request.nextUrl
+    const status = searchParams.get('status') ?? undefined
+    const project = searchParams.get('project') ?? undefined
+    const limit = searchParams.get('limit')
+      ? parseInt(searchParams.get('limit')!, 10)
+      : undefined
+    const offset = searchParams.get('offset')
+      ? parseInt(searchParams.get('offset')!, 10)
+      : undefined
+
+    const incidents = getIncidents({ status, project, limit, offset })
+    return NextResponse.json(incidents)
+  } catch (err) {
+    console.error('[api/incidents] Error:', err)
+    return NextResponse.json(
+      { error: 'Failed to fetch incidents' },
+      { status: 500 }
+    )
+  }
+}
