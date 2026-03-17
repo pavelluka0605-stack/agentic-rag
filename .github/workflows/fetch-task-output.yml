@@ -55,11 +55,17 @@ jobs:
             echo "=== Nginx → dashboard proxy (HTTP, port 80) ==="
             $SSH_CMD "curl -sI --max-time 5 -H 'Host: webhook.marbomebel.ru' http://127.0.0.1:80/ 2>&1 | head -5" || true
             echo ""
-            echo "=== Nginx → dashboard proxy (HTTPS) ==="
-            $SSH_CMD "curl -skI --max-time 5 https://webhook.marbomebel.ru/ 2>&1 | head -10" || true
+            echo "=== SSL cert check ==="
+            $SSH_CMD "ls -la /etc/letsencrypt/live/webhook.marbomebel.ru/ 2>&1 || echo '(no cert dir)'" || true
             echo ""
-            echo "=== Nginx → /tasks proxy (HTTPS) ==="
-            $SSH_CMD "curl -skI --max-time 5 https://webhook.marbomebel.ru/tasks 2>&1 | head -10" || true
+            echo "=== Nginx → dashboard proxy (HTTPS via localhost) ==="
+            $SSH_CMD "curl -svkI --max-time 10 --connect-to webhook.marbomebel.ru:443:127.0.0.1:443 https://webhook.marbomebel.ru/ 2>&1 | tail -20" || true
+            echo ""
+            echo "=== Nginx listening ports ==="
+            $SSH_CMD "ss -tlnp | grep -E 'nginx|:443|:80'" || true
+            echo ""
+            echo "=== Direct dashboard /tasks via port 3200 ==="
+            $SSH_CMD "curl -s --max-time 5 http://127.0.0.1:3200/tasks 2>&1 | head -c 300" || true
           } > real-task-output.txt
           cat real-task-output.txt
 
