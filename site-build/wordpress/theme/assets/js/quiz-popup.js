@@ -111,7 +111,7 @@
       '}' +
       '.kr-quiz-popup__cta {' +
         'display: inline-block;' +
-        'background: var(--color-primary, #E65100);' +
+        'background: var(--color-primary, #C2613A);' +
         'color: #fff;' +
         'font-family: "Montserrat", sans-serif;' +
         'font-size: 16px;' +
@@ -125,12 +125,12 @@
       '}' +
       '.kr-quiz-popup__cta:hover,' +
       '.kr-quiz-popup__cta:focus {' +
-        'background: var(--color-primary-dark, #BF360C);' +
+        'background: var(--color-primary-hover, #A8512F);' +
         'transform: translateY(-1px);' +
         'outline: none;' +
       '}' +
       '.kr-quiz-popup__cta:focus-visible {' +
-        'box-shadow: 0 0 0 3px rgba(230, 81, 0, 0.4);' +
+        'box-shadow: 0 0 0 3px rgba(194, 97, 58, 0.4);' +
       '}' +
       '@media (max-width: 480px) {' +
         '.kr-quiz-popup { padding: 32px 20px 24px; }' +

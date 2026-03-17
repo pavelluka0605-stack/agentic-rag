@@ -146,7 +146,7 @@ function kuhni_rema_meta_og() {
 	if ( is_singular() ) {
 		$og['og:url'] = get_permalink();
 	} else {
-		$og['og:url'] = home_url( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ) );
+		$og['og:url'] = home_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) );
 	}
 
 	// Title.

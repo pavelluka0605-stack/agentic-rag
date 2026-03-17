@@ -242,12 +242,18 @@ test_json_endpoint "POST" "/wp-admin/admin-ajax.php" \
   "action=kuhni_rema_submit_form&form_type=quick&phone=70000000000" \
   "AJAX kuhni_rema_submit_form"
 
-# ─── 3. Redirect tests ───
+# ─── 3. Redirect tests (mebelit.site → kuhnirema only) ───
 
 echo -e "${CYAN}--- Redirect Tests ---${RESET}"
 
-test_redirect "/straight" "/pryamye-kuhni/" "301"
-test_redirect "/corner" "/uglovye-kuhni/" "301"
+# These redirects are configured in nginx for mebelit.site server block.
+# Only test when BASE_URL points to mebelit.site.
+if echo "$BASE_URL" | grep -q "mebelit"; then
+  test_redirect "/straight" "/pryamye-kuhni/" "301"
+  test_redirect "/corner" "/uglovye-kuhni/" "301"
+else
+  echo "  (Skipping mebelit.site redirect tests — not applicable for $BASE_URL)"
+fi
 
 # ─── 4. SEO / technical endpoints ───
 

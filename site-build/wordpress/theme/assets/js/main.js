@@ -10,7 +10,7 @@
    * Helpers
    * ----------------------------------------------------- */
   function raf(fn) {
-    let ticking = false;
+    var ticking = false;
     return function () {
       if (ticking) return;
       ticking = true;
