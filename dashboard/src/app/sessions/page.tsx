@@ -14,16 +14,16 @@ import type { Episode } from '@/types'
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Episode[] | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchSessions() {
       try {
         const res = await fetch('/api/sessions?limit=30')
-        if (res.ok) {
-          setSessions(await res.json())
-        }
-      } catch {
-        // silently handle network errors
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        setSessions(await res.json())
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load sessions')
       } finally {
         setLoading(false)
       }
@@ -46,13 +46,23 @@ export default function SessionsPage() {
         description="Development session history and open loops"
       />
 
-      {!sessions || sessions.length === 0 ? (
+      {error && (
+        <Card className="p-6">
+          <p className="text-sm text-destructive">
+            Failed to load sessions: {error}
+          </p>
+        </Card>
+      )}
+
+      {!error && (!sessions || sessions.length === 0) && (
         <EmptyState
           icon={History}
           title="No sessions yet"
           description="Sessions will appear here as you work"
         />
-      ) : (
+      )}
+
+      {sessions && sessions.length > 0 && (
         <div className="space-y-3 animate-fade-in">
           {sessions.map((ep) => {
             const openLoops = parseJsonField<string[]>(ep.open_loops)

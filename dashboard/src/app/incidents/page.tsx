@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AlertTriangle, ExternalLink } from 'lucide-react'
 import { Card } from '@/components/ui/card'
@@ -36,6 +37,16 @@ function statusToDot(status: Incident['status']): string {
 }
 
 export default function IncidentsPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><Loading size="lg" /></div>}>
+      <IncidentsPageInner />
+    </Suspense>
+  )
+}
+
+function IncidentsPageInner() {
+  const searchParams = useSearchParams()
+  const projectParam = searchParams.get('project')
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [loading, setLoading] = useState(true)
@@ -50,6 +61,9 @@ export default function IncidentsPage() {
     if (filter !== 'all') {
       params.set('status', filter)
     }
+    if (projectParam) {
+      params.set('project', projectParam)
+    }
 
     fetch(`/api/incidents?${params}`)
       .then((res) => {
@@ -59,13 +73,23 @@ export default function IncidentsPage() {
       .then((data) => setIncidents(data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [filter])
+  }, [filter, projectParam])
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Incidents"
-        badge={!loading && !error ? <Badge variant="secondary">{incidents.length}</Badge> : undefined}
+        badge={
+          <div className="flex items-center gap-2">
+            {projectParam && (
+              <Badge variant="outline">
+                {projectParam}
+                <Link href="/incidents" className="ml-1 hover:text-foreground">&times;</Link>
+              </Badge>
+            )}
+            {!loading && !error && <Badge variant="secondary">{incidents.length}</Badge>}
+          </div>
+        }
       />
 
       <FilterTabs
@@ -106,7 +130,7 @@ export default function IncidentsPage() {
             {incidents.map((incident) => (
               <div
                 key={incident.id}
-                className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-[oklch(0.195_0.008_260)] cursor-pointer group"
+                className="flex items-center gap-4 px-4 py-3 overflow-hidden transition-colors hover:bg-[oklch(0.195_0.008_260)] cursor-pointer group"
                 onClick={(e) => {
                   // Only open drawer if not clicking a link
                   if (!(e.target as HTMLElement).closest('a')) {
