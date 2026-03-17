@@ -40,8 +40,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B ops/task-output origin/main
           git add -f real-task-output.txt
           git diff --cached --quiet && echo "No changes" || {
             git commit -m "ops: real task output from VPS [skip ci]"
-            git push origin main
+            git push -f origin ops/task-output
           }
