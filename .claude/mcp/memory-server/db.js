@@ -402,6 +402,114 @@ export class MemoryDB {
     return stats;
   }
 
+  // ── Task Pipeline ────────────────────────────────────────────────────────
+
+  createTask({ project, raw_input, input_type, voice_transcript }) {
+    const stmt = this.db.prepare(`
+      INSERT INTO tasks (project, raw_input, input_type, voice_transcript, status)
+      VALUES (?, ?, ?, ?, 'draft')
+    `);
+    const r = stmt.run(project || null, raw_input, input_type || "text", voice_transcript || null);
+    return this.db.prepare("SELECT * FROM tasks WHERE id = ?").get(r.lastInsertRowid);
+  }
+
+  getTask(id) {
+    return this.db.prepare("SELECT * FROM tasks WHERE id = ?").get(id);
+  }
+
+  getTasks({ status, project, limit = 20, offset = 0 } = {}) {
+    let sql = "SELECT * FROM tasks WHERE 1=1";
+    const params = [];
+    if (status) { sql += " AND status = ?"; params.push(status); }
+    if (project) { sql += " AND project = ?"; params.push(project); }
+    sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?";
+    params.push(limit, offset);
+    return this.db.prepare(sql).all(...params);
+  }
+
+  updateTaskInterpretation(id, interpretation) {
+    this.db.prepare(`
+      UPDATE tasks SET interpretation = ?, status = 'pending', updated_at = datetime('now')
+      WHERE id = ?
+    `).run(typeof interpretation === "object" ? JSON.stringify(interpretation) : interpretation, id);
+    return this.getTask(id);
+  }
+
+  addTaskRevision(id, text) {
+    const task = this.getTask(id);
+    if (!task) return null;
+    const revisions = task.revisions ? JSON.parse(task.revisions) : [];
+    revisions.push({ text, timestamp: new Date().toISOString() });
+    // Append revision to raw_input for context
+    const updatedInput = task.raw_input + "\n\n[Уточнение]: " + text;
+    this.db.prepare(`
+      UPDATE tasks SET revisions = ?, raw_input = ?, status = 'draft', updated_at = datetime('now')
+      WHERE id = ?
+    `).run(JSON.stringify(revisions), updatedInput, id);
+    return this.getTask(id);
+  }
+
+  confirmTask(id, { mode, engineering_packet } = {}) {
+    const fields = ["status = 'confirmed'", "updated_at = datetime('now')"];
+    const params = [];
+    if (mode) { fields.push("mode = ?"); params.push(mode); }
+    if (engineering_packet) {
+      fields.push("engineering_packet = ?");
+      params.push(typeof engineering_packet === "object" ? JSON.stringify(engineering_packet) : engineering_packet);
+    }
+    params.push(id);
+    this.db.prepare(`UPDATE tasks SET ${fields.join(", ")} WHERE id = ?`).run(...params);
+    return this.getTask(id);
+  }
+
+  startTaskExecution(id, execution_run_id) {
+    this.db.prepare(`
+      UPDATE tasks SET status = 'running', execution_run_id = ?, progress = '[]', updated_at = datetime('now')
+      WHERE id = ?
+    `).run(execution_run_id || null, id);
+    return this.getTask(id);
+  }
+
+  addTaskProgress(id, message_ru, pct) {
+    const task = this.getTask(id);
+    if (!task) return null;
+    const progress = task.progress ? JSON.parse(task.progress) : [];
+    progress.push({ message_ru, pct: pct ?? null, timestamp: new Date().toISOString() });
+    this.db.prepare(`
+      UPDATE tasks SET progress = ?, updated_at = datetime('now') WHERE id = ?
+    `).run(JSON.stringify(progress), id);
+    return this.getTask(id);
+  }
+
+  completeTask(id, { result_summary_ru, result_detail }) {
+    this.db.prepare(`
+      UPDATE tasks SET status = 'done', result_summary_ru = ?, result_detail = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(result_summary_ru || null, result_detail || null, id);
+    return this.getTask(id);
+  }
+
+  failTask(id, error) {
+    this.db.prepare(`
+      UPDATE tasks SET status = 'failed', error = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(error || "Unknown error", id);
+    return this.getTask(id);
+  }
+
+  cancelTask(id) {
+    this.db.prepare(`
+      UPDATE tasks SET status = 'cancelled', updated_at = datetime('now')
+      WHERE id = ?
+    `).run(id);
+    return this.getTask(id);
+  }
+
+  setTaskTelegramNotified(id) {
+    this.db.prepare(`UPDATE tasks SET telegram_notified = 1, updated_at = datetime('now') WHERE id = ?`).run(id);
+    return this.getTask(id);
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   _ftsQuery(text) {

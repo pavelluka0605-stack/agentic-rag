@@ -16,6 +16,7 @@ import {
   PanelLeft,
   Terminal,
   X,
+  ListTodo,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +36,7 @@ const navGroups: NavGroup[] = [
     title: 'Main',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { label: 'Задачи', href: '/tasks', icon: ListTodo },
     ],
   },
   {

@@ -10,6 +10,7 @@ import type {
   LogsResponse,
   HealthService,
   MemoryType,
+  Task,
 } from '@/types'
 import type { ProjectInfo } from '@/lib/db'
 
@@ -159,6 +160,58 @@ export async function fetchGithubEvents(opts?: {
 
 export async function fetchProjects(): Promise<ProjectInfo[]> {
   return apiFetch<ProjectInfo[]>('/api/projects')
+}
+
+// --- Tasks ---
+
+export async function fetchTasks(opts?: {
+  status?: string
+  project?: string
+  limit?: number
+  offset?: number
+}): Promise<Task[]> {
+  const query = buildQuery({
+    status: opts?.status,
+    project: opts?.project,
+    limit: opts?.limit,
+    offset: opts?.offset,
+  })
+  return apiFetch<Task[]>(`/api/tasks${query}`)
+}
+
+export async function fetchTask(id: number): Promise<Task> {
+  return apiFetch<Task>(`/api/tasks/${id}`)
+}
+
+export async function fetchTaskStats(): Promise<{
+  total: number; draft: number; pending: number; running: number; done: number; failed: number
+}> {
+  return apiFetch(`/api/tasks?stats=true`)
+}
+
+export async function createTask(data: {
+  raw_input: string
+  input_type?: 'text' | 'voice'
+  voice_transcript?: string
+  project?: string
+}): Promise<Task> {
+  return apiFetch<Task>('/api/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+export async function taskAction(
+  id: number,
+  action: string,
+  data?: Record<string, unknown>
+): Promise<Task> {
+  return apiFetch<Task>(`/api/tasks/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...data }),
+  })
 }
 
 // --- Health ---

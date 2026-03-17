@@ -160,6 +160,62 @@ export interface HealthService {
 
 export type MemoryType = 'policies' | 'episodes' | 'incidents' | 'solutions' | 'decisions' | 'contexts' | 'github_events'
 
+// Task Pipeline types
+export type TaskStatus = 'draft' | 'pending' | 'confirmed' | 'running' | 'done' | 'failed' | 'cancelled'
+export type TaskMode = 'fast' | 'safe'
+
+export interface TaskInterpretation {
+  understood: string
+  expected_outcome: string
+  affected_areas: string[]
+  constraints: string[]
+  plan: string[]
+  risk_level: 'low' | 'medium' | 'high'
+  risk_note: string
+}
+
+export interface TaskEngineeringPacket {
+  title: string
+  objective: string
+  scope: string[]
+  steps: string[]
+  constraints: string[]
+  acceptance_criteria: string[]
+  mode: TaskMode
+}
+
+export interface TaskProgress {
+  message_ru: string
+  pct: number | null
+  timestamp: string
+}
+
+export interface TaskRevision {
+  text: string
+  timestamp: string
+}
+
+export interface Task {
+  id: number
+  project: string | null
+  raw_input: string
+  input_type: 'text' | 'voice'
+  voice_transcript: string | null
+  interpretation: string | null       // JSON string of TaskInterpretation
+  status: TaskStatus
+  mode: TaskMode
+  revisions: string | null            // JSON string of TaskRevision[]
+  engineering_packet: string | null   // JSON string of TaskEngineeringPacket
+  execution_run_id: string | null
+  progress: string | null             // JSON string of TaskProgress[]
+  result_summary_ru: string | null
+  result_detail: string | null
+  error: string | null
+  telegram_notified: number
+  created_at: string
+  updated_at: string
+}
+
 export interface SearchResult {
   _type: MemoryType
   rank: number

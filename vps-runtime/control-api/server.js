@@ -14,6 +14,18 @@
 //   POST /api/restart    — restart runtime
 //   GET  /health         — simple health check
 //
+//   Task Pipeline (intake → confirm → execute):
+//   POST /api/tasks              — create task from Russian text/voice
+//   GET  /api/tasks              — list tasks (?status=&limit=&offset=)
+//   GET  /api/tasks/:id          — get task by id
+//   POST /api/tasks/:id/interpret — generate Russian interpretation (1 LLM call)
+//   POST /api/tasks/:id/revise   — add text revision (deterministic, no LLM)
+//   POST /api/tasks/:id/confirm  — confirm + build eng packet (1 LLM call)
+//   POST /api/tasks/:id/cancel   — cancel task
+//   POST /api/tasks/:id/progress — add progress update (Russian)
+//   POST /api/tasks/:id/complete — mark done with Russian result
+//   POST /api/tasks/:id/fail     — mark failed
+//
 // Security: Bearer token auth via CONTROL_API_TOKEN env var
 // =============================================================================
 
@@ -21,12 +33,100 @@ import http from "http";
 import { execSync, exec } from "child_process";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = parseInt(process.env.CONTROL_API_PORT || "3901");
 const TOKEN = process.env.CONTROL_API_TOKEN || "";
 const BIN_DIR = process.env.CLAUDE_BIN_DIR || "/opt/claude-code/bin";
 const LOG_DIR = process.env.CLAUDE_LOG_DIR || "/opt/claude-code/logs";
 const MEMORY_DB = process.env.MEMORY_DB_PATH || "/opt/claude-code/memory/memory.db";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || "";
+const TG_CHAT_ID = process.env.TG_CHAT_ID || "";
+
+// ── Database (lazy init at startup) ──────────────────────────────────────
+
+let taskDb = null;
+async function initTaskDb() {
+  const memoryServerPath = process.env.MEMORY_SERVER_PATH
+    || path.join(__dirname, "..", "..", ".claude", "mcp", "memory-server");
+  try {
+    const mod = await import(path.join(memoryServerPath, "db.js"));
+    taskDb = new mod.MemoryDB(MEMORY_DB);
+    console.log("[control-api] Task DB initialized from", MEMORY_DB);
+  } catch (e) {
+    console.warn("[control-api] Task DB not available:", e.message);
+  }
+}
+
+// ── LLM helper (single-call, cost-conscious) ─────────────────────────────
+
+async function llmCall(systemPrompt, userMessage) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY not configured");
+  }
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",     // Cost-conscious: mini for interpretation
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      temperature: 0.3,
+      max_tokens: 1500,
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`LLM API error ${res.status}: ${body}`);
+  }
+  const data = await res.json();
+  return JSON.parse(data.choices[0].message.content);
+}
+
+// ── Telegram helper ────────────────────────────────────────────────────────
+
+async function sendTelegram(text) {
+  if (!TG_BOT_TOKEN || !TG_CHAT_ID) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: TG_CHAT_ID,
+        text,
+        parse_mode: "HTML",
+      }),
+    });
+  } catch (e) {
+    console.error("[telegram] Send failed:", e.message);
+  }
+}
+
+// ── Request body parser ──────────────────────────────────────────────────
+
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (e) {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
 
 // ── Auth middleware ─────────────────────────────────────────────────────────
 
@@ -150,6 +250,229 @@ async function handleAction(action, req, res) {
   }
 }
 
+// ── Task Pipeline Handlers ──────────────────────────────────────────────────
+
+const INTERPRET_SYSTEM_PROMPT = `Ты — ассистент-интерпретатор задач. Пользователь описал задачу на русском языке.
+Верни JSON со следующими полями (все на русском):
+{
+  "understood": "Как ты понял задачу (1-2 предложения)",
+  "expected_outcome": "Ожидаемый результат",
+  "affected_areas": ["Список затрагиваемых областей/файлов/систем"],
+  "constraints": ["Ограничения и условия"],
+  "plan": ["Шаг 1", "Шаг 2", ...],
+  "risk_level": "low|medium|high",
+  "risk_note": "Почему такой уровень риска (1 предложение)"
+}
+Будь конкретным и практичным. Не добавляй лишних шагов.`;
+
+const ENGINEERING_SYSTEM_PROMPT = `You are an engineering task packager. Given a task description in Russian with its interpretation, produce a structured English engineering packet as JSON:
+{
+  "title": "Short English title",
+  "objective": "What needs to be accomplished",
+  "scope": ["file or system 1", "file or system 2"],
+  "steps": ["Step 1", "Step 2", ...],
+  "constraints": ["Constraint 1"],
+  "acceptance_criteria": ["Criterion 1", "Criterion 2"],
+  "mode": "fast|safe"
+}
+Be precise and actionable. The executor will use this packet directly.`;
+
+async function handleTaskCreate(req, res) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  try {
+    const body = await parseBody(req);
+    if (!body.raw_input) return json(res, 400, { error: "raw_input is required" });
+    const task = taskDb.createTask({
+      project: body.project,
+      raw_input: body.raw_input,
+      input_type: body.input_type || "text",
+      voice_transcript: body.voice_transcript,
+    });
+    json(res, 201, task);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
+async function handleTaskList(req, res) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const tasks = taskDb.getTasks({
+    status: url.searchParams.get("status") || undefined,
+    project: url.searchParams.get("project") || undefined,
+    limit: parseInt(url.searchParams.get("limit") || "20"),
+    offset: parseInt(url.searchParams.get("offset") || "0"),
+  });
+  json(res, 200, tasks);
+}
+
+async function handleTaskGet(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  json(res, 200, task);
+}
+
+async function handleTaskInterpret(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (task.status !== "draft") return json(res, 400, { error: `Cannot interpret task in status '${task.status}'` });
+
+  try {
+    // Single LLM call for interpretation
+    const interpretation = await llmCall(INTERPRET_SYSTEM_PROMPT, task.raw_input);
+    const updated = taskDb.updateTaskInterpretation(id, interpretation);
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: `Interpretation failed: ${e.message}` });
+  }
+}
+
+async function handleTaskRevise(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (!["pending", "draft"].includes(task.status)) {
+    return json(res, 400, { error: `Cannot revise task in status '${task.status}'` });
+  }
+
+  try {
+    const body = await parseBody(req);
+    if (!body.text) return json(res, 400, { error: "text is required" });
+    // Deterministic: append revision, reset to draft, NO LLM call
+    const updated = taskDb.addTaskRevision(id, body.text);
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
+async function handleTaskConfirm(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (task.status !== "pending") {
+    return json(res, 400, { error: `Cannot confirm task in status '${task.status}'. Must be 'pending'.` });
+  }
+
+  try {
+    const body = await parseBody(req);
+    const mode = body.mode || task.mode || "safe";
+
+    // Single LLM call for engineering packet
+    const contextForPacket = `Task (Russian): ${task.raw_input}\n\nInterpretation: ${task.interpretation}\n\nMode: ${mode}`;
+    const packet = await llmCall(ENGINEERING_SYSTEM_PROMPT, contextForPacket);
+    packet.mode = mode;
+
+    const updated = taskDb.confirmTask(id, { mode, engineering_packet: packet });
+
+    // Notify Telegram
+    const interp = typeof task.interpretation === "string" ? JSON.parse(task.interpretation) : task.interpretation;
+    await sendTelegram(
+      `<b>Задача подтверждена</b>\n\n` +
+      `<b>Задача:</b> ${interp?.understood || task.raw_input.slice(0, 200)}\n` +
+      `<b>Режим:</b> ${mode === "fast" ? "Быстрый" : "Безопасный"}\n` +
+      `<b>Риск:</b> ${interp?.risk_level || "?"}`
+    );
+
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: `Confirm failed: ${e.message}` });
+  }
+}
+
+async function handleTaskCancel(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (["done", "cancelled"].includes(task.status)) {
+    return json(res, 400, { error: `Task already ${task.status}` });
+  }
+  const updated = taskDb.cancelTask(id);
+  json(res, 200, updated);
+}
+
+async function handleTaskProgress(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (task.status !== "running") return json(res, 400, { error: "Task is not running" });
+
+  try {
+    const body = await parseBody(req);
+    if (!body.message_ru) return json(res, 400, { error: "message_ru is required" });
+    const updated = taskDb.addTaskProgress(id, body.message_ru, body.pct);
+
+    // Send progress to Telegram
+    await sendTelegram(`<b>Прогресс задачи #${id}</b>\n${body.message_ru}${body.pct != null ? ` (${body.pct}%)` : ""}`);
+
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
+async function handleTaskComplete(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+
+  try {
+    const body = await parseBody(req);
+    const updated = taskDb.completeTask(id, {
+      result_summary_ru: body.result_summary_ru,
+      result_detail: body.result_detail,
+    });
+
+    // Send result to Telegram
+    await sendTelegram(
+      `<b>Задача #${id} выполнена</b>\n\n` +
+      `${body.result_summary_ru || "Результат не указан"}`
+    );
+    taskDb.setTaskTelegramNotified(id);
+
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
+async function handleTaskFail(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+
+  try {
+    const body = await parseBody(req);
+    const updated = taskDb.failTask(id, body.error || "Unknown error");
+
+    await sendTelegram(`<b>Задача #${id} не выполнена</b>\n\n<b>Ошибка:</b> ${body.error || "Неизвестная ошибка"}`);
+    taskDb.setTaskTelegramNotified(id);
+
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
+async function handleTaskStartExec(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (task.status !== "confirmed") {
+    return json(res, 400, { error: `Cannot start execution for task in status '${task.status}'. Must be 'confirmed'.` });
+  }
+
+  try {
+    const body = await parseBody(req);
+    const updated = taskDb.startTaskExecution(id, body.execution_run_id);
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -178,13 +501,40 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && urlPath === "/api/stop") return handleAction("stop", req, res);
     if (req.method === "POST" && urlPath === "/api/restart") return handleAction("restart", req, res);
 
+    // Task pipeline routes
+    if (req.method === "POST" && urlPath === "/api/tasks") return handleTaskCreate(req, res);
+    if (req.method === "GET" && urlPath === "/api/tasks") return handleTaskList(req, res);
+
+    // /api/tasks/:id and /api/tasks/:id/:action
+    const taskMatch = urlPath.match(/^\/api\/tasks\/(\d+)(?:\/(\w+))?$/);
+    if (taskMatch) {
+      const taskId = parseInt(taskMatch[1]);
+      const action = taskMatch[2];
+      if (req.method === "GET" && !action) return handleTaskGet(req, res, taskId);
+      if (req.method === "POST" && action === "interpret") return handleTaskInterpret(req, res, taskId);
+      if (req.method === "POST" && action === "revise") return handleTaskRevise(req, res, taskId);
+      if (req.method === "POST" && action === "confirm") return handleTaskConfirm(req, res, taskId);
+      if (req.method === "POST" && action === "cancel") return handleTaskCancel(req, res, taskId);
+      if (req.method === "POST" && action === "start") return handleTaskStartExec(req, res, taskId);
+      if (req.method === "POST" && action === "progress") return handleTaskProgress(req, res, taskId);
+      if (req.method === "POST" && action === "complete") return handleTaskComplete(req, res, taskId);
+      if (req.method === "POST" && action === "fail") return handleTaskFail(req, res, taskId);
+    }
+
     json(res, 404, { error: "Not found" });
   } catch (e) {
     json(res, 500, { error: e.message });
   }
 });
 
+// ── Startup ──────────────────────────────────────────────────────────────────
+
+await initTaskDb();
+
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`[control-api] Listening on 127.0.0.1:${PORT}`);
   console.log(`[control-api] Auth: ${TOKEN ? "enabled" : "disabled (set CONTROL_API_TOKEN)"}`);
+  console.log(`[control-api] Task DB: ${taskDb ? "ready" : "not available"}`);
+  console.log(`[control-api] LLM: ${OPENAI_API_KEY ? "configured" : "not configured"}`);
+  console.log(`[control-api] Telegram: ${TG_BOT_TOKEN && TG_CHAT_ID ? "configured" : "not configured"}`);
 });

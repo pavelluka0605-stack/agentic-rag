@@ -65,3 +65,14 @@ export async function stopRuntime(): Promise<Record<string, unknown> | null> {
 export async function restartRuntime(): Promise<Record<string, unknown> | null> {
   return controlFetch<Record<string, unknown>>('/api/restart', { method: 'POST' })
 }
+
+// Generic POST helper for task pipeline and future endpoints
+export async function controlPost<T = Record<string, unknown>>(
+  path: string,
+  body?: unknown
+): Promise<T | null> {
+  return controlFetch<T>(path, {
+    method: 'POST',
+    body: body ? JSON.stringify(body) : undefined,
+  })
+}
