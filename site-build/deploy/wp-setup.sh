@@ -13,7 +13,7 @@ set -euo pipefail
 
 # ---------- Configuration ----------
 
-WP_PATH="${1:---path=/var/www/kuhni-rema}"
+WP_PATH="${1:---path=/var/www/kuhnirema}"
 WP="wp ${WP_PATH} --allow-root"
 
 SITE_TITLE="Кухни Рема"

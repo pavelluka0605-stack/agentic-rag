@@ -371,7 +371,7 @@ fi
 # ─── Step 12: Import data ────────────────────────────
 step "Step 12: Data imports"
 
-DATA_DIR="${SITE_BUILD_DIR}/data"
+DATA_DIR="${SITE_BUILD_DIR}/wordpress/theme/data"
 IMPORT_SCRIPTS=(
   "import-kitchens.php"
   "import-projects.php"
