@@ -102,13 +102,13 @@ jobs:
 
           # -----------------------------------------------
           echo ""
-          echo "=== 11. curl https://webhook.marbomebel.ru/ ==="
-          curl -skI --max-time 10 https://webhook.marbomebel.ru/ 2>&1 || echo "(no response)"
+          echo "=== 11. curl https://chat.marbomebel.ru/ ==="
+          curl -skI --max-time 10 https://chat.marbomebel.ru/ 2>&1 || echo "(no response)"
 
           # -----------------------------------------------
           echo ""
-          echo "=== 12. curl https://webhook.marbomebel.ru/tasks ==="
-          curl -sk --max-time 10 https://webhook.marbomebel.ru/tasks 2>&1 | head -30 || echo "(no response)"
+          echo "=== 12. curl https://chat.marbomebel.ru/tasks ==="
+          curl -sk --max-time 10 https://chat.marbomebel.ru/tasks 2>&1 | head -30 || echo "(no response)"
 
           # -----------------------------------------------
           echo ""

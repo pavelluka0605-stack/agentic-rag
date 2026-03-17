@@ -129,6 +129,12 @@ jobs:
           # Deploy Traefik dynamic config for dashboard (auto-reloaded by Traefik)
           $SCP_CMD vps-runtime/etc/traefik-dashboard.yml $VPS:/opt/n8n-traefik/dynamic/dashboard.yml
 
+          # Remove old chat.yml Traefik config (chat.marbomebel.ru now served by dashboard.yml)
+          $SSH_CMD "rm -f /opt/n8n-traefik/dynamic/chat.yml"
+
+          # Stop old claude-chat PM2 process (no longer needed)
+          $SSH_CMD "pm2 stop claude-chat 2>/dev/null; pm2 delete claude-chat 2>/dev/null; pm2 save 2>/dev/null || true"
+
           echo "✓ Scripts, configs, systemd units, memory server, control API, and dashboard deployed"
 
       - name: Bootstrap
