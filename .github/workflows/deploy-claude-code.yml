@@ -23,6 +23,7 @@ on:
           - health
           - smoke-test
           - live-pilot
+          - run-real-task
           - update-scripts
 
 jobs:
@@ -164,18 +165,22 @@ jobs:
           $SSH_CMD "/opt/claude-code/bin/smoke-test.sh" || true
 
       - name: Live Pilot Test
-        if: inputs.action == 'live-pilot' || github.event_name == 'push'
+        if: inputs.action == 'live-pilot'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "bash /opt/claude-code/bin/live-pilot-test.sh" 2>&1 | tee /tmp/live-pilot-output.txt
-          echo ""
-          echo "=== LIVE PILOT OUTPUT SAVED ==="
 
-      - name: Upload pilot results
-        if: inputs.action == 'live-pilot' || github.event_name == 'push'
+      - name: Run Real Task
+        if: inputs.action == 'run-real-task' || github.event_name == 'push'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "bash /opt/claude-code/bin/run-real-task.sh" 2>&1 | tee /tmp/real-task-output.txt
+
+      - name: Upload results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-pilot-results
-          path: /tmp/live-pilot-output.txt
+          name: task-run-results
+          path: /tmp/real-task-output.txt
           retention-days: 7
         continue-on-error: true
