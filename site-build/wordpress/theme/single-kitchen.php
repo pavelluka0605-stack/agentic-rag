@@ -78,9 +78,7 @@ if ( ! empty( $gallery ) && isset( $gallery[0]['url'] ) ) {
 
 <div class="breadcrumbs">
     <div class="container">
-        <?php if ( function_exists( 'rank_math_the_breadcrumbs' ) ) : ?>
-            <?php rank_math_the_breadcrumbs(); ?>
-        <?php else : ?>
+        <?php // RankMath breadcrumbs are disabled in rankmath-config.php; always use custom breadcrumbs. ?>
             <nav class="breadcrumbs__nav" aria-label="Хлебные крошки">
                 <a href="<?php echo esc_url( home_url( '/' ) ); ?>">Главная</a>
                 <span class="breadcrumbs__sep" aria-hidden="true">&rsaquo;</span>
@@ -105,7 +103,6 @@ if ( ! empty( $gallery ) && isset( $gallery[0]['url'] ) ) {
 
                 <span class="breadcrumbs__current"><?php the_title(); ?></span>
             </nav>
-        <?php endif; ?>
     </div>
 </div>
 
