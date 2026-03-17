@@ -1,4 +1,4 @@
-name: "Fetch Real Task Output"
+name: "Fetch Real Task Output v2"
 
 on:
   push:
