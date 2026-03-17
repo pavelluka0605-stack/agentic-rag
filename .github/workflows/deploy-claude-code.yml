@@ -174,17 +174,12 @@ jobs:
         if: inputs.action == 'run-real-task' || github.event_name == 'push'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
-          $SSH_CMD "bash /opt/claude-code/bin/run-real-task.sh" 2>&1 | tee /tmp/real-task-output.txt
+          $SSH_CMD "bash /opt/claude-code/bin/run-real-task.sh 2>&1 | tee /opt/claude-code/logs/real-task-output.txt"
 
-      - name: Commit task output
+      - name: Fetch task output from VPS
         if: always()
         run: |
-          if [ -f /tmp/real-task-output.txt ]; then
-            cp /tmp/real-task-output.txt real-task-output.txt
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add real-task-output.txt
-            git diff --cached --quiet || git commit -m "ops: real task pipeline output [skip ci]"
-            git push origin HEAD || true
-          fi
-        continue-on-error: true
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          echo "=== REAL TASK OUTPUT FROM VPS ==="
+          $SSH_CMD "cat /opt/claude-code/logs/real-task-output.txt 2>/dev/null" || echo "(no output)"
+          echo "=== END ==="
