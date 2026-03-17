@@ -439,11 +439,29 @@ function TaskCard({
             </div>
           )}
 
-          {/* Draft — waiting for interpretation */}
+          {/* Draft — waiting for interpretation or failed */}
           {task.status === 'draft' && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Анализируем задачу...
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onAction(task.id, 'interpret')}
+                loading={isLoading('interpret')}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Повторить
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onAction(task.id, 'cancel')}
+                loading={isLoading('cancel')}
+              >
+                <XCircle className="h-3.5 w-3.5" />
+                Отменить
+              </Button>
             </div>
           )}
         </CardContent>

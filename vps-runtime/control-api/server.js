@@ -404,8 +404,13 @@ async function handleTaskProgress(req, res, id) {
     if (!body.message_ru) return json(res, 400, { error: "message_ru is required" });
     const updated = taskDb.addTaskProgress(id, body.message_ru, body.pct);
 
-    // Send progress to Telegram
-    await sendTelegram(`<b>Прогресс задачи #${id}</b>\n${body.message_ru}${body.pct != null ? ` (${body.pct}%)` : ""}`);
+    // Send progress to Telegram only on milestones (first update, 25/50/75/100%)
+    const progressArr = updated.progress ? JSON.parse(updated.progress) : [];
+    const isMilestone = progressArr.length === 1
+      || (body.pct != null && [25, 50, 75, 100].includes(body.pct));
+    if (isMilestone) {
+      await sendTelegram(`<b>Прогресс задачи #${id}</b>\n${body.message_ru}${body.pct != null ? ` (${body.pct}%)` : ""}`);
+    }
 
     json(res, 200, updated);
   } catch (e) {
@@ -417,6 +422,9 @@ async function handleTaskComplete(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
+  if (!["running", "confirmed"].includes(task.status)) {
+    return json(res, 400, { error: `Cannot complete task in status '${task.status}'. Must be 'running' or 'confirmed'.` });
+  }
 
   try {
     const body = await parseBody(req);
@@ -442,6 +450,9 @@ async function handleTaskFail(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
+  if (!["running", "confirmed"].includes(task.status)) {
+    return json(res, 400, { error: `Cannot fail task in status '${task.status}'. Must be 'running' or 'confirmed'.` });
+  }
 
   try {
     const body = await parseBody(req);
