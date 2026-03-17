@@ -55,28 +55,20 @@ jobs:
             echo "=== Nginx → dashboard proxy (HTTP, port 80) ==="
             $SSH_CMD "curl -sI --max-time 5 -H 'Host: webhook.marbomebel.ru' http://127.0.0.1:80/ 2>&1 | head -5" || true
             echo ""
-            echo "=== Traefik docker-compose location ==="
-            $SSH_CMD "find /opt /root /home -name 'docker-compose*' -path '*traefik*' 2>/dev/null | head -10" || true
-            $SSH_CMD "find /opt /root /home -name 'docker-compose*' -path '*n8n*' 2>/dev/null | head -10" || true
+            echo "=== Existing Traefik dynamic configs ==="
+            $SSH_CMD "ls -la /opt/n8n-traefik/dynamic/ 2>/dev/null" || true
             echo ""
-            echo "=== Traefik static config ==="
-            $SSH_CMD "docker inspect n8n-traefik-traefik-1 --format '{{.Args}}' 2>/dev/null" || true
+            echo "=== Existing dynamic config content ==="
+            $SSH_CMD "cat /opt/n8n-traefik/dynamic/*.yml 2>/dev/null || cat /opt/n8n-traefik/dynamic/*.yaml 2>/dev/null || echo '(no yaml files)'" || true
             echo ""
-            echo "=== Traefik dynamic config files ==="
-            $SSH_CMD "docker exec n8n-traefik-traefik-1 ls /etc/traefik/ 2>/dev/null" || true
-            $SSH_CMD "docker exec n8n-traefik-traefik-1 cat /etc/traefik/traefik.yml 2>/dev/null || echo '(no static config file)'" || true
+            echo "=== Traefik compose.yaml ==="
+            $SSH_CMD "cat /opt/n8n-traefik/compose.yaml 2>/dev/null" || true
             echo ""
-            echo "=== Traefik container mounts ==="
-            $SSH_CMD "docker inspect n8n-traefik-traefik-1 --format '{{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}' 2>/dev/null" || true
+            echo "=== Host gateway / extra_hosts check ==="
+            $SSH_CMD "docker inspect n8n-traefik-traefik-1 --format '{{json .HostConfig.ExtraHosts}}' 2>/dev/null" || true
             echo ""
-            echo "=== Traefik routers (API) ==="
-            $SSH_CMD "docker exec n8n-traefik-traefik-1 wget -qO- http://localhost:8080/api/http/routers 2>/dev/null | python3 -m json.tool 2>/dev/null | head -60 || echo '(traefik API not available)'" || true
-            echo ""
-            echo "=== Docker labels on traefik container ==="
-            $SSH_CMD "docker inspect n8n-traefik-traefik-1 --format '{{json .Config.Labels}}' 2>/dev/null | python3 -m json.tool 2>/dev/null | head -30" || true
-            echo ""
-            echo "=== N8N docker-compose.yml ==="
-            $SSH_CMD "cat /opt/n8n-docker/docker-compose.yml 2>/dev/null || cat /root/n8n/docker-compose.yml 2>/dev/null || echo '(not found at common locations)'" || true
+            echo "=== VPS host IP (for Traefik routing) ==="
+            $SSH_CMD "ip route get 1 2>/dev/null | awk '{print \$7; exit}'" || true
             echo ""
             echo "=== Direct dashboard /tasks via port 3200 ==="
             $SSH_CMD "curl -s --max-time 5 http://127.0.0.1:3200/tasks 2>&1 | head -c 300" || true
