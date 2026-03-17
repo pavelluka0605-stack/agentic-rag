@@ -147,6 +147,54 @@ else
   test_it "github-webhook responding" "1"
 fi
 
+# ── 9. Task Pipeline (Control API) ────────────────────────────────────────────
+
+echo "9. Task Pipeline:"
+API="http://127.0.0.1:3901"
+
+# Read token if available
+CTRL_TOKEN=""
+if [ -f /opt/claude-code/env/control-api.env ]; then
+  CTRL_TOKEN=$(grep '^CONTROL_API_TOKEN=' /opt/claude-code/env/control-api.env 2>/dev/null | cut -d= -f2-)
+fi
+AUTH_HDR=""
+[ -n "$CTRL_TOKEN" ] && AUTH_HDR="Authorization: Bearer $CTRL_TOKEN"
+
+# Create a test task
+CREATE_RESP=$(curl -s --max-time 5 -X POST "$API/api/tasks" \
+  -H "Content-Type: application/json" \
+  ${AUTH_HDR:+-H "$AUTH_HDR"} \
+  -d '{"raw_input":"Тестовая задача для проверки пайплайна","input_type":"text"}' 2>/dev/null)
+TASK_ID=$(echo "$CREATE_RESP" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+[ -n "$TASK_ID" ] && [ "$TASK_ID" -gt 0 ] 2>/dev/null
+test_it "create task via API" "$?"
+
+if [ -n "$TASK_ID" ] && [ "$TASK_ID" -gt 0 ] 2>/dev/null; then
+  # Get task
+  GET_RESP=$(curl -s --max-time 5 "$API/api/tasks/$TASK_ID" \
+    ${AUTH_HDR:+-H "$AUTH_HDR"} 2>/dev/null)
+  echo "$GET_RESP" | grep -q '"status":"draft"'
+  test_it "task starts as draft" "$?"
+
+  # Get events
+  EVENTS_RESP=$(curl -s --max-time 5 "$API/api/tasks/$TASK_ID/events" \
+    ${AUTH_HDR:+-H "$AUTH_HDR"} 2>/dev/null)
+  echo "$EVENTS_RESP" | grep -q '"event_type":"created"'
+  test_it "created event recorded" "$?"
+
+  # Cancel the test task (cleanup)
+  curl -s --max-time 5 -X POST "$API/api/tasks/$TASK_ID/cancel" \
+    -H "Content-Type: application/json" \
+    ${AUTH_HDR:+-H "$AUTH_HDR"} \
+    -d '{}' >/dev/null 2>&1
+  CANCEL_RESP=$(curl -s --max-time 5 "$API/api/tasks/$TASK_ID" \
+    ${AUTH_HDR:+-H "$AUTH_HDR"} 2>/dev/null)
+  echo "$CANCEL_RESP" | grep -q '"status":"cancelled"'
+  test_it "task cancelled successfully" "$?"
+else
+  echo "  (skipping pipeline tests — task creation failed)"
+fi
+
 echo ""
 
 # ── Summary ──────────────────────────────────────────────────────────────────

@@ -40,13 +40,18 @@ jobs:
 
       - name: Deploy runtime scripts
         if: inputs.action == 'bootstrap' || inputs.action == 'update-scripts' || github.event_name == 'push'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          CONTROL_API_TOKEN: ${{ secrets.CONTROL_API_TOKEN }}
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           SCP_CMD="scp -o StrictHostKeyChecking=no"
           VPS="${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
 
           # Create dirs on VPS
-          $SSH_CMD "mkdir -p /opt/claude-code/{bin,env,etc,logs,workspace,backups,control-api}"
+          $SSH_CMD "mkdir -p /opt/claude-code/{bin,env,etc,logs,workspace,backups,control-api,memory-server}"
 
           # Copy scripts
           $SCP_CMD vps-runtime/bin/*.sh $VPS:/opt/claude-code/bin/
@@ -61,6 +66,25 @@ jobs:
           $SCP_CMD vps-runtime/control-api/server.js $VPS:/opt/claude-code/control-api/
           $SCP_CMD vps-runtime/control-api/package.json $VPS:/opt/claude-code/control-api/
 
+          # Copy memory server (needed by control API for task DB)
+          $SCP_CMD .claude/mcp/memory-server/db.js $VPS:/opt/claude-code/memory-server/
+          $SCP_CMD .claude/mcp/memory-server/package.json $VPS:/opt/claude-code/memory-server/
+          $SCP_CMD -r .claude/mcp/memory-server/migrations $VPS:/opt/claude-code/memory-server/
+
+          # Install memory server deps (better-sqlite3) and ensure memory dir
+          $SSH_CMD "cd /opt/claude-code/memory-server && npm install --production 2>&1 | tail -3"
+          $SSH_CMD "mkdir -p /opt/claude-code/memory"
+
+          # Write control-api.env with secrets
+          $SSH_CMD "cat > /opt/claude-code/env/control-api.env << 'ENVEOF'
+OPENAI_API_KEY=${OPENAI_API_KEY:-}
+TG_BOT_TOKEN=${TG_BOT_TOKEN:-}
+TG_CHAT_ID=${TG_CHAT_ID:-}
+CONTROL_API_TOKEN=${CONTROL_API_TOKEN:-}
+MEMORY_SERVER_PATH=/opt/claude-code/memory-server
+ENVEOF
+          chmod 600 /opt/claude-code/env/control-api.env"
+
           # Make executable
           $SSH_CMD "chmod +x /opt/claude-code/bin/*.sh"
 
@@ -74,7 +98,7 @@ jobs:
           # Setup backup cron (idempotent)
           $SSH_CMD "crontab -l 2>/dev/null | grep -q backup-memory || (crontab -l 2>/dev/null; echo '*/30 * * * * /opt/claude-code/bin/backup-memory.sh >> /opt/claude-code/logs/backup.log 2>&1') | crontab -"
 
-          echo "✓ Scripts, configs, systemd units, and control API deployed"
+          echo "✓ Scripts, configs, systemd units, memory server, and control API deployed"
 
       - name: Bootstrap
         if: inputs.action == 'bootstrap'
