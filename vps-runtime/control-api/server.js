@@ -25,6 +25,9 @@
 //   POST /api/tasks/:id/progress — add progress update (Russian)
 //   POST /api/tasks/:id/complete — mark done with Russian result
 //   POST /api/tasks/:id/fail     — mark failed
+//   POST /api/tasks/:id/review   — move to review state
+//   POST /api/tasks/:id/request-review — escalate to manual review
+//   GET  /api/tasks/:id/events   — task lifecycle events
 //
 // Security: Bearer token auth via CONTROL_API_TOKEN env var
 // =============================================================================
@@ -335,6 +338,7 @@ async function handleTaskCreate(req, res) {
       input_type: body.input_type || "text",
       voice_transcript: body.voice_transcript,
     });
+    taskDb.addTaskEvent(task.id, "created", "Задача создана");
     json(res, 201, task);
   } catch (e) {
     json(res, 500, { error: e.message });
@@ -411,6 +415,7 @@ async function handleTaskInterpret(req, res, id) {
     // Single LLM call for interpretation
     const interpretation = await llmCall(INTERPRET_SYSTEM_PROMPT, task.raw_input);
     const updated = taskDb.updateTaskInterpretation(id, interpretation);
+    taskDb.addTaskEvent(id, "interpreted", `Задача проанализирована. Риск: ${interpretation.risk_level || "?"}`);
     json(res, 200, updated);
   } catch (e) {
     json(res, 500, { error: `Interpretation failed: ${e.message}` });
@@ -430,6 +435,7 @@ async function handleTaskRevise(req, res, id) {
     if (!body.text) return json(res, 400, { error: "text is required" });
     // Deterministic: append revision, reset to draft, NO LLM call
     const updated = taskDb.addTaskRevision(id, body.text);
+    taskDb.addTaskEvent(id, "revised", `Уточнение: ${body.text.slice(0, 200)}`);
     json(res, 200, updated);
   } catch (e) {
     json(res, 500, { error: e.message });
@@ -454,6 +460,7 @@ async function handleTaskConfirm(req, res, id) {
     packet.mode = mode;
 
     const updated = taskDb.confirmTask(id, { mode, engineering_packet: packet });
+    taskDb.addTaskEvent(id, "confirmed", `Подтверждена. Режим: ${mode === "fast" ? "быстрый" : "безопасный"}`);
 
     // Notify Telegram
     const interp = typeof task.interpretation === "string" ? JSON.parse(task.interpretation) : task.interpretation;
@@ -478,6 +485,7 @@ async function handleTaskCancel(req, res, id) {
     return json(res, 400, { error: `Task already ${task.status}` });
   }
   const updated = taskDb.cancelTask(id);
+  taskDb.addTaskEvent(id, "cancelled", "Задача отменена");
   json(res, 200, updated);
 }
 
@@ -491,6 +499,7 @@ async function handleTaskProgress(req, res, id) {
     const body = await parseBody(req);
     if (!body.message_ru) return json(res, 400, { error: "message_ru is required" });
     const updated = taskDb.addTaskProgress(id, body.message_ru, body.pct);
+    taskDb.addTaskEvent(id, "progress", `${body.message_ru}${body.pct != null ? ` (${body.pct}%)` : ""}`);
 
     // Send progress to Telegram only on milestones (first update, 25/50/75/100%)
     const progressArr = updated.progress ? JSON.parse(updated.progress) : [];
@@ -510,8 +519,8 @@ async function handleTaskComplete(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (!["running", "confirmed"].includes(task.status)) {
-    return json(res, 400, { error: `Cannot complete task in status '${task.status}'. Must be 'running' or 'confirmed'.` });
+  if (!["running", "confirmed", "review", "needs_manual_review"].includes(task.status)) {
+    return json(res, 400, { error: `Cannot complete task in status '${task.status}'. Must be 'running', 'confirmed', 'review', or 'needs_manual_review'.` });
   }
 
   try {
@@ -520,6 +529,7 @@ async function handleTaskComplete(req, res, id) {
       result_summary_ru: body.result_summary_ru,
       result_detail: body.result_detail,
     });
+    taskDb.addTaskEvent(id, "completed", body.result_summary_ru || "Задача выполнена");
 
     // Send result to Telegram
     await sendTelegram(
@@ -538,13 +548,14 @@ async function handleTaskFail(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (!["running", "confirmed"].includes(task.status)) {
-    return json(res, 400, { error: `Cannot fail task in status '${task.status}'. Must be 'running' or 'confirmed'.` });
+  if (!["running", "confirmed", "review", "needs_manual_review"].includes(task.status)) {
+    return json(res, 400, { error: `Cannot fail task in status '${task.status}'. Must be 'running', 'confirmed', 'review', or 'needs_manual_review'.` });
   }
 
   try {
     const body = await parseBody(req);
     const updated = taskDb.failTask(id, body.error || "Unknown error");
+    taskDb.addTaskEvent(id, "failed", body.error || "Неизвестная ошибка");
 
     await sendTelegram(`<b>Задача #${id} не выполнена</b>\n\n<b>Ошибка:</b> ${body.error || "Неизвестная ошибка"}`);
     taskDb.setTaskTelegramNotified(id);
@@ -565,16 +576,17 @@ async function handleTaskStartExec(req, res, id) {
 
   try {
     const body = await parseBody(req);
-    const updated = taskDb.startTaskExecution(id, body.execution_run_id || `task-${id}`);
 
-    // Dispatch engineering packet to executor via tmux (if available)
+    // Parse engineering packet before changing state
     const packet = task.engineering_packet
       ? (typeof task.engineering_packet === "string" ? JSON.parse(task.engineering_packet) : task.engineering_packet)
       : null;
 
+    // Write task file BEFORE flipping to running (dispatch-first safety)
+    let taskFile = null;
     if (packet) {
       const taskDir = path.join(LOG_DIR, "..", "workspace");
-      const taskFile = path.join(taskDir, `task-${id}.md`);
+      taskFile = path.join(taskDir, `task-${id}.md`);
       const prompt = [
         `# Task #${id}: ${packet.title}`,
         "",
@@ -604,19 +616,86 @@ async function handleTaskStartExec(req, res, id) {
       try {
         fs.mkdirSync(taskDir, { recursive: true });
         fs.writeFileSync(taskFile, prompt, "utf-8");
+      } catch (writeErr) {
+        taskDb.addTaskEvent(id, "dispatch_failed", `Не удалось записать файл задачи: ${writeErr.message}`);
+        return json(res, 500, { error: `Dispatch failed: could not write task file — ${writeErr.message}` });
+      }
+    }
 
-        // Try to send to tmux workspace window
+    // File written successfully (or no packet) — now flip to running
+    const updated = taskDb.startTaskExecution(id, body.execution_run_id || `task-${id}`);
+    taskDb.addTaskEvent(id, "dispatched", `Задача отправлена на выполнение${taskFile ? ` → ${path.basename(taskFile)}` : ""}`);
+
+    // Try to send to tmux (non-fatal — external executor can still pick up the file)
+    if (taskFile) {
+      try {
         const session = process.env.CLAUDE_TMUX_SESSION || "claude-code";
         const tmuxUp = run(`tmux has-session -t "${session}" 2>/dev/null && echo yes`) === "yes";
         if (tmuxUp) {
-          // Send the task file path as a prompt to Claude Code
           run(`tmux send-keys -t "${session}:workspace" "cat ${taskFile}" Enter`);
+          taskDb.addTaskEvent(id, "running", "Передано в tmux-сессию");
+        } else {
+          taskDb.addTaskEvent(id, "running", "tmux недоступен — ожидание внешнего исполнителя");
         }
-      } catch (dispatchErr) {
-        console.warn("[task-exec] Dispatch failed (non-fatal):", dispatchErr.message);
-        // Non-fatal: task is already 'running', external executor can still pick it up
+      } catch (tmuxErr) {
+        console.warn("[task-exec] tmux dispatch failed (non-fatal):", tmuxErr.message);
+        taskDb.addTaskEvent(id, "running", `tmux ошибка (не критично): ${tmuxErr.message}`);
       }
     }
+
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
+async function handleTaskEvents(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  const events = taskDb.getTaskEvents(id);
+  json(res, 200, events);
+}
+
+async function handleTaskReview(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (task.status !== "running") {
+    return json(res, 400, { error: `Cannot request review for task in status '${task.status}'. Must be 'running'.` });
+  }
+
+  try {
+    const body = await parseBody(req);
+    const updated = taskDb.reviewTask(id, body.detail);
+
+    await sendTelegram(
+      `<b>Задача #${id} — запрос проверки</b>\n\n` +
+      `${body.detail || "Задача ожидает проверки"}`
+    );
+
+    json(res, 200, updated);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
+async function handleTaskRequestManualReview(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (!["running", "review"].includes(task.status)) {
+    return json(res, 400, { error: `Cannot request manual review for task in status '${task.status}'. Must be 'running' or 'review'.` });
+  }
+
+  try {
+    const body = await parseBody(req);
+    const updated = taskDb.requestManualReview(id, body.reason);
+
+    await sendTelegram(
+      `<b>Задача #${id} — нужна ручная проверка</b>\n\n` +
+      `<b>Причина:</b> ${body.reason || "Требуется ручная проверка"}`
+    );
 
     json(res, 200, updated);
   } catch (e) {
@@ -658,11 +737,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && urlPath === "/api/tasks") return handleTaskList(req, res);
 
     // /api/tasks/:id and /api/tasks/:id/:action
-    const taskMatch = urlPath.match(/^\/api\/tasks\/(\d+)(?:\/(\w+))?$/);
+    const taskMatch = urlPath.match(/^\/api\/tasks\/(\d+)(?:\/([\w-]+))?$/);
     if (taskMatch) {
       const taskId = parseInt(taskMatch[1]);
       const action = taskMatch[2];
       if (req.method === "GET" && !action) return handleTaskGet(req, res, taskId);
+      if (req.method === "GET" && action === "events") return handleTaskEvents(req, res, taskId);
       if (req.method === "POST" && action === "interpret") return handleTaskInterpret(req, res, taskId);
       if (req.method === "POST" && action === "revise") return handleTaskRevise(req, res, taskId);
       if (req.method === "POST" && action === "confirm") return handleTaskConfirm(req, res, taskId);
@@ -671,6 +751,8 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "POST" && action === "progress") return handleTaskProgress(req, res, taskId);
       if (req.method === "POST" && action === "complete") return handleTaskComplete(req, res, taskId);
       if (req.method === "POST" && action === "fail") return handleTaskFail(req, res, taskId);
+      if (req.method === "POST" && action === "review") return handleTaskReview(req, res, taskId);
+      if (req.method === "POST" && action === "request-review") return handleTaskRequestManualReview(req, res, taskId);
     }
 
     json(res, 404, { error: "Not found" });
