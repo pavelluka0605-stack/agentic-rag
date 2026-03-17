@@ -1,5 +1,5 @@
 ========================================
-=== VPS FULL DIAGNOSTIC Tue Mar 17 06:23:15 UTC 2026 ===
+=== VPS FULL DIAGNOSTIC Tue Mar 17 07:27:01 UTC 2026 ===
 ========================================
 
 === 1. Service worker files in /opt/claude-chat/public/ ===
@@ -745,7 +745,7 @@ app.listen(PORT, '0.0.0.0', () => {
 │ namespace         │ default                               │
 │ version           │ 1.0.0                                 │
 │ restarts          │ 0                                     │
-│ uptime            │ 43h                                   │
+│ uptime            │ 44h                                   │
 │ script path       │ /opt/claude-chat/server.js            │
 │ script args       │ N/A                                   │
 │ error log path    │ /root/.pm2/logs/claude-chat-error.log │
@@ -774,11 +774,11 @@ app.listen(PORT, '0.0.0.0', () => {
 
  Code metrics value 
 ┌────────────────────────┬───────────┐
-│ Used Heap Size         │ 12.76 MiB │
-│ Heap Usage             │ 76.76 %   │
+│ Used Heap Size         │ 13.18 MiB │
+│ Heap Usage             │ 79.3 %    │
 │ Heap Size              │ 16.63 MiB │
-│ Event Loop Latency p95 │ 1.46 ms   │
-│ Event Loop Latency     │ 0.48 ms   │
+│ Event Loop Latency p95 │ 1.45 ms   │
+│ Event Loop Latency     │ 0.53 ms   │
 │ Active handles         │ 4         │
 │ Active requests        │ 0         │
 │ HTTP                   │ 0 req/min │
@@ -809,7 +809,7 @@ bfdfe0129de2   9f9e493a5f9e                  "tini -- /docker-ent…"   3 days a
 581a07387d54   traefik                       "/entrypoint.sh --ap…"   3 days ago    Up 3 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp   n8n-traefik-traefik-1
 b77d63637705   pgvector/pgvector:pg16        "docker-entrypoint.s…"   7 days ago    Up 7 days              5432/tcp                                                                       n8n-postgres-1
 43bc332d60fe   nginx:alpine                  "/docker-entrypoint.…"   8 days ago    Up 8 days              80/tcp                                                                         n8n-voice-app-1
-f22e23598ce9   n8nio/n8n:latest              "tini -- /docker-ent…"   8 days ago    Up 6 days              5678/tcp                                                                       n8n-n8n-1
+f22e23598ce9   n8nio/n8n:latest              "tini -- /docker-ent…"   8 days ago    Up 7 days              5678/tcp                                                                       n8n-n8n-1
 a2ffa3a5ed71   alpine/openclaw:latest        "docker-entrypoint.s…"   13 days ago   Up 13 days (healthy)                                                                                  openclaw
 a99e00dabc0d   n8nio/n8n                     "tini -- /docker-ent…"   2 weeks ago   Created                                                                                               n8n
 
@@ -899,7 +899,7 @@ Traefik container: 581a07387d54
 < access-control-allow-origin: *
 < cache-control: no-cache, no-store, must-revalidate
 < content-type: text/html; charset=utf-8
-< date: Tue, 17 Mar 2026 06:23:16 GMT
+< date: Tue, 17 Mar 2026 07:27:02 GMT
 < etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 < expires: 0
 < pragma: no-cache
@@ -933,7 +933,7 @@ MATCH: Same content
 ; <<>> DiG 9.18.39-0ubuntu0.24.04.2-Ubuntu <<>> chat.marbomebel.ru
 ;; global options: +cmd
 ;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 34328
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 2642
 ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
 
 ;; OPT PSEUDOSECTION:
@@ -942,11 +942,11 @@ MATCH: Same content
 ;chat.marbomebel.ru.		IN	A
 
 ;; ANSWER SECTION:
-chat.marbomebel.ru.	6504	IN	A	72.56.127.126
+chat.marbomebel.ru.	2678	IN	A	72.56.127.126
 
 ;; Query time: 0 msec
 ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
-;; WHEN: Tue Mar 17 06:23:16 UTC 2026
+;; WHEN: Tue Mar 17 07:27:02 UTC 2026
 ;; MSG SIZE  rcvd: 63
 
 
@@ -961,7 +961,7 @@ access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
 content-type: text/html; charset=utf-8
-date: Tue, 17 Mar 2026 06:23:16 GMT
+date: Tue, 17 Mar 2026 07:27:02 GMT
 etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 expires: 0
 pragma: no-cache
