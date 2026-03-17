@@ -325,7 +325,7 @@ export default function DashboardPage() {
               {events.map((ev) => (
                 <div
                   key={ev.id}
-                  className="flex items-center gap-4 rounded-lg border border-border-subtle px-4 py-2.5 transition-colors hover:bg-[oklch(0.195_0.008_260)]"
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-border-subtle px-3 py-2.5 transition-colors hover:bg-[oklch(0.195_0.008_260)] sm:flex-nowrap sm:gap-4 sm:px-4"
                 >
                   <Badge variant={eventVariant(ev.event_type)}>
                     {ev.event_type}
