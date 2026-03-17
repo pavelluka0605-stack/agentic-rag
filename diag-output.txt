@@ -1,15 +1,15 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Tue Mar 17 12:42:46 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Tue Mar 17 12:47:15 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
 ● dashboard.service - Claude Code Task Dashboard (Next.js)
      Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
-     Active: active (running) since Tue 2026-03-17 12:06:37 UTC; 36min ago
+     Active: active (running) since Tue 2026-03-17 12:06:37 UTC; 40min ago
    Main PID: 1135265 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 78.8M (max: 256.0M available: 177.1M peak: 80.4M)
-        CPU: 1.662s
+     Memory: 78.9M (max: 256.0M available: 177.0M peak: 80.4M)
+        CPU: 1.698s
      CGroup: /system.slice/dashboard.service
              └─1135265 "next-server (v16.1.6)"
 
@@ -23,11 +23,11 @@ Mar 17 12:06:38 fra-1-vm-ckr7 node[1135265]: ✓ Ready in 849ms
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Tue 2026-03-17 12:06:33 UTC; 36min ago
+     Active: active (running) since Tue 2026-03-17 12:06:33 UTC; 40min ago
    Main PID: 1135094 (node)
       Tasks: 11 (limit: 32)
-     Memory: 23.8M (max: 128.0M available: 104.1M peak: 43.9M)
-        CPU: 567ms
+     Memory: 23.9M (max: 128.0M available: 104.0M peak: 43.9M)
+        CPU: 575ms
      CGroup: /system.slice/control-api.service
              └─1135094 /usr/bin/node server.js
 
@@ -132,7 +132,7 @@ Cache-Control: s-maxage=31536000
 ETag: "fibvqu9q0c4sf"
 Content-Type: text/html; charset=utf-8
 Content-Length: 6207
-Date: Tue, 17 Mar 2026 12:42:46 GMT
+Date: Tue, 17 Mar 2026 12:47:15 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,12 +142,34 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-17T12:42:46.441Z"
+  "timestamp": "2026-03-17T12:47:15.394Z"
 }
-=== 11. curl https://webhook.marbomebel.ru/ ===
-(no response)
+=== 11. curl https://chat.marbomebel.ru/ ===
+HTTP/2 200 
+access-control-allow-headers: Content-Type, Authorization
+access-control-allow-methods: GET, POST, OPTIONS
+access-control-allow-origin: *
+cache-control: no-cache, no-store, must-revalidate
+content-type: text/html; charset=utf-8
+date: Tue, 17 Mar 2026 12:47:15 GMT
+etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
+expires: 0
+pragma: no-cache
+x-powered-by: Express
+content-length: 29629
 
-=== 12. curl https://webhook.marbomebel.ru/tasks ===
+
+=== 12. curl https://chat.marbomebel.ru/tasks ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /tasks</pre>
+</body>
+</html>
 
 === 13. Traefik dynamic configs ===
 total 16
@@ -201,7 +223,7 @@ openclaw                 Up 13 days (healthy)
 ┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
 │ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
 ├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 829221   │ 2D     │ 0    │ online    │ 0%       │ 65.7mb   │ root     │ disabled │
+│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 829221   │ 2D     │ 0    │ online    │ 0%       │ 65.5mb   │ root     │ disabled │
 └────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
 === 17. chat.marbomebel.ru status ===
@@ -211,7 +233,7 @@ access-control-allow-methods: GET, POST, OPTIONS
 access-control-allow-origin: *
 cache-control: no-cache, no-store, must-revalidate
 content-type: text/html; charset=utf-8
-date: Tue, 17 Mar 2026 12:42:46 GMT
+date: Tue, 17 Mar 2026 12:47:15 GMT
 etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
 expires: 0
 pragma: no-cache
