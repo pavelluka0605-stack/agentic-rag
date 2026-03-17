@@ -46,11 +46,20 @@ jobs:
             $SSH_CMD "curl -s --max-time 5 http://127.0.0.1:3200/tasks 2>&1 | head -c 200" || true
             echo ""
             echo ""
-            echo "=== Nginx → dashboard proxy ==="
-            $SSH_CMD "curl -sI --max-time 5 https://webhook.marbomebel.ru/ 2>&1 | head -5" || true
+            echo "=== Nginx config test ==="
+            $SSH_CMD "nginx -t 2>&1" || true
             echo ""
-            echo "=== Nginx → /tasks proxy ==="
-            $SSH_CMD "curl -sI --max-time 5 https://webhook.marbomebel.ru/tasks 2>&1 | head -5" || true
+            echo "=== Nginx sites-available/webhook dashboard section ==="
+            $SSH_CMD "grep -A5 'Task Dashboard' /etc/nginx/sites-available/webhook 2>/dev/null || echo '(not found)'"
+            echo ""
+            echo "=== Nginx → dashboard proxy (HTTP, port 80) ==="
+            $SSH_CMD "curl -sI --max-time 5 -H 'Host: webhook.marbomebel.ru' http://127.0.0.1:80/ 2>&1 | head -5" || true
+            echo ""
+            echo "=== Nginx → dashboard proxy (HTTPS) ==="
+            $SSH_CMD "curl -skI --max-time 5 https://webhook.marbomebel.ru/ 2>&1 | head -10" || true
+            echo ""
+            echo "=== Nginx → /tasks proxy (HTTPS) ==="
+            $SSH_CMD "curl -skI --max-time 5 https://webhook.marbomebel.ru/tasks 2>&1 | head -10" || true
           } > real-task-output.txt
           cat real-task-output.txt
 
