@@ -8,6 +8,7 @@ on:
       - 'vps-runtime/**'
       - '.claude/mcp/**'
       - '.claude/hooks/**'
+      - 'dashboard/**'
       - '.github/workflows/deploy-claude-code.yml'
   workflow_dispatch:
     inputs:
@@ -102,7 +103,31 @@ jobs:
           # Setup backup cron (idempotent)
           $SSH_CMD "crontab -l 2>/dev/null | grep -q backup-memory || (crontab -l 2>/dev/null; echo '*/30 * * * * /opt/claude-code/bin/backup-memory.sh >> /opt/claude-code/logs/backup.log 2>&1') | crontab -"
 
-          echo "✓ Scripts, configs, systemd units, memory server, and control API deployed"
+          # Deploy dashboard (Next.js)
+          $SSH_CMD "mkdir -p /opt/claude-code/dashboard"
+          $SCP_CMD -r dashboard/src $VPS:/opt/claude-code/dashboard/
+          $SCP_CMD -r dashboard/public $VPS:/opt/claude-code/dashboard/ 2>/dev/null || true
+          $SCP_CMD dashboard/package.json dashboard/package-lock.json $VPS:/opt/claude-code/dashboard/ 2>/dev/null || true
+          for f in dashboard/next.config.ts dashboard/tsconfig.json dashboard/postcss.config.mjs dashboard/next-env.d.ts; do
+            [ -f "$f" ] && $SCP_CMD "$f" $VPS:/opt/claude-code/dashboard/
+          done
+          # Write dashboard .env.local on VPS
+          printf '%s\n' \
+            "MEMORY_DB_PATH=/opt/claude-code/memory/memory.db" \
+            "CONTROL_API_URL=http://127.0.0.1:3901" \
+            "CONTROL_API_TOKEN=${CONTROL_API_TOKEN:-}" \
+            > /tmp/dashboard-env
+          $SCP_CMD /tmp/dashboard-env $VPS:/opt/claude-code/dashboard/.env.local
+          rm -f /tmp/dashboard-env
+          # Install deps and build
+          $SSH_CMD "cd /opt/claude-code/dashboard && npm install --production=false 2>&1 | tail -5"
+          $SSH_CMD "cd /opt/claude-code/dashboard && npm run build 2>&1 | tail -10"
+          # Enable dashboard service
+          $SSH_CMD "systemctl enable dashboard.service 2>/dev/null || true"
+          # Copy nginx config and reload
+          $SSH_CMD "cp /opt/claude-code/etc/nginx-webhook.conf /etc/nginx/sites-available/webhook 2>/dev/null && nginx -t 2>&1 && systemctl reload nginx 2>/dev/null || true"
+
+          echo "✓ Scripts, configs, systemd units, memory server, control API, and dashboard deployed"
 
       - name: Bootstrap
         if: inputs.action == 'bootstrap'
@@ -129,6 +154,7 @@ jobs:
           $SSH_CMD "systemctl restart control-api.service 2>/dev/null || true"
           $SSH_CMD "systemctl is-active claude-code.service >/dev/null 2>&1 && /opt/claude-code/bin/restart.sh || /opt/claude-code/bin/start.sh" || true
           $SSH_CMD "systemctl restart github-webhook.service 2>/dev/null || true"
+          $SSH_CMD "systemctl restart dashboard.service 2>/dev/null || true"
           echo "✓ Services started/restarted"
 
       - name: Start
@@ -136,21 +162,21 @@ jobs:
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/start.sh"
-          $SSH_CMD "systemctl start control-api.service 2>/dev/null || true"
+          $SSH_CMD "systemctl start control-api.service dashboard.service 2>/dev/null || true"
 
       - name: Stop
         if: inputs.action == 'stop'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/stop.sh"
-          $SSH_CMD "systemctl stop control-api.service 2>/dev/null || true"
+          $SSH_CMD "systemctl stop control-api.service dashboard.service 2>/dev/null || true"
 
       - name: Restart
         if: inputs.action == 'restart'
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/restart.sh"
-          $SSH_CMD "systemctl restart control-api.service 2>/dev/null || true"
+          $SSH_CMD "systemctl restart control-api.service dashboard.service 2>/dev/null || true"
 
       - name: Health Check
         if: inputs.action == 'health' || inputs.action == 'bootstrap' || inputs.action == 'start' || inputs.action == 'restart' || github.event_name == 'push'

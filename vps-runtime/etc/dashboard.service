@@ -1,0 +1,24 @@
+[Unit]
+Description=Claude Code Task Dashboard (Next.js)
+After=network-online.target control-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/claude-code/dashboard
+Environment=NODE_ENV=production
+Environment=PORT=3100
+Environment=MEMORY_DB_PATH=/opt/claude-code/memory/memory.db
+Environment=CONTROL_API_URL=http://127.0.0.1:3901
+EnvironmentFile=-/opt/claude-code/env/control-api.env
+ExecStart=/usr/bin/node node_modules/.bin/next start --port 3100
+Restart=on-failure
+RestartSec=5
+
+# Resource limits
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
