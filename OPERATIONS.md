@@ -123,7 +123,7 @@ curl -X POST https://webhook.marbomebel.ru/api/tasks/{id}/cancel \
   -H "Content-Type: application/json" -d '{}'
 ```
 
-- Rejects if already `done` or `cancelled`.
+- Rejects if already `done`, `failed`, or `cancelled` (terminal states).
 - Works from: draft, pending, confirmed, running, review, needs_manual_review.
 - **Cost:** 0 LLM calls.
 
@@ -659,6 +659,106 @@ Or run the automated version: `/opt/claude-code/bin/smoke-test.sh`
 - Telegram bot token compromised.
 - CONTROL_API_TOKEN leaked (rotate immediately in GitHub secrets + redeploy).
 - Unknown tasks appearing in the database (possible unauthorized access).
+
+### Escalation contacts
+
+> **Fill in before first production use.**
+
+| Role | Name | Contact | When to reach |
+|------|------|---------|---------------|
+| **Primary operator** | _______________ | _______________ | Day-to-day operations, task management |
+| **Developer** | _______________ | _______________ | Code changes, state machine, prompts, deploy fixes |
+| **Infrastructure** | _______________ | _______________ | VPS, disk, network, SSL, DNS |
+| **Security** | _______________ | _______________ | Token leaks, unauthorized access, compromised keys |
+
+---
+
+## 13. CONTROL_API_TOKEN — Access and Rotation
+
+### Who needs the token
+
+- Any operator or automated client calling the Control API (`/api/*` endpoints).
+- The dashboard does NOT need it (reads SQLite directly).
+- The Telegram bot does NOT need it (outbound only from the server).
+
+### Where the token lives
+
+| Location | Purpose | Access |
+|----------|---------|--------|
+| **GitHub Secrets** → `CONTROL_API_TOKEN` | Source of truth. Used by deploy workflow. | Repo admins only |
+| **VPS file** → `/opt/claude-code/env/control-api.env` | Runtime. Loaded by control-api.service. | VPS SSH access only |
+
+The token is **never** committed to git. The deploy workflow writes it from GitHub Secrets
+to the VPS env file automatically.
+
+### How to rotate the token
+
+1. Generate a new token: `openssl rand -hex 32`.
+2. Update GitHub Secret: repo → Settings → Secrets → `CONTROL_API_TOKEN` → update value.
+3. Redeploy: run `deploy-claude-code.yml` with action `update-scripts`.
+4. Verify: the deploy writes the new token to VPS and restarts the service.
+5. Update all API clients/scripts with the new token.
+6. Old token stops working immediately after service restart.
+
+### If the token is leaked
+
+1. Rotate immediately (steps above).
+2. Check recent task list for unauthorized tasks: `GET /api/tasks`.
+3. Review control-api logs: `journalctl -u control-api.service --since "24 hours ago"`.
+4. Escalate to security contact if unknown tasks exist.
+
+---
+
+## 14. Telegram Chat — Configuration and Verification
+
+### Where the configured chat target is defined
+
+| Location | Variable | Purpose |
+|----------|----------|---------|
+| **GitHub Secrets** → `TG_CHAT_ID` | Chat/user ID receiving notifications | Source of truth |
+| **VPS file** → `/opt/claude-code/env/control-api.env` | Runtime value | Auto-provisioned by deploy |
+
+The `TG_CHAT_ID` is a numeric ID (not a username). It points to a specific Telegram user
+or group chat.
+
+### How to verify safely (without exposing secrets)
+
+```bash
+# On VPS — check the bot can reach the chat:
+source /opt/claude-code/env/control-api.env
+curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/getChat?chat_id=${TG_CHAT_ID}" \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('result',{}).get('title') or d.get('result',{}).get('first_name','?'), '— ok' if d.get('ok') else '— ERROR')"
+```
+
+This prints the chat/user name without exposing the raw IDs.
+
+### If the chat target is wrong
+
+1. Get the correct `TG_CHAT_ID`:
+   - For a user: send `/start` to the bot, then check
+     `https://api.telegram.org/bot$TOKEN/getUpdates` for the `chat.id`.
+   - For a group: add the bot to the group, send a message, check `getUpdates`.
+2. Update GitHub Secret: `TG_CHAT_ID` → new value.
+3. Redeploy: `deploy-claude-code.yml` with action `update-scripts`.
+4. Test: confirm a test task and verify the notification arrives in the correct chat.
+
+---
+
+## 15. Day-to-Day Readiness Checklist
+
+> Run this before starting your operational day. Takes ~30 seconds.
+
+```
+[ ] 1. Open Telegram — check you see the bot's last message (proves chat works)
+[ ] 2. curl https://webhook.marbomebel.ru/health — responds (proves API is up)
+[ ] 3. Check task list: GET /api/tasks — review any tasks not in done/cancelled/failed
+[ ] 4. If tasks in "running" — check: is the executor alive? (connect.sh or tmux check)
+[ ] 5. If tasks in "review" or "needs_manual_review" — act on them now
+[ ] 6. Confirm you have your CONTROL_API_TOKEN ready for curl commands
+[ ] 7. Ready — create your first task of the day
+```
+
+**If any check fails:** see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) before proceeding.
 
 ---
 

@@ -130,7 +130,7 @@ ls -la /opt/claude-code/workspace/task-{id}.md
 **Fix:**
 - Investigate the issue described in the reason.
 - Call `/complete` or `/fail` after resolution.
-- If blocked: escalate to developer.
+- If blocked: escalate to developer (see OPERATIONS.md § Escalation contacts).
 
 **Warning:** Tasks in `needs_manual_review` have no timeout. They will stay there forever
 until someone acts.
@@ -166,7 +166,7 @@ systemctl restart control-api.service
 curl -s http://127.0.0.1:3901/health
 ```
 If it keeps crashing (restart loop): check logs for the error. Likely a code bug or missing
-dependency — escalate to developer.
+dependency — escalate to developer (see OPERATIONS.md § Escalation contacts).
 
 ## 13. tmux session dead
 

@@ -483,7 +483,7 @@ async function handleTaskCancel(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (["done", "cancelled"].includes(task.status)) {
+  if (["done", "failed", "cancelled"].includes(task.status)) {
     return json(res, 400, { error: `Task already ${task.status}` });
   }
   const updated = taskDb.cancelTask(id);
