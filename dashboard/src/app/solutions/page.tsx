@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Lightbulb, ExternalLink } from 'lucide-react'
 import type { Solution } from '@/types'
@@ -26,24 +27,40 @@ function patternBadgeVariant(type: string): 'default' | 'secondary' | 'warning' 
 }
 
 export default function SolutionsPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><Loading size="lg" /></div>}>
+      <SolutionsPageInner />
+    </Suspense>
+  )
+}
+
+function SolutionsPageInner() {
+  const searchParams = useSearchParams()
+  const projectParam = searchParams.get('project')
   const [solutions, setSolutions] = useState<Solution[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [patternType, setPatternType] = useState<string>('All')
   const [verifiedOnly, setVerifiedOnly] = useState(false)
   const [drawerSolution, setDrawerSolution] = useState<Solution | null>(null)
 
   useEffect(() => {
     setLoading(true)
+    setError(null)
     const params = new URLSearchParams({ limit: '50' })
     if (verifiedOnly) params.set('verified', 'true')
     if (patternType !== 'All') params.set('pattern_type', patternType)
+    if (projectParam) params.set('project', projectParam)
 
     fetch(`/api/solutions?${params}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then((data) => setSolutions(Array.isArray(data) ? data : []))
-      .catch(() => setSolutions([]))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load solutions'))
       .finally(() => setLoading(false))
-  }, [patternType, verifiedOnly])
+  }, [patternType, verifiedOnly, projectParam])
 
   const verifiedCount = solutions.filter((s) => s.verified).length
 
@@ -51,7 +68,17 @@ export default function SolutionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Solutions"
-        badge={<Badge variant="success">{verifiedCount} verified</Badge>}
+        badge={
+          <div className="flex items-center gap-2">
+            {projectParam && (
+              <Badge variant="outline">
+                {projectParam}
+                <Link href="/solutions" className="ml-1 hover:text-foreground">&times;</Link>
+              </Badge>
+            )}
+            <Badge variant="success">{verifiedCount} verified</Badge>
+          </div>
+        }
       />
 
       <div className="flex items-center gap-3">
@@ -71,11 +98,19 @@ export default function SolutionsPage() {
         </div>
       </div>
 
+      {error && (
+        <Card className="p-6">
+          <p className="text-sm text-destructive">
+            Failed to load solutions: {error}
+          </p>
+        </Card>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12">
           <Loading size="lg" />
         </div>
-      ) : solutions.length === 0 ? (
+      ) : !error && solutions.length === 0 ? (
         <EmptyState
           icon={Lightbulb}
           title="No solutions found"

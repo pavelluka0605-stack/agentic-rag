@@ -38,8 +38,8 @@ export async function GET() {
 
     // Overall status
     const allHealthy = services.every((s) => s.status === 'healthy')
-    const anyDown = services.some((s) => s.status === 'down')
-    const overall = allHealthy ? 'healthy' : anyDown ? 'degraded' : 'degraded'
+    const allDown = services.every((s) => s.status === 'down')
+    const overall = allHealthy ? 'healthy' : allDown ? 'down' : 'degraded'
 
     return NextResponse.json({
       status: overall,

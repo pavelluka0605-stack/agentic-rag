@@ -52,7 +52,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     { id: 'nav-github', label: 'GitHub Activity', description: 'Webhook events and PRs', icon: Github, action: () => router.push('/github'), group: 'Navigation', keywords: ['webhooks', 'pr', 'pull request', 'workflow'] },
     { id: 'nav-health', label: 'System Health', description: 'Services status and runtime', icon: Activity, action: () => router.push('/health'), group: 'Navigation', keywords: ['status', 'services', 'runtime', 'control'] },
     // Quick Actions
-    { id: 'act-search', label: 'Search Memory', description: 'Full-text search across all layers', icon: Search, action: () => router.push('/memory'), group: 'Quick Actions', keywords: ['find', 'query', 'fts'] },
+    { id: 'act-search', label: 'Search Memory', description: 'Full-text search across all layers', icon: Search, action: () => router.push(query.trim() ? `/memory?q=${encodeURIComponent(query.trim())}` : '/memory'), group: 'Quick Actions', keywords: ['find', 'query', 'fts'] },
     { id: 'act-open-incidents', label: 'View Open Incidents', description: 'Show unresolved errors', icon: AlertTriangle, action: () => router.push('/incidents?status=open'), group: 'Quick Actions', keywords: ['open', 'unresolved', 'active'] },
     { id: 'act-verified', label: 'Verified Solutions', description: 'Proven fixes only', icon: Lightbulb, action: () => router.push('/solutions?verified=true'), group: 'Quick Actions', keywords: ['proven', 'working'] },
     { id: 'act-latest-session', label: 'Latest Session', description: 'Jump to most recent session', icon: Play, action: () => router.push('/sessions'), group: 'Quick Actions', keywords: ['resume', 'continue', 'last', 'recent'] },

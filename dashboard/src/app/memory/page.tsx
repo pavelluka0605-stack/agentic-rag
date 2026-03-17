@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Brain, Search, AlertTriangle, Lightbulb, History, BookOpen, Shield, Database } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -57,7 +58,17 @@ function getItemLink(item: MemoryItem): string {
 }
 
 export default function MemoryPage() {
-  const [query, setQuery] = useState('')
+  return (
+    <Suspense fallback={<Loading variant="skeleton" />}>
+      <MemoryPageInner />
+    </Suspense>
+  )
+}
+
+function MemoryPageInner() {
+  const searchParams = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
+  const [query, setQuery] = useState(initialQuery)
   const [activeFilter, setActiveFilter] = useState('all')
   const [results, setResults] = useState<MemoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,16 +83,16 @@ export default function MemoryPage() {
         fetch('/api/decisions?limit=5').then(r => r.json()),
       ])
       const items: MemoryItem[] = []
-      if (sessions.status === 'fulfilled') {
+      if (sessions.status === 'fulfilled' && Array.isArray(sessions.value)) {
         for (const s of sessions.value) items.push({ ...s, _type: 'episodes' })
       }
-      if (incidents.status === 'fulfilled') {
+      if (incidents.status === 'fulfilled' && Array.isArray(incidents.value)) {
         for (const i of incidents.value) items.push({ ...i, _type: 'incidents' })
       }
-      if (solutions.status === 'fulfilled') {
+      if (solutions.status === 'fulfilled' && Array.isArray(solutions.value)) {
         for (const s of solutions.value) items.push({ ...s, _type: 'solutions' })
       }
-      if (decisions.status === 'fulfilled') {
+      if (decisions.status === 'fulfilled' && Array.isArray(decisions.value)) {
         for (const d of decisions.value) items.push({ ...d, _type: 'decisions' })
       }
       items.sort((a, b) => {

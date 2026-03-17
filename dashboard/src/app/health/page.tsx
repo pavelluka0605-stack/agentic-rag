@@ -41,6 +41,7 @@ export default function SystemHealthPage() {
   const [logs, setLogs] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [logsOpen, setLogsOpen] = useState(false)
 
@@ -99,6 +100,7 @@ export default function SystemHealthPage() {
 
   const overallStatus = health?.status || 'unknown'
   const statusColor = overallStatus === 'healthy' ? 'text-success' : overallStatus === 'degraded' ? 'text-warning' : 'text-destructive'
+  const controlApiDown = health?.services?.some(s => s.name === 'control_api' && s.status === 'down') ?? true
 
   return (
     <div className="space-y-6">
@@ -134,8 +136,9 @@ export default function SystemHealthPage() {
               variant="outline"
               onClick={() => handleAction('start')}
               loading={actionLoading === 'start'}
-              disabled={!!actionLoading}
+              disabled={!!actionLoading || controlApiDown}
               className="border-success/30 text-success hover:bg-success/10"
+              title={controlApiDown ? 'Control API unavailable' : undefined}
             >
               <Play className="h-3.5 w-3.5" />
               Start
@@ -145,8 +148,9 @@ export default function SystemHealthPage() {
               variant="outline"
               onClick={() => handleAction('stop')}
               loading={actionLoading === 'stop'}
-              disabled={!!actionLoading}
+              disabled={!!actionLoading || controlApiDown}
               className="border-destructive/30 text-destructive hover:bg-destructive/10"
+              title={controlApiDown ? 'Control API unavailable' : undefined}
             >
               <Square className="h-3.5 w-3.5" />
               Stop
@@ -156,8 +160,9 @@ export default function SystemHealthPage() {
               variant="outline"
               onClick={() => handleAction('restart')}
               loading={actionLoading === 'restart'}
-              disabled={!!actionLoading}
+              disabled={!!actionLoading || controlApiDown}
               className="border-warning/30 text-warning hover:bg-warning/10"
+              title={controlApiDown ? 'Control API unavailable' : undefined}
             >
               <RotateCw className="h-3.5 w-3.5" />
               Restart
@@ -166,7 +171,8 @@ export default function SystemHealthPage() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => { setLoading(true); fetchAll() }}
+              loading={refreshing}
+              onClick={() => { setRefreshing(true); fetchAll().finally(() => setRefreshing(false)) }}
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Refresh

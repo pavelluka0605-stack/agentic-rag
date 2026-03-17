@@ -111,6 +111,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         {mobileOpen && (
           <button
             onClick={onMobileClose}
+            aria-label="Close menu"
             className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground md:hidden"
           >
             <X className="h-4 w-4" />
@@ -164,7 +165,10 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <div className="border-t border-border-subtle p-2">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground/70 transition-colors hover:bg-[oklch(0.175_0.008_260)] hover:text-muted-foreground"
+          className={cn(
+            'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground/70 transition-colors hover:bg-[oklch(0.175_0.008_260)] hover:text-muted-foreground',
+            mobileOpen && 'hidden'
+          )}
         >
           {collapsed ? (
             <PanelLeft className="h-4 w-4 shrink-0" />

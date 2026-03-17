@@ -141,7 +141,7 @@ export function IncidentDrawerContent({ incident }: { incident: { id: number; fi
 }
 
 // Quick-view drawer content for solutions
-export function SolutionDrawerContent({ solution }: { solution: { id: number; title: string; description: string; pattern_type: string; verified: number; code?: string | null; usefulness_score: number; use_count: number; project?: string | null } }) {
+export function SolutionDrawerContent({ solution }: { solution: { id: number; title: string; description: string; pattern_type: string; verified: number; code?: string | null; usefulness_score: number; use_count: number; project?: string | null; solves_incident?: number | null; github_pr?: string | null } }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -180,6 +180,24 @@ export function SolutionDrawerContent({ solution }: { solution: { id: number; ti
           <p className="font-medium">{solution.use_count}x</p>
         </div>
       </div>
+
+      {(solution.solves_incident || solution.github_pr) && (
+        <div className="space-y-2">
+          <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">Linked</label>
+          <div className="flex flex-col gap-1.5">
+            {solution.solves_incident && (
+              <a href={`/incidents/${solution.solves_incident}`} className="text-sm text-primary hover:underline">
+                Incident #{solution.solves_incident}
+              </a>
+            )}
+            {solution.github_pr && (
+              <a href={solution.github_pr} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                {solution.github_pr}
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
