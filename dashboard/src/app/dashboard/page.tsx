@@ -99,7 +99,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <PageHeader
         title="Dashboard"
-        description="Memory system overview and recent activity"
+        description="Memory system overview and recent activity — pipeline test OK"
       />
 
       {/* Resume Session CTA */}
