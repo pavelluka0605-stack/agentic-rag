@@ -542,12 +542,12 @@ async function handleTaskComplete(req, res, id) {
         const lastProgress = progressArr.length > 0 ? progressArr[progressArr.length - 1] : null;
         const progressHint = lastProgress ? `\nПоследний прогресс: ${lastProgress.message || JSON.stringify(lastProgress)}` : "";
 
-        const fallbackPrompt = `Задача: ${taskTitle}${progressHint}\n\nСформулируй краткий итог выполнения задачи (2-3 предложения на русском). Что было сделано, что изменилось. Без JSON, просто текст.`;
-        const generated = await llmCall("Ты кратко резюмируешь выполненные задачи на русском языке. Отвечай только текстом, без JSON.", fallbackPrompt);
-        if (typeof generated === "string" && generated.trim()) {
-          summaryRu = generated.trim();
-        } else if (typeof generated === "object" && generated !== null) {
-          summaryRu = JSON.stringify(generated);
+        const fallbackPrompt = `Задача: ${taskTitle}${progressHint}\n\nСформулируй краткий итог выполнения (2-3 предложения). Верни JSON: {"summary": "текст итога"}`;
+        const generated = await llmCall("Ты кратко резюмируешь выполненные задачи на русском языке. Отвечай JSON: {\"summary\": \"...\"}", fallbackPrompt);
+        // llmCall returns parsed JSON object, extract summary field
+        const text = generated?.summary || generated?.text || generated?.result;
+        if (text && typeof text === "string" && text.trim()) {
+          summaryRu = text.trim();
         }
       } catch {
         // LLM failed — use structured fallback from task data
