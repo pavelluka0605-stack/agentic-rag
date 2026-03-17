@@ -28,11 +28,13 @@ import { timeAgo, parseJsonField, truncate } from '@/lib/utils'
 import {
   fetchTasks,
   createTask,
+  createVoiceTask,
   taskAction,
 } from '@/lib/api-client'
 import type {
   Task,
   TaskInterpretation,
+  TaskEngineeringPacket,
   TaskProgress,
   TaskStatus,
 } from '@/types'
@@ -65,6 +67,10 @@ export default function TasksPage() {
   // New task form
   const [inputText, setInputText] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Voice recording
+  const [recording, setRecording] = useState(false)
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
 
   // Active task (expanded)
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null)
@@ -133,6 +139,51 @@ export default function TasksPage() {
     await handleAction(taskId, 'interpret')
   }
 
+  // ── Voice recording ────────────────────────────────
+
+  async function handleVoiceToggle() {
+    if (recording && mediaRecorder) {
+      // Stop recording
+      mediaRecorder.stop()
+      setRecording(false)
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      const chunks: Blob[] = []
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        setMediaRecorder(null)
+
+        const blob = new Blob(chunks, { type: 'audio/webm' })
+        // Convert to base64
+        const buffer = await blob.arrayBuffer()
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+
+        setSubmitting(true)
+        try {
+          const task = await createVoiceTask({ audio: base64 })
+          setActiveTaskId(task.id)
+          await loadTasks()
+        } catch (e) {
+          setError(`Ошибка голосового ввода: ${e}`)
+        } finally {
+          setSubmitting(false)
+        }
+      }
+
+      recorder.start()
+      setMediaRecorder(recorder)
+      setRecording(true)
+    } catch (e) {
+      setError(`Микрофон недоступен: ${e}`)
+    }
+  }
+
   // ── Render ──────────────────────────────────────────
 
   if (loading) {
@@ -180,8 +231,16 @@ export default function TasksPage() {
                 <Send className="h-4 w-4" />
                 Отправить
               </Button>
-              <Button type="button" variant="outline" size="sm" disabled title="Голосовой ввод (скоро)">
-                <Mic className="h-4 w-4" />
+              <Button
+                type="button"
+                variant={recording ? 'destructive' : 'outline'}
+                size="sm"
+                onClick={handleVoiceToggle}
+                disabled={submitting}
+                title={recording ? 'Остановить запись' : 'Голосовой ввод'}
+              >
+                <Mic className={`h-4 w-4 ${recording ? 'animate-pulse' : ''}`} />
+                {recording ? 'Стоп' : ''}
               </Button>
             </div>
           </form>
@@ -243,6 +302,7 @@ function TaskCard({
   onRevise,
 }: TaskCardProps) {
   const interpretation = parseJsonField<TaskInterpretation>(task.interpretation)
+  const engPacket = parseJsonField<TaskEngineeringPacket>(task.engineering_packet)
   const progress = parseJsonField<TaskProgress[]>(task.progress)
   const config = statusConfig[task.status]
   const isLoading = (action: string) => actionLoading === `${task.id}-${action}`
@@ -426,6 +486,55 @@ function TaskCard({
                 >
                   <Zap className="h-4 w-4" />
                   Быстрый режим
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => onAction(task.id, 'cancel')}
+                  loading={isLoading('cancel')}
+                >
+                  <XCircle className="h-4 w-4" />
+                  Отменить
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Confirmed — engineering packet + Execute button */}
+          {task.status === 'confirmed' && engPacket && (
+            <div className="mt-6 space-y-4">
+              <div className="rounded-lg border border-info/30 bg-info/5 p-4 space-y-3">
+                <h4 className="text-sm font-medium text-info flex items-center gap-2">
+                  <ListTodo className="h-4 w-4" />
+                  Инженерный пакет
+                </h4>
+                <p className="text-sm font-medium">{engPacket.title}</p>
+                <p className="text-sm text-muted-foreground">{engPacket.objective}</p>
+                <div>
+                  <span className="text-xs font-medium uppercase text-muted-foreground/70">Шаги:</span>
+                  <ol className="mt-1 list-inside list-decimal space-y-1 text-sm">
+                    {engPacket.steps.map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+                {engPacket.acceptance_criteria.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium uppercase text-muted-foreground/70">Критерии приёмки:</span>
+                    <ul className="mt-1 list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                      {engPacket.acceptance_criteria.map((c, i) => (
+                        <li key={i}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => onAction(task.id, 'start')}
+                  loading={isLoading('start')}
+                >
+                  <Play className="h-4 w-4" />
+                  Запустить выполнение
                 </Button>
                 <Button
                   variant="ghost"

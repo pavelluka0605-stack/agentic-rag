@@ -250,6 +250,44 @@ async function handleAction(action, req, res) {
   }
 }
 
+// ── Whisper STT helper ────────────────────────────────────────────────────
+
+async function whisperTranscribe(audioBase64) {
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
+
+  // Decode base64 to buffer
+  const audioBuffer = Buffer.from(audioBase64, "base64");
+
+  // Build multipart/form-data manually (no external deps)
+  const boundary = "----WhisperBoundary" + Date.now();
+  const header = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.webm"\r\nContent-Type: audio/webm\r\n\r\n`;
+  const modelPart = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n`;
+  const langPart = `--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\nru\r\n--${boundary}--\r\n`;
+
+  const body = Buffer.concat([
+    Buffer.from(header),
+    audioBuffer,
+    Buffer.from(modelPart),
+    Buffer.from(langPart),
+  ]);
+
+  const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": `multipart/form-data; boundary=${boundary}`,
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Whisper API error ${res.status}: ${errBody}`);
+  }
+  const data = await res.json();
+  return data.text;
+}
+
 // ── Task Pipeline Handlers ──────────────────────────────────────────────────
 
 const INTERPRET_SYSTEM_PROMPT = `Ты — ассистент-интерпретатор задач. Пользователь описал задачу на русском языке.
@@ -289,6 +327,40 @@ async function handleTaskCreate(req, res) {
       voice_transcript: body.voice_transcript,
     });
     json(res, 201, task);
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
+async function handleTaskVoice(req, res) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  try {
+    const body = await parseBody(req);
+    if (!body.audio) return json(res, 400, { error: "audio (base64) is required" });
+
+    // 1. Transcribe with Whisper
+    const transcript = await whisperTranscribe(body.audio);
+    if (!transcript || !transcript.trim()) {
+      return json(res, 400, { error: "Не удалось распознать речь" });
+    }
+
+    // 2. Create task from transcript
+    const task = taskDb.createTask({
+      project: body.project,
+      raw_input: transcript,
+      input_type: "voice",
+      voice_transcript: transcript,
+    });
+
+    // 3. Auto-interpret
+    try {
+      const interpretation = await llmCall(INTERPRET_SYSTEM_PROMPT, transcript);
+      const updated = taskDb.updateTaskInterpretation(task.id, interpretation);
+      return json(res, 201, updated);
+    } catch (llmErr) {
+      // Task created but interpretation failed — return draft task
+      return json(res, 201, task);
+    }
   } catch (e) {
     json(res, 500, { error: e.message });
   }
@@ -513,6 +585,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && urlPath === "/api/restart") return handleAction("restart", req, res);
 
     // Task pipeline routes
+    if (req.method === "POST" && urlPath === "/api/tasks/voice") return handleTaskVoice(req, res);
     if (req.method === "POST" && urlPath === "/api/tasks") return handleTaskCreate(req, res);
     if (req.method === "GET" && urlPath === "/api/tasks") return handleTaskList(req, res);
 

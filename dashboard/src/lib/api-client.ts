@@ -202,6 +202,17 @@ export async function createTask(data: {
   })
 }
 
+export async function createVoiceTask(data: {
+  audio: string       // base64-encoded audio
+  project?: string
+}): Promise<Task> {
+  return apiFetch<Task>('/api/tasks/voice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
 export async function taskAction(
   id: number,
   action: string,
