@@ -176,11 +176,15 @@ jobs:
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "bash /opt/claude-code/bin/run-real-task.sh" 2>&1 | tee /tmp/real-task-output.txt
 
-      - name: Upload results
+      - name: Commit task output
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: task-run-results
-          path: /tmp/real-task-output.txt
-          retention-days: 7
+        run: |
+          if [ -f /tmp/real-task-output.txt ]; then
+            cp /tmp/real-task-output.txt real-task-output.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add real-task-output.txt
+            git diff --cached --quiet || git commit -m "ops: real task pipeline output [skip ci]"
+            git push origin HEAD || true
+          fi
         continue-on-error: true
