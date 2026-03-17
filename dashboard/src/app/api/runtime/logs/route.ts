@@ -10,10 +10,8 @@ export async function GET(request: NextRequest) {
 
     const logs = await getLogs(lines)
     if (!logs) {
-      return NextResponse.json(
-        { error: 'Control API not available' },
-        { status: 502 }
-      )
+      // Return empty logs instead of 502 — Control API is down but UI should still work
+      return NextResponse.json({ lines: [], message: 'Control API not reachable' })
     }
     return NextResponse.json(logs)
   } catch (err) {

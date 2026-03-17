@@ -5,10 +5,17 @@ export async function GET() {
   try {
     const status = await getStatus()
     if (!status) {
-      return NextResponse.json(
-        { error: 'Control API not available' },
-        { status: 502 }
-      )
+      // Return degraded status instead of 502 — let the UI show "unavailable" gracefully
+      return NextResponse.json({
+        status: 'unavailable',
+        tmux: { running: false, session: 'unknown', windows: [] },
+        services: {},
+        resources: { disk: '—', memory: '—', uptime: '—', load: '—' },
+        claude: { version: 'unavailable' },
+        logs: { today: '0 lines' },
+        timestamp: new Date().toISOString(),
+        _note: 'Control API not reachable',
+      })
     }
     return NextResponse.json(status)
   } catch (err) {

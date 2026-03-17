@@ -1,46 +1,24 @@
 ## Traefik dynamic config — Task Dashboard
 ## Deployed to /opt/n8n-traefik/dynamic/dashboard.yml
 ## Traefik auto-reloads (file.watch=true)
-## Domain: chat.marbomebel.ru (repurposed from old Claude Chat)
+## Domain: chat.marbomebel.ru
+##
+## ALL traffic goes to Next.js dashboard (port 3200).
+## Dashboard reads SQLite directly for GET, proxies mutations to Control API.
+## This ensures the UI works even when Control API is temporarily down.
 
 http:
   routers:
-    dashboard-app:
+    dashboard:
       rule: "Host(`chat.marbomebel.ru`)"
       entryPoints:
         - websecure
-      service: dashboard-app
+      service: dashboard
       tls:
         certResolver: mytlschallenge
-      priority: 10
-
-    # API routes go to control-api (port 3901)
-    dashboard-api:
-      rule: "Host(`chat.marbomebel.ru`) && PathPrefix(`/api/`)"
-      entryPoints:
-        - websecure
-      service: dashboard-api
-      tls:
-        certResolver: mytlschallenge
-      priority: 20
-
-    # Health endpoint
-    dashboard-health:
-      rule: "Host(`chat.marbomebel.ru`) && Path(`/health`)"
-      entryPoints:
-        - websecure
-      service: dashboard-api
-      tls:
-        certResolver: mytlschallenge
-      priority: 20
 
   services:
-    dashboard-app:
+    dashboard:
       loadBalancer:
         servers:
           - url: "http://172.17.0.1:3200"
-
-    dashboard-api:
-      loadBalancer:
-        servers:
-          - url: "http://172.17.0.1:3901"
