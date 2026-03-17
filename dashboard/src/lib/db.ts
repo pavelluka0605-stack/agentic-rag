@@ -320,6 +320,55 @@ export function getGithubEvents(opts: {
   )
 }
 
+// --- Tasks ---
+
+export function getTasks(opts: {
+  status?: string
+  project?: string
+  limit?: number
+  offset?: number
+} = {}): import('@/types').Task[] {
+  const conditions: string[] = []
+  const params: unknown[] = []
+
+  if (opts.status) {
+    conditions.push('status = ?')
+    params.push(opts.status)
+  }
+  if (opts.project) {
+    conditions.push('project = ?')
+    params.push(opts.project)
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  const limit = opts.limit ?? 50
+  const offset = opts.offset ?? 0
+
+  return queryAll<import('@/types').Task>(
+    `SELECT * FROM tasks ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  )
+}
+
+export function getTask(id: number): import('@/types').Task | null {
+  return queryOne<import('@/types').Task>('SELECT * FROM tasks WHERE id = ?', [id])
+}
+
+export function getTaskStats(): { total: number; draft: number; pending: number; running: number; done: number; failed: number } {
+  const defaults = { total: 0, draft: 0, pending: 0, running: 0, done: 0, failed: 0 }
+  try {
+    const total = queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM tasks')
+    if (total) defaults.total = total.cnt
+    for (const status of ['draft', 'pending', 'running', 'done', 'failed'] as const) {
+      const row = queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM tasks WHERE status = ?', [status])
+      if (row) defaults[status] = row.cnt
+    }
+  } catch {
+    // tasks table may not exist yet
+  }
+  return defaults
+}
+
 // --- Search ---
 
 interface FtsRow {
