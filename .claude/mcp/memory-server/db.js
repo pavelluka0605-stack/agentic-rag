@@ -25,6 +25,76 @@ export class MemoryDB {
       const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), "utf-8");
       this.db.exec(sql);
     }
+    this._expandTaskStatuses();
+  }
+
+  // Expand task status CHECK constraint to include review states
+  // SQLite can't ALTER CHECK, so we recreate the table if needed
+  _expandTaskStatuses() {
+    try {
+      // Test if new statuses are supported
+      this.db.prepare("INSERT INTO tasks (raw_input, status) VALUES ('__migrate_test__', 'review')").run();
+      this.db.prepare("DELETE FROM tasks WHERE raw_input = '__migrate_test__'").run();
+      // Already migrated
+    } catch {
+      // CHECK constraint blocks 'review' — need to recreate table
+      try {
+        this.db.exec(`
+          BEGIN TRANSACTION;
+          ALTER TABLE tasks RENAME TO tasks_old;
+          CREATE TABLE tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT,
+            raw_input TEXT NOT NULL,
+            input_type TEXT DEFAULT 'text' CHECK(input_type IN ('text', 'voice')),
+            voice_transcript TEXT,
+            interpretation TEXT,
+            status TEXT DEFAULT 'draft' CHECK(status IN (
+              'draft', 'pending', 'confirmed', 'running',
+              'review', 'needs_manual_review',
+              'done', 'failed', 'cancelled'
+            )),
+            mode TEXT DEFAULT 'safe' CHECK(mode IN ('fast', 'safe')),
+            revisions TEXT,
+            engineering_packet TEXT,
+            execution_run_id TEXT,
+            progress TEXT,
+            result_summary_ru TEXT,
+            result_detail TEXT,
+            error TEXT,
+            telegram_notified INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+          );
+          INSERT INTO tasks SELECT * FROM tasks_old;
+          DROP TABLE tasks_old;
+          CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+          CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project);
+          -- Recreate FTS triggers
+          DROP TRIGGER IF EXISTS tasks_ai;
+          DROP TRIGGER IF EXISTS tasks_ad;
+          DROP TRIGGER IF EXISTS tasks_au;
+          CREATE TRIGGER tasks_ai AFTER INSERT ON tasks BEGIN
+            INSERT INTO tasks_fts(rowid, raw_input, interpretation, result_summary_ru)
+            VALUES (new.id, new.raw_input, new.interpretation, new.result_summary_ru);
+          END;
+          CREATE TRIGGER tasks_ad AFTER DELETE ON tasks BEGIN
+            INSERT INTO tasks_fts(tasks_fts, rowid, raw_input, interpretation, result_summary_ru)
+            VALUES ('delete', old.id, old.raw_input, old.interpretation, old.result_summary_ru);
+          END;
+          CREATE TRIGGER tasks_au AFTER UPDATE ON tasks BEGIN
+            INSERT INTO tasks_fts(tasks_fts, rowid, raw_input, interpretation, result_summary_ru)
+            VALUES ('delete', old.id, old.raw_input, old.interpretation, old.result_summary_ru);
+            INSERT INTO tasks_fts(rowid, raw_input, interpretation, result_summary_ru)
+            VALUES (new.id, new.raw_input, new.interpretation, new.result_summary_ru);
+          END;
+          COMMIT;
+        `);
+        console.log("[db] Expanded task statuses to include review states");
+      } catch (e) {
+        console.warn("[db] Task status expansion failed (may already be done):", e.message);
+      }
+    }
   }
 
   // ── Fingerprint for dedup ─────────────────────────────────────────────────
@@ -507,6 +577,38 @@ export class MemoryDB {
 
   setTaskTelegramNotified(id) {
     this.db.prepare(`UPDATE tasks SET telegram_notified = 1, updated_at = datetime('now') WHERE id = ?`).run(id);
+    return this.getTask(id);
+  }
+
+  // ── Task Events (audit trail) ──────────────────────────────────────────────
+
+  addTaskEvent(taskId, eventType, detail) {
+    this.db.prepare(`
+      INSERT INTO task_events (task_id, event_type, detail) VALUES (?, ?, ?)
+    `).run(taskId, eventType, detail || null);
+  }
+
+  getTaskEvents(taskId) {
+    return this.db.prepare(
+      `SELECT * FROM task_events WHERE task_id = ? ORDER BY created_at ASC`
+    ).all(taskId);
+  }
+
+  // ── Review states ──────────────────────────────────────────────────────────
+
+  reviewTask(id, detail) {
+    this.db.prepare(`
+      UPDATE tasks SET status = 'review', updated_at = datetime('now') WHERE id = ?
+    `).run(id);
+    this.addTaskEvent(id, "review_requested", detail || "Задача ожидает проверки");
+    return this.getTask(id);
+  }
+
+  requestManualReview(id, reason) {
+    this.db.prepare(`
+      UPDATE tasks SET status = 'needs_manual_review', error = ?, updated_at = datetime('now') WHERE id = ?
+    `).run(reason || "Требуется ручная проверка", id);
+    this.addTaskEvent(id, "manual_review_needed", reason || "Требуется ручная проверка");
     return this.getTask(id);
   }
 

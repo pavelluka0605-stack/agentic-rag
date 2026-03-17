@@ -354,6 +354,13 @@ export function getTask(id: number): import('@/types').Task | null {
   return queryOne<import('@/types').Task>('SELECT * FROM tasks WHERE id = ?', [id])
 }
 
+export function getTaskEvents(taskId: number): import('@/types').TaskEvent[] {
+  return queryAll<import('@/types').TaskEvent>(
+    'SELECT * FROM task_events WHERE task_id = ? ORDER BY created_at ASC',
+    [taskId]
+  )
+}
+
 export function getTaskStats(): { total: number; draft: number; pending: number; running: number; done: number; failed: number } {
   const defaults = { total: 0, draft: 0, pending: 0, running: 0, done: 0, failed: 0 }
   try {

@@ -161,7 +161,7 @@ export interface HealthService {
 export type MemoryType = 'policies' | 'episodes' | 'incidents' | 'solutions' | 'decisions' | 'contexts' | 'github_events'
 
 // Task Pipeline types
-export type TaskStatus = 'draft' | 'pending' | 'confirmed' | 'running' | 'done' | 'failed' | 'cancelled'
+export type TaskStatus = 'draft' | 'pending' | 'confirmed' | 'running' | 'review' | 'needs_manual_review' | 'done' | 'failed' | 'cancelled'
 export type TaskMode = 'fast' | 'safe'
 
 export interface TaskInterpretation {
@@ -214,6 +214,14 @@ export interface Task {
   telegram_notified: number
   created_at: string
   updated_at: string
+}
+
+export interface TaskEvent {
+  id: number
+  task_id: number
+  event_type: string
+  detail: string | null
+  created_at: string
 }
 
 export interface SearchResult {

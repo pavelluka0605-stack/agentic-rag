@@ -179,8 +179,9 @@ export async function fetchTasks(opts?: {
   return apiFetch<Task[]>(`/api/tasks${query}`)
 }
 
-export async function fetchTask(id: number): Promise<Task> {
-  return apiFetch<Task>(`/api/tasks/${id}`)
+export async function fetchTask(id: number, opts?: { events?: boolean }): Promise<Task> {
+  const query = opts?.events ? '?events=1' : ''
+  return apiFetch<Task>(`/api/tasks/${id}${query}`)
 }
 
 export async function fetchTaskStats(): Promise<{

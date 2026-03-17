@@ -27,6 +27,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { timeAgo, parseJsonField, truncate } from '@/lib/utils'
 import {
   fetchTasks,
+  fetchTask,
   createTask,
   createVoiceTask,
   taskAction,
@@ -37,6 +38,7 @@ import type {
   TaskEngineeringPacket,
   TaskProgress,
   TaskStatus,
+  TaskEvent,
 } from '@/types'
 
 // ── Status helpers ─────────────────────────────────────────────
@@ -46,6 +48,8 @@ const statusConfig: Record<TaskStatus, { label: string; variant: 'default' | 'se
   pending: { label: 'Ожидает подтверждения', variant: 'warning' },
   confirmed: { label: 'Подтверждена', variant: 'info' },
   running: { label: 'Выполняется', variant: 'default' },
+  review: { label: 'На проверке', variant: 'warning' },
+  needs_manual_review: { label: 'Ручная проверка', variant: 'destructive' },
   done: { label: 'Выполнена', variant: 'success' },
   failed: { label: 'Ошибка', variant: 'destructive' },
   cancelled: { label: 'Отменена', variant: 'secondary' },
@@ -76,6 +80,7 @@ export default function TasksPage() {
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [revisionText, setRevisionText] = useState('')
+  const [taskEvents, setTaskEvents] = useState<Record<number, TaskEvent[]>>({})
 
   const loadTasks = useCallback(async () => {
     try {
@@ -128,6 +133,26 @@ export default function TasksPage() {
       setError(`Ошибка: ${e}`)
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  async function loadTaskEvents(taskId: number) {
+    try {
+      const taskWithEvents = await fetchTask(taskId, { events: true }) as Task & { events?: TaskEvent[] }
+      if (taskWithEvents.events) {
+        setTaskEvents(prev => ({ ...prev, [taskId]: taskWithEvents.events! }))
+      }
+    } catch {
+      // non-critical
+    }
+  }
+
+  function handleToggle(taskId: number) {
+    if (activeTaskId === taskId) {
+      setActiveTaskId(null)
+    } else {
+      setActiveTaskId(taskId)
+      loadTaskEvents(taskId)
     }
   }
 
@@ -278,12 +303,13 @@ export default function TasksPage() {
               key={task.id}
               task={task}
               isExpanded={activeTaskId === task.id}
-              onToggle={() => setActiveTaskId(activeTaskId === task.id ? null : task.id)}
+              onToggle={() => handleToggle(task.id)}
               actionLoading={actionLoading}
               onAction={handleAction}
               revisionText={activeTaskId === task.id ? revisionText : ''}
               onRevisionTextChange={setRevisionText}
               onRevise={handleRevise}
+              events={taskEvents[task.id]}
             />
           ))}
         </div>
@@ -303,6 +329,7 @@ interface TaskCardProps {
   revisionText: string
   onRevisionTextChange: (text: string) => void
   onRevise: (taskId: number) => void
+  events?: TaskEvent[]
 }
 
 function TaskCard({
@@ -314,15 +341,16 @@ function TaskCard({
   revisionText,
   onRevisionTextChange,
   onRevise,
+  events,
 }: TaskCardProps) {
   const interpretation = parseJsonField<TaskInterpretation>(task.interpretation)
   const engPacket = parseJsonField<TaskEngineeringPacket>(task.engineering_packet)
   const progress = parseJsonField<TaskProgress[]>(task.progress)
-  const config = statusConfig[task.status]
+  const config = statusConfig[task.status] || { label: task.status, variant: 'secondary' as const }
   const isLoading = (action: string) => actionLoading === `${task.id}-${action}`
 
   return (
-    <Card className={task.status === 'pending' ? 'border-warning/30' : task.status === 'running' ? 'border-primary/30' : undefined}>
+    <Card className={task.status === 'pending' ? 'border-warning/30' : task.status === 'running' ? 'border-primary/30' : task.status === 'review' ? 'border-warning/30' : task.status === 'needs_manual_review' ? 'border-destructive/30' : undefined}>
       {/* Header row */}
       <button
         onClick={onToggle}
@@ -452,6 +480,93 @@ function TaskCard({
                 Ошибка
               </h4>
               <p className="mt-2 text-sm">{task.error}</p>
+            </div>
+          )}
+
+          {/* Review state — approve / reject / escalate */}
+          {task.status === 'review' && (
+            <div className="mt-4 space-y-3">
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
+                <h4 className="text-sm font-medium text-warning flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Задача ожидает проверки
+                </h4>
+                {task.error && <p className="mt-2 text-sm text-muted-foreground">{task.error}</p>}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={() => onAction(task.id, 'complete', { result_summary_ru: 'Проверка пройдена' })}
+                  loading={isLoading('complete')}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Принять
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => onAction(task.id, 'request-review', { reason: 'Требуется ручная проверка' })}
+                  loading={isLoading('request-review')}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Ручная проверка
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => onAction(task.id, 'fail', { error: 'Отклонено при проверке' })}
+                  loading={isLoading('fail')}
+                >
+                  <XCircle className="h-4 w-4" />
+                  Отклонить
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Needs manual review — show reason and resolution buttons */}
+          {task.status === 'needs_manual_review' && (
+            <div className="mt-4 space-y-3">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <h4 className="text-sm font-medium text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Требуется ручная проверка
+                </h4>
+                {task.error && <p className="mt-2 text-sm">{task.error}</p>}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={() => onAction(task.id, 'complete', { result_summary_ru: 'Решено вручную' })}
+                  loading={isLoading('complete')}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Решено — принять
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => onAction(task.id, 'fail', { error: 'Не удалось решить' })}
+                  loading={isLoading('fail')}
+                >
+                  <XCircle className="h-4 w-4" />
+                  Не решено
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Event timeline */}
+          {events && events.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                История событий
+              </h4>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {events.map((evt) => (
+                  <div key={evt.id} className="flex items-start gap-2 text-xs">
+                    <span className="text-muted-foreground/60 whitespace-nowrap shrink-0">{timeAgo(evt.created_at)}</span>
+                    <Badge variant="secondary" className="text-[10px] shrink-0">{evt.event_type}</Badge>
+                    {evt.detail && <span className="text-muted-foreground">{evt.detail}</span>}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
