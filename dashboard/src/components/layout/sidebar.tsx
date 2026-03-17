@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -15,6 +15,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Terminal,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -65,24 +66,55 @@ const navGroups: NavGroup[] = [
   },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+}
+
+export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
 
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    onMobileClose?.()
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <aside
-      className={cn(
-        'flex h-screen flex-col border-r border-border-subtle bg-bg-deep transition-all duration-200 ease-out',
-        collapsed ? 'w-16' : 'w-60'
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+          onClick={onMobileClose}
+        />
       )}
-    >
+
+      <aside
+        className={cn(
+          'flex h-screen flex-col border-r border-border-subtle bg-bg-deep transition-all duration-200 ease-out',
+          collapsed ? 'w-16' : 'w-60',
+          // Mobile: fixed overlay, hidden by default
+          'fixed inset-y-0 left-0 z-50 md:static md:z-auto',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        )}
+      >
       {/* Logo */}
       <div className="flex h-14 items-center gap-2.5 border-b border-border-subtle px-4 shadow-[0_1px_8px_-2px_oklch(0.685_0.155_250_/_0.15)]">
         <Terminal className="h-6 w-6 shrink-0 text-primary" />
         {!collapsed && (
-          <span className="text-gradient text-sm font-semibold tracking-tight opacity-90">
+          <span className="text-gradient text-sm font-semibold tracking-tight opacity-90 flex-1">
             Claude Code
           </span>
+        )}
+        {/* Mobile close button */}
+        {mobileOpen && (
+          <button
+            onClick={onMobileClose}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
         )}
       </div>
 
@@ -153,5 +185,6 @@ export function Sidebar() {
         )}
       </div>
     </aside>
+    </>
   )
 }
