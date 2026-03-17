@@ -144,6 +144,29 @@ jobs:
           echo "=== 18. Dashboard package.json exists? ==="
           cat /opt/claude-code/dashboard/package.json 2>/dev/null | head -20 || echo "(package.json not found)"
 
+          # -----------------------------------------------
+          echo ""
+          echo "=== 19. DNS resolution for chat.marbomebel.ru ==="
+          echo "--- from VPS (dig) ---"
+          dig +short chat.marbomebel.ru A 2>/dev/null || echo "(dig not available)"
+          echo "--- from VPS (getent) ---"
+          getent hosts chat.marbomebel.ru 2>/dev/null || echo "(getent failed)"
+          echo "--- from external DNS (Google 8.8.8.8) ---"
+          dig @8.8.8.8 +short chat.marbomebel.ru A 2>/dev/null || echo "(dig @8.8.8.8 failed)"
+          echo "--- from external DNS (Cloudflare 1.1.1.1) ---"
+          dig @1.1.1.1 +short chat.marbomebel.ru A 2>/dev/null || echo "(dig @1.1.1.1 failed)"
+          echo "--- n8n.marbomebel.ru for comparison ---"
+          dig +short n8n.marbomebel.ru A 2>/dev/null || echo "(dig failed)"
+          echo "--- /etc/hosts entries for marbomebel ---"
+          grep marbomebel /etc/hosts 2>/dev/null || echo "(no entries in /etc/hosts)"
+          echo "--- VPS public IP ---"
+          curl -s ifconfig.me 2>/dev/null || echo "(cannot determine)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 20. Traefik container logs (last 20, chat.marbomebel) ==="
+          docker logs n8n-traefik-traefik-1 2>&1 | grep -i "chat.marbomebel" | tail -20 || echo "(no matches)"
+
           echo ""
           echo "========================================"
           echo "=== DIAGNOSTIC COMPLETE ==="
