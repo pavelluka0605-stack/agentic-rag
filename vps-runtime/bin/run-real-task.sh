@@ -133,7 +133,7 @@ echo "── STEP 5: PROGRESS UPDATE (simulated 25%) ──"
 PROG_RESP=$(curl -s --max-time 10 -X POST "$API/api/tasks/$TASK_ID/progress" \
   -H "Content-Type: application/json" \
   $(h) \
-  -d '{"progress_pct":25,"message":"Создана структура страницы Акции, начата вёрстка баннера"}' 2>&1)
+  -d '{"progress_pct":25,"message_ru":"Создана структура страницы Акции, начата вёрстка баннера"}' 2>&1)
 echo "  Response: $PROG_RESP"
 echo ""
 
@@ -142,7 +142,7 @@ echo "── STEP 5b: PROGRESS UPDATE (50%) ──"
 PROG2_RESP=$(curl -s --max-time 10 -X POST "$API/api/tasks/$TASK_ID/progress" \
   -H "Content-Type: application/json" \
   $(h) \
-  -d '{"progress_pct":50,"message":"Баннер готов, работа над списком прошлых акций"}' 2>&1)
+  -d '{"progress_pct":50,"message_ru":"Баннер готов, работа над списком прошлых акций"}' 2>&1)
 echo "  Response: $PROG2_RESP"
 echo ""
 
@@ -151,7 +151,7 @@ echo "── STEP 5c: PROGRESS UPDATE (75%) ──"
 PROG3_RESP=$(curl -s --max-time 10 -X POST "$API/api/tasks/$TASK_ID/progress" \
   -H "Content-Type: application/json" \
   $(h) \
-  -d '{"progress_pct":75,"message":"Форма заявки на скидку реализована, начата адаптивная вёрстка"}' 2>&1)
+  -d '{"progress_pct":75,"message_ru":"Форма заявки на скидку реализована, начата адаптивная вёрстка"}' 2>&1)
 echo "  Response: $PROG3_RESP"
 echo ""
 
