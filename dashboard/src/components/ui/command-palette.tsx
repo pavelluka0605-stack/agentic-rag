@@ -42,21 +42,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const listRef = useRef<HTMLDivElement>(null)
 
   const commands: CommandItem[] = useMemo(() => [
-    // Navigation
-    { id: 'nav-dashboard', label: 'Dashboard', description: 'Overview and stats', icon: LayoutDashboard, action: () => router.push('/dashboard'), group: 'Navigation', keywords: ['home', 'overview', 'main'] },
-    { id: 'nav-sessions', label: 'Sessions', description: 'Development session history', icon: History, action: () => router.push('/sessions'), group: 'Navigation', keywords: ['episodes', 'work', 'history'] },
-    { id: 'nav-memory', label: 'Memory Explorer', description: 'Search all memory layers', icon: Brain, action: () => router.push('/memory'), group: 'Navigation', keywords: ['search', 'explore', 'find'] },
-    { id: 'nav-incidents', label: 'Incidents', description: 'Error tracking and fixes', icon: AlertTriangle, action: () => router.push('/incidents'), group: 'Navigation', keywords: ['errors', 'bugs', 'issues'] },
-    { id: 'nav-solutions', label: 'Solutions', description: 'Verified fixes and patterns', icon: Lightbulb, action: () => router.push('/solutions'), group: 'Navigation', keywords: ['fixes', 'patterns', 'playbooks'] },
-    { id: 'nav-projects', label: 'Projects', description: 'All projects overview', icon: FolderKanban, action: () => router.push('/projects'), group: 'Navigation', keywords: ['repos', 'repositories'] },
-    { id: 'nav-github', label: 'GitHub Activity', description: 'Webhook events and PRs', icon: Github, action: () => router.push('/github'), group: 'Navigation', keywords: ['webhooks', 'pr', 'pull request', 'workflow'] },
-    { id: 'nav-health', label: 'System Health', description: 'Services status and runtime', icon: Activity, action: () => router.push('/health'), group: 'Navigation', keywords: ['status', 'services', 'runtime', 'control'] },
-    // Quick Actions
-    { id: 'act-search', label: 'Search Memory', description: 'Full-text search across all layers', icon: Search, action: () => router.push(query.trim() ? `/memory?q=${encodeURIComponent(query.trim())}` : '/memory'), group: 'Quick Actions', keywords: ['find', 'query', 'fts'] },
-    { id: 'act-open-incidents', label: 'View Open Incidents', description: 'Show unresolved errors', icon: AlertTriangle, action: () => router.push('/incidents?status=open'), group: 'Quick Actions', keywords: ['open', 'unresolved', 'active'] },
-    { id: 'act-verified', label: 'Verified Solutions', description: 'Proven fixes only', icon: Lightbulb, action: () => router.push('/solutions?verified=true'), group: 'Quick Actions', keywords: ['proven', 'working'] },
-    { id: 'act-latest-session', label: 'Latest Session', description: 'Jump to most recent session', icon: Play, action: () => router.push('/sessions'), group: 'Quick Actions', keywords: ['resume', 'continue', 'last', 'recent'] },
-    { id: 'act-remote', label: 'Remote Control', description: 'Runtime management and logs', icon: Zap, action: () => router.push('/health'), group: 'Quick Actions', keywords: ['control', 'start', 'stop', 'restart', 'runtime'] },
+    // Навигация
+    { id: 'nav-dashboard', label: 'Обзор', description: 'Статистика и сводка', icon: LayoutDashboard, action: () => router.push('/dashboard'), group: 'Навигация', keywords: ['home', 'overview', 'main', 'обзор'] },
+    { id: 'nav-sessions', label: 'Сессии', description: 'История рабочих сессий', icon: History, action: () => router.push('/sessions'), group: 'Навигация', keywords: ['episodes', 'work', 'history', 'сессии'] },
+    { id: 'nav-memory', label: 'Память', description: 'Поиск по всем слоям памяти', icon: Brain, action: () => router.push('/memory'), group: 'Навигация', keywords: ['search', 'explore', 'find', 'память'] },
+    { id: 'nav-incidents', label: 'Инциденты', description: 'Ошибки и исправления', icon: AlertTriangle, action: () => router.push('/incidents'), group: 'Навигация', keywords: ['errors', 'bugs', 'issues', 'ошибки'] },
+    { id: 'nav-solutions', label: 'Решения', description: 'Проверенные исправления', icon: Lightbulb, action: () => router.push('/solutions'), group: 'Навигация', keywords: ['fixes', 'patterns', 'решения'] },
+    { id: 'nav-projects', label: 'Проекты', description: 'Все проекты', icon: FolderKanban, action: () => router.push('/projects'), group: 'Навигация', keywords: ['repos', 'repositories', 'проекты'] },
+    { id: 'nav-github', label: 'GitHub', description: 'Вебхуки и PR', icon: Github, action: () => router.push('/github'), group: 'Навигация', keywords: ['webhooks', 'pr', 'pull request', 'workflow'] },
+    { id: 'nav-health', label: 'Здоровье системы', description: 'Статус сервисов', icon: Activity, action: () => router.push('/health'), group: 'Навигация', keywords: ['status', 'services', 'runtime', 'статус'] },
+    // Быстрые действия
+    { id: 'act-search', label: 'Поиск по памяти', description: 'Полнотекстовый поиск', icon: Search, action: () => router.push(query.trim() ? `/memory?q=${encodeURIComponent(query.trim())}` : '/memory'), group: 'Действия', keywords: ['find', 'query', 'fts', 'поиск'] },
+    { id: 'act-open-incidents', label: 'Открытые инциденты', description: 'Нерешённые ошибки', icon: AlertTriangle, action: () => router.push('/incidents?status=open'), group: 'Действия', keywords: ['open', 'unresolved', 'active', 'открытые'] },
+    { id: 'act-verified', label: 'Проверенные решения', description: 'Только подтверждённые', icon: Lightbulb, action: () => router.push('/solutions?verified=true'), group: 'Действия', keywords: ['proven', 'working', 'проверенные'] },
+    { id: 'act-latest-session', label: 'Последняя сессия', description: 'Перейти к последней', icon: Play, action: () => router.push('/sessions'), group: 'Действия', keywords: ['resume', 'continue', 'last', 'recent', 'последняя'] },
+    { id: 'act-remote', label: 'Управление', description: 'Контроль и логи', icon: Zap, action: () => router.push('/health'), group: 'Действия', keywords: ['control', 'start', 'stop', 'restart', 'управление'] },
   ], [router])
 
   const filtered = useMemo(() => {
@@ -179,7 +179,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command or search..."
+            placeholder="Команда или поиск..."
             className="h-12 w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
           />
           <kbd className="hidden shrink-0 rounded border border-border-subtle bg-bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-block">
@@ -191,7 +191,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         <div ref={listRef} className="max-h-72 overflow-y-auto p-2">
           {filtered.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              No commands found
+              Ничего не найдено
             </div>
           ) : (
             groups.map(([groupName, items]) => (
@@ -238,15 +238,15 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         <div className="flex items-center gap-4 border-t border-border-subtle px-4 py-2 text-[11px] text-muted-foreground/50">
           <span className="flex items-center gap-1">
             <kbd className="rounded border border-border-subtle px-1 font-mono text-[10px]">&uarr;&darr;</kbd>
-            navigate
+            навигация
           </span>
           <span className="flex items-center gap-1">
             <kbd className="rounded border border-border-subtle px-1 font-mono text-[10px]">&crarr;</kbd>
-            select
+            выбор
           </span>
           <span className="flex items-center gap-1">
             <kbd className="rounded border border-border-subtle px-1 font-mono text-[10px]">esc</kbd>
-            close
+            закрыть
           </span>
         </div>
       </div>

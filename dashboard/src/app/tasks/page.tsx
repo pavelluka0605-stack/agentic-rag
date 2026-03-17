@@ -250,23 +250,21 @@ export default function TasksPage() {
       {/* New task input */}
       <Card>
         <CardContent className="pt-5">
-          <form onSubmit={handleSubmit} className="flex gap-3">
-            <div className="relative flex-1">
-              <textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Опишите задачу на русском языке..."
-                rows={2}
-                className="w-full resize-none rounded-lg border border-border-subtle bg-bg-deep px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    handleSubmit(e)
-                  }
-                }}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Button type="submit" disabled={!inputText.trim() || submitting} loading={submitting}>
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Опишите задачу..."
+              rows={2}
+              className="w-full resize-none rounded-lg border border-border-subtle bg-bg-deep px-3 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  handleSubmit(e)
+                }
+              }}
+            />
+            <div className="flex items-center gap-2">
+              <Button type="submit" disabled={!inputText.trim() || submitting} loading={submitting} className="flex-1 sm:flex-none">
                 <Send className="h-4 w-4" />
                 Отправить
               </Button>
@@ -279,7 +277,7 @@ export default function TasksPage() {
                 title={recording ? 'Остановить запись' : 'Голосовой ввод'}
               >
                 <Mic className={`h-4 w-4 ${recording ? 'animate-pulse' : ''}`} />
-                {recording ? 'Стоп' : ''}
+                {recording ? 'Стоп' : 'Голос'}
               </Button>
             </div>
           </form>
@@ -354,15 +352,13 @@ function TaskCard({
       {/* Header row */}
       <button
         onClick={onToggle}
-        className="flex w-full items-center gap-3 p-5 text-left"
+        className="flex w-full items-center gap-2 p-4 sm:p-5 text-left"
         role="button"
         tabIndex={0}
       >
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{truncate(task.raw_input, 120)}</span>
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium break-words">{truncate(task.raw_input, 100)}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge variant={config.variant}>{config.label}</Badge>
             <span className="text-xs text-muted-foreground">{timeAgo(task.created_at)}</span>
             {task.mode === 'fast' && (
@@ -377,17 +373,17 @@ function TaskCard({
             )}
             {interpretation?.risk_level && (
               <span className={`text-xs font-medium ${riskColors[interpretation.risk_level] || ''}`}>
-                Риск: {interpretation.risk_level}
+                Риск: {interpretation.risk_level === 'low' ? 'низкий' : interpretation.risk_level === 'medium' ? 'средний' : 'высокий'}
               </span>
             )}
           </div>
         </div>
-        {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        {isExpanded ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
       </button>
 
       {/* Expanded content */}
       {isExpanded && (
-        <CardContent className="border-t border-border-subtle pt-5">
+        <CardContent className="border-t border-border-subtle pt-4 px-3 sm:px-6">
           {/* Interpretation */}
           {interpretation && (
             <div className="space-y-4">
@@ -486,17 +482,18 @@ function TaskCard({
           {/* Review state — approve / reject / escalate */}
           {task.status === 'review' && (
             <div className="mt-4 space-y-3">
-              <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
                 <h4 className="text-sm font-medium text-warning flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
                   Задача ожидает проверки
                 </h4>
-                {task.error && <p className="mt-2 text-sm text-muted-foreground">{task.error}</p>}
+                {task.error && <p className="mt-2 text-sm text-muted-foreground break-words">{task.error}</p>}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
                 <Button
                   onClick={() => onAction(task.id, 'complete', { result_summary_ru: 'Проверка пройдена' })}
                   loading={isLoading('complete')}
+                  className="w-full sm:w-auto"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   Принять
@@ -505,6 +502,7 @@ function TaskCard({
                   variant="outline"
                   onClick={() => onAction(task.id, 'request-review', { reason: 'Требуется ручная проверка' })}
                   loading={isLoading('request-review')}
+                  className="w-full sm:w-auto"
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Ручная проверка
@@ -513,6 +511,7 @@ function TaskCard({
                   variant="ghost"
                   onClick={() => onAction(task.id, 'fail', { error: 'Отклонено при проверке' })}
                   loading={isLoading('fail')}
+                  className="w-full sm:w-auto"
                 >
                   <XCircle className="h-4 w-4" />
                   Отклонить
@@ -524,17 +523,18 @@ function TaskCard({
           {/* Needs manual review — show reason and resolution buttons */}
           {task.status === 'needs_manual_review' && (
             <div className="mt-4 space-y-3">
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
                 <h4 className="text-sm font-medium text-destructive flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
                   Требуется ручная проверка
                 </h4>
-                {task.error && <p className="mt-2 text-sm">{task.error}</p>}
+                {task.error && <p className="mt-2 text-sm break-words">{task.error}</p>}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
                 <Button
                   onClick={() => onAction(task.id, 'complete', { result_summary_ru: 'Решено вручную' })}
                   loading={isLoading('complete')}
+                  className="w-full sm:w-auto"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   Решено — принять
@@ -543,6 +543,7 @@ function TaskCard({
                   variant="ghost"
                   onClick={() => onAction(task.id, 'fail', { error: 'Не удалось решить' })}
                   loading={isLoading('fail')}
+                  className="w-full sm:w-auto"
                 >
                   <XCircle className="h-4 w-4" />
                   Не решено
@@ -563,7 +564,7 @@ function TaskCard({
                   <div key={evt.id} className="flex items-start gap-2 text-xs">
                     <span className="text-muted-foreground/60 whitespace-nowrap shrink-0">{timeAgo(evt.created_at)}</span>
                     <Badge variant="secondary" className="text-[10px] shrink-0">{evt.event_type}</Badge>
-                    {evt.detail && <span className="text-muted-foreground">{evt.detail}</span>}
+                    {evt.detail && <span className="text-muted-foreground break-words min-w-0">{evt.detail}</span>}
                   </div>
                 ))}
               </div>
@@ -572,15 +573,15 @@ function TaskCard({
 
           {/* Actions for pending tasks */}
           {task.status === 'pending' && (
-            <div className="mt-6 space-y-4">
+            <div className="mt-5 space-y-4">
               {/* Revision input */}
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <input
                   type="text"
                   value={revisionText}
                   onChange={(e) => onRevisionTextChange(e.target.value)}
-                  placeholder="Уточнить задачу (текстом)..."
-                  className="flex-1 rounded-lg border border-border-subtle bg-bg-deep px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none"
+                  placeholder="Уточнить задачу..."
+                  className="w-full rounded-lg border border-border-subtle bg-bg-deep px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none sm:flex-1"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && revisionText.trim()) {
                       onRevise(task.id)
@@ -593,6 +594,7 @@ function TaskCard({
                   onClick={() => onRevise(task.id)}
                   disabled={!revisionText.trim()}
                   loading={isLoading('revise') || isLoading('interpret')}
+                  className="w-full sm:w-auto"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   Уточнить
@@ -600,18 +602,20 @@ function TaskCard({
               </div>
 
               {/* Confirm / Cancel / Mode */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
                 <Button
                   onClick={() => onAction(task.id, 'confirm', { mode: 'safe' })}
                   loading={isLoading('confirm')}
+                  className="w-full sm:w-auto"
                 >
                   <Shield className="h-4 w-4" />
-                  Подтвердить (безопасно)
+                  Подтвердить
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => onAction(task.id, 'confirm', { mode: 'fast' })}
                   loading={isLoading('confirm')}
+                  className="w-full sm:w-auto"
                 >
                   <Zap className="h-4 w-4" />
                   Быстрый режим
@@ -620,6 +624,7 @@ function TaskCard({
                   variant="ghost"
                   onClick={() => onAction(task.id, 'cancel')}
                   loading={isLoading('cancel')}
+                  className="w-full sm:w-auto"
                 >
                   <XCircle className="h-4 w-4" />
                   Отменить
@@ -630,17 +635,17 @@ function TaskCard({
 
           {/* Confirmed — engineering packet + Execute button */}
           {task.status === 'confirmed' && engPacket && (
-            <div className="mt-6 space-y-4">
-              <div className="rounded-lg border border-info/30 bg-info/5 p-4 space-y-3">
+            <div className="mt-5 space-y-4">
+              <div className="rounded-lg border border-info/30 bg-info/5 p-3 sm:p-4 space-y-3">
                 <h4 className="text-sm font-medium text-info flex items-center gap-2">
-                  <ListTodo className="h-4 w-4" />
-                  Инженерный пакет
+                  <ListTodo className="h-4 w-4 shrink-0" />
+                  План выполнения
                 </h4>
-                <p className="text-sm font-medium">{engPacket.title}</p>
-                <p className="text-sm text-muted-foreground">{engPacket.objective}</p>
+                <p className="text-sm font-medium break-words">{engPacket.title}</p>
+                <p className="text-sm text-muted-foreground break-words">{engPacket.objective}</p>
                 <div>
                   <span className="text-xs font-medium uppercase text-muted-foreground/70">Шаги:</span>
-                  <ol className="mt-1 list-inside list-decimal space-y-1 text-sm">
+                  <ol className="mt-1 list-inside list-decimal space-y-1 text-sm break-words">
                     {engPacket.steps.map((step, i) => (
                       <li key={i}>{step}</li>
                     ))}
@@ -649,7 +654,7 @@ function TaskCard({
                 {engPacket.acceptance_criteria.length > 0 && (
                   <div>
                     <span className="text-xs font-medium uppercase text-muted-foreground/70">Критерии приёмки:</span>
-                    <ul className="mt-1 list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                    <ul className="mt-1 list-inside list-disc space-y-1 text-sm text-muted-foreground break-words">
                       {engPacket.acceptance_criteria.map((c, i) => (
                         <li key={i}>{c}</li>
                       ))}
@@ -657,18 +662,20 @@ function TaskCard({
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
                 <Button
                   onClick={() => onAction(task.id, 'start')}
                   loading={isLoading('start')}
+                  className="w-full sm:w-auto"
                 >
                   <Play className="h-4 w-4" />
-                  Запустить выполнение
+                  Запустить
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={() => onAction(task.id, 'cancel')}
                   loading={isLoading('cancel')}
+                  className="w-full sm:w-auto"
                 >
                   <XCircle className="h-4 w-4" />
                   Отменить
@@ -679,27 +686,31 @@ function TaskCard({
 
           {/* Draft — waiting for interpretation or failed */}
           {task.status === 'draft' && (
-            <div className="mt-4 flex items-center gap-3 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Анализируем задачу...
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onAction(task.id, 'interpret')}
-                loading={isLoading('interpret')}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                Повторить
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onAction(task.id, 'cancel')}
-                loading={isLoading('cancel')}
-              >
-                <XCircle className="h-3.5 w-3.5" />
-                Отменить
-              </Button>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                Анализируем задачу...
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onAction(task.id, 'interpret')}
+                  loading={isLoading('interpret')}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Повторить
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onAction(task.id, 'cancel')}
+                  loading={isLoading('cancel')}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Отменить
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

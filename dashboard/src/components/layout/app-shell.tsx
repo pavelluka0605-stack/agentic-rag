@@ -12,13 +12,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-bg-deep">
       <Sidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar
           onSearchClick={() => setCommandPaletteOpen(true)}
           onMenuClick={() => setMobileMenuOpen(true)}
         />
-        <main className="flex-1 overflow-y-auto bg-bg-surface p-4 sm:p-6">
-          <div className="mx-auto max-w-[1400px] animate-fade-in">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-bg-surface p-3 sm:p-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+          <div className="mx-auto max-w-[1400px] w-full animate-fade-in">
             {children}
           </div>
         </main>

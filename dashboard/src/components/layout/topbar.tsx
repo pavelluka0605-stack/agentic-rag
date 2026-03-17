@@ -5,14 +5,15 @@ import { usePathname } from 'next/navigation'
 import { Search, RefreshCw, Command, Menu } from 'lucide-react'
 
 const pathTitles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/sessions': 'Sessions',
-  '/memory': 'Memory',
-  '/incidents': 'Incidents',
-  '/solutions': 'Solutions',
-  '/projects': 'Projects',
+  '/dashboard': 'Обзор',
+  '/tasks': 'Задачи',
+  '/sessions': 'Сессии',
+  '/memory': 'Память',
+  '/incidents': 'Инциденты',
+  '/solutions': 'Решения',
+  '/projects': 'Проекты',
   '/github': 'GitHub',
-  '/health': 'System Health',
+  '/health': 'Здоровье системы',
 }
 
 function getPageTitle(pathname: string): string {
@@ -20,7 +21,7 @@ function getPageTitle(pathname: string): string {
   for (const [path, title] of Object.entries(pathTitles)) {
     if (pathname.startsWith(path + '/')) return title
   }
-  return 'Dashboard'
+  return 'Обзор'
 }
 
 interface TopbarProps {
@@ -37,16 +38,16 @@ export function Topbar({ onSearchClick, onMenuClick }: TopbarProps) {
     function tick() {
       const now = new Date()
       setTime(
-        now.toLocaleTimeString('en-US', {
+        now.toLocaleTimeString('ru-RU', {
           hour: '2-digit',
           minute: '2-digit',
           hour12: false,
         })
       )
       setDateStr(
-        now.toLocaleDateString('en-US', {
-          month: 'short',
+        now.toLocaleDateString('ru-RU', {
           day: 'numeric',
+          month: 'short',
           year: 'numeric',
         })
       )
@@ -63,7 +64,7 @@ export function Topbar({ onSearchClick, onMenuClick }: TopbarProps) {
         <button
           onClick={onMenuClick}
           className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground md:hidden"
-          title="Open menu"
+          title="Меню"
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -83,10 +84,10 @@ export function Topbar({ onSearchClick, onMenuClick }: TopbarProps) {
         <button
           onClick={onSearchClick}
           className="flex h-8 items-center gap-2 rounded-lg border border-border-subtle bg-bg-inset px-3 text-sm text-muted-foreground/60 transition-colors hover:bg-bg-overlay hover:text-muted-foreground"
-          title="Search (Cmd+K)"
+          title="Поиск (Cmd+K)"
         >
           <Search className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Search...</span>
+          <span className="hidden sm:inline">Поиск...</span>
           <kbd className="ml-1 hidden rounded border border-border-subtle px-1 py-0.5 font-mono text-[10px] sm:inline-block">
             <Command className="inline h-2.5 w-2.5" />K
           </kbd>
@@ -95,7 +96,7 @@ export function Topbar({ onSearchClick, onMenuClick }: TopbarProps) {
         <button
           onClick={() => window.location.reload()}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-          title="Refresh"
+          title="Обновить"
         >
           <RefreshCw className="h-4 w-4" />
         </button>

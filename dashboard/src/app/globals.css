@@ -80,6 +80,11 @@
 
 /* ─── Base ─── */
 
+html {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background: var(--color-bg-surface);
   color: var(--color-foreground);
@@ -89,6 +94,9 @@ body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ─── Scrollbar (minimal, unobtrusive) ─── */

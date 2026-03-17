@@ -33,37 +33,37 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    title: 'Main',
+    title: 'Основное',
     items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { label: 'Обзор', href: '/dashboard', icon: LayoutDashboard },
       { label: 'Задачи', href: '/tasks', icon: ListTodo },
     ],
   },
   {
-    title: 'Work',
+    title: 'Работа',
     items: [
-      { label: 'Sessions', href: '/sessions', icon: History },
-      { label: 'Memory', href: '/memory', icon: Brain },
+      { label: 'Сессии', href: '/sessions', icon: History },
+      { label: 'Память', href: '/memory', icon: Brain },
     ],
   },
   {
-    title: 'Issues',
+    title: 'Проблемы',
     items: [
-      { label: 'Incidents', href: '/incidents', icon: AlertTriangle },
-      { label: 'Solutions', href: '/solutions', icon: Lightbulb },
+      { label: 'Инциденты', href: '/incidents', icon: AlertTriangle },
+      { label: 'Решения', href: '/solutions', icon: Lightbulb },
     ],
   },
   {
-    title: 'External',
+    title: 'Внешнее',
     items: [
-      { label: 'Projects', href: '/projects', icon: FolderKanban },
+      { label: 'Проекты', href: '/projects', icon: FolderKanban },
       { label: 'GitHub', href: '/github', icon: Github },
     ],
   },
   {
-    title: 'System',
+    title: 'Система',
     items: [
-      { label: 'System Health', href: '/health', icon: Activity },
+      { label: 'Здоровье', href: '/health', icon: Activity },
     ],
   },
 ]
@@ -177,7 +177,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           ) : (
             <>
               <PanelLeftClose className="h-4 w-4 shrink-0" />
-              <span>Collapse</span>
+              <span>Свернуть</span>
             </>
           )}
         </button>
