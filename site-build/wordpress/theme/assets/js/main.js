@@ -256,12 +256,13 @@
    * Footer Accordion
    * ----------------------------------------------------- */
   function initFooterAccordion() {
-    var toggles = document.querySelectorAll('.footer__accordion-toggle');
+    var toggles = document.querySelectorAll('[data-accordion]');
     for (var i = 0; i < toggles.length; i++) {
       toggles[i].addEventListener('click', function () {
-        var accordion = this.closest('[data-accordion]');
-        if (accordion) {
-          accordion.classList.toggle('is-open');
+        this.classList.toggle('is-open');
+        var list = this.nextElementSibling;
+        if (list) {
+          list.classList.toggle('is-open');
         }
       });
     }

@@ -19,12 +19,16 @@ add_action( 'wp_head', 'kuhni_rema_schema_output', 1 );
  */
 function kuhni_rema_schema_output() {
 
-	// Organization — on every page.
-	kuhni_rema_schema_organization();
+	// When RankMath is active, it outputs its own Organization/LocalBusiness schema.
+	// Skip theme Organization and LocalBusiness to avoid duplicate entities in Google Search Console.
+	if ( ! function_exists( 'rank_math' ) ) {
+		// Organization — on every page.
+		kuhni_rema_schema_organization();
 
-	// LocalBusiness — only on the contacts page.
-	if ( is_page( array( 'kontakty', 'contacts' ) ) || kuhni_rema_is_page_template( 'contacts' ) ) {
-		kuhni_rema_schema_local_business();
+		// LocalBusiness — only on the contacts page.
+		if ( is_page( array( 'kontakty', 'contacts' ) ) || kuhni_rema_is_page_template( 'contacts' ) ) {
+			kuhni_rema_schema_local_business();
+		}
 	}
 
 	// Product — single kitchen (CPT "kitchen" or kitchen category).
