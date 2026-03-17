@@ -25,7 +25,7 @@ $faq_categories = array(
 
 $phone          = kuhni_rema_option( 'global_phone_main' );
 $phone_link     = $phone ? kuhni_rema_phone_link( $phone ) : '';
-$whatsapp_phone = kuhni_rema_option( 'social_whatsapp_phone' );
+$whatsapp_phone = kuhni_rema_option( 'global_whatsapp' );
 
 // Collect all FAQs for Schema.org
 $all_faqs_schema = array();

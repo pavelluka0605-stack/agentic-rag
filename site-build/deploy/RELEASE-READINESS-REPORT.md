@@ -77,16 +77,27 @@
 | P1-003 | **P1** | `quiz-popup.js:114,128,133` | CSS fallback цвета `#E65100` / `#BF360C` не совпадали с design tokens `#C2613A` / `#A8512F` — визуальное расхождение | **FIXED** |
 | P1-004 | **P1** | `smoke-test.sh:249-250` | Redirect тесты `/straight` → `/pryamye-kuhni/` работают только для mebelit.site nginx block, падали на основном домене | **FIXED** |
 | P1-005 | **P1** | `main.js:13` | Использование `let` (ES6) вместо `var` — несовместимо со старыми браузерами (77% трафика — мобильные) | **FIXED** |
+| P0-002 | **P0** | `templates/single-kitchen.php`, `templates/single-project.php`, `templates/archive-kitchen.php` | Файлы template hierarchy в `templates/` — WordPress их НЕ загружает из подпапок. Кухни/проекты показывали бы generic Bricks content. Перемещены в корень темы | **FIXED** |
+| P1-006 | **P1** | `templates/header-minimal.php` | `get_header('minimal')` ищет в корне темы, файл был в `templates/`. Перемещён | **FIXED** |
+| P1-007 | **P1** | `acf-options.php` | ACF поля `global_company_name`, `global_company_inn`, `global_company_ogrn` не зарегистрированы — страница политики конфиденциальности без обязательных данных оператора (152-ФЗ). Зарегистрированы | **FIXED** |
+| P1-008 | **P1** | `acf-options.php` | ACF поле `analytics_ym_counter_id` не зарегистрировано — конверсии на странице «Спасибо» не отслеживались. Зарегистрировано | **FIXED** |
+| P1-009 | **P1** | `seo-schema.php:278-279` | `kitchen_facade_material` и `kitchen_type` читались как ACF поля, но это таксономии. Schema.org Product material/category были пустыми. Исправлено на `wp_get_post_terms()` | **FIXED** |
+| P1-010 | **P1** | `rankmath-config.php:304` | Неверное имя поля `contacts_phone` вместо `global_phone_main`. Телефон в RankMath Organization schema был пустым | **FIXED** |
+| P1-011 | **P1** | `page-faq.php:28` | Неверное имя поля `social_whatsapp_phone` вместо `global_whatsapp`. WhatsApp CTA на FAQ не работал | **FIXED** |
 
 ### Оставшиеся (P2 + P3 — не блокируют релиз)
 
 | ID | Severity | Файл | Описание |
 |----|----------|------|----------|
 | P2-001 | P2 | `helpers.php:37-43` | ACF price field echoed без explicit esc_html() — риск минимален (number_format на numeric field) |
+| P2-002 | P2 | `seo-meta.php`, `rankmath-config.php` | `yandex_verification`, `google_verification`, `og_default_image` не зарегистрированы в ACF — работают через wp_options fallback |
 | P3-001 | P3 | 10 template files | Отсутствует `defined('ABSPATH') \|\| exit` guard — неэксплуатируемо, т.к. шаблоны вызывают get_header() |
 | P3-002 | P3 | `helpers.php:193` | `aria-label` без esc_attr() — intval() уже санитизирует |
 | P3-003 | P3 | `admin-roles.php:101-107` | admin_url() без esc_url() — admin-only context |
 | P3-004 | P3 | `cpt-kitchen.php:315-316` | number_format() в admin column без esc_html() — admin-only |
+| P3-005 | P3 | `functions.php:227` | Image size `kitchen-micro` зарегистрирован но не используется |
+| P3-006 | P3 | `functions.php:232-233` | Menu locations `footer` и `catalog` зарегистрированы но не используются в шаблонах |
+| P3-007 | P3 | `page-home.php:137` | ACF field `kitchen_type_image` для таксономии не зарегистрирован |
 
 ---
 

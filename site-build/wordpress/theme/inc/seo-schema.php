@@ -274,9 +274,16 @@ function kuhni_rema_schema_product() {
 	$material = '';
 	$category = '';
 	if ( function_exists( 'get_field' ) ) {
-		$price    = get_field( 'kitchen_price', $post_id );
-		$material = get_field( 'kitchen_facade_material', $post_id );
-		$category = get_field( 'kitchen_type', $post_id );
+		$price = get_field( 'kitchen_price', $post_id );
+	}
+	// Material and type are taxonomies, not ACF fields.
+	$material_terms = wp_get_post_terms( $post_id, 'kitchen_material', array( 'fields' => 'names' ) );
+	if ( ! is_wp_error( $material_terms ) && ! empty( $material_terms ) ) {
+		$material = $material_terms[0];
+	}
+	$type_terms = wp_get_post_terms( $post_id, 'kitchen_type', array( 'fields' => 'names' ) );
+	if ( ! is_wp_error( $type_terms ) && ! empty( $type_terms ) ) {
+		$category = $type_terms[0];
 	}
 
 	$schema = array(

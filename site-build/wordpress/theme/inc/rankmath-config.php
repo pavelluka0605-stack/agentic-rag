@@ -301,7 +301,7 @@ function kuhni_rema_rm_local_seo( $data, $jsonld ) {
 
 		// Phone from ACF options.
 		if ( function_exists( 'get_field' ) ) {
-			$phone = get_field( 'contacts_phone', 'option' );
+			$phone = get_field( 'global_phone_main', 'option' );
 			if ( $phone ) {
 				$schema['telephone'] = $phone;
 			}
