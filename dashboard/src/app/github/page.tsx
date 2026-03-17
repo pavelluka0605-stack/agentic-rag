@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Loading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { timeAgo } from '@/lib/utils'
+import { PageHeader } from '@/components/ui/page-header'
+import { FilterTabs } from '@/components/ui/filter-tabs'
 import type { GithubEvent } from '@/types'
 
 const EVENT_TYPES = ['All', 'push', 'pull_request', 'issues', 'workflow_run'] as const
@@ -57,27 +59,17 @@ export default function GitHubPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">GitHub Activity</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Webhook events from GitHub repositories
-        </p>
-      </div>
+      <PageHeader
+        title="GitHub Activity"
+        description="Webhook events from GitHub repositories"
+      />
 
       {/* Filter row */}
-      <div className="flex flex-wrap gap-2">
-        {EVENT_TYPES.map((type) => (
-          <Button
-            key={type}
-            variant={filter === type ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter(type)}
-          >
-            {type === 'All' && <Activity className="h-3.5 w-3.5" />}
-            {type}
-          </Button>
-        ))}
-      </div>
+      <FilterTabs
+        options={EVENT_TYPES.map(t => ({ key: t, label: t, icon: t === 'All' ? Activity : undefined }))}
+        value={filter}
+        onChange={setFilter}
+      />
 
       {/* Content */}
       {loading ? (
@@ -99,10 +91,10 @@ export default function GitHubPage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="overflow-x-auto rounded-lg border border-border animate-fade-in">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-border bg-[oklch(0.175_0.008_260)]">
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Action</th>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Repository</th>
@@ -116,7 +108,7 @@ export default function GitHubPage() {
               {events.map((ev) => (
                 <tr
                   key={ev.id}
-                  className="border-b border-border/50 transition-colors hover:bg-muted/30"
+                  className="border-b border-border-subtle transition-colors hover:bg-[oklch(0.195_0.008_260)]"
                 >
                   <td className="px-4 py-3">
                     <Badge variant={eventVariant(ev.event_type)}>

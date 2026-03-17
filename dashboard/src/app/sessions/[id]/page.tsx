@@ -66,7 +66,7 @@ export default function SessionDetailPage() {
   const filesChanged = parseJsonField<string[]>(session.files_changed)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Back link */}
       <Link href="/sessions">
         <Button variant="ghost" size="sm">
@@ -171,7 +171,7 @@ export default function SessionDetailPage() {
               {filesChanged.map((file, i) => (
                 <li
                   key={i}
-                  className="rounded px-2 py-1 font-mono text-xs text-foreground bg-muted/50"
+                  className="rounded px-2 py-1 font-mono text-xs text-foreground bg-[oklch(0.125_0.005_260)]"
                 >
                   {file}
                 </li>
@@ -190,24 +190,24 @@ export default function SessionDetailPage() {
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {session.project && (
               <div>
-                <dt className="text-xs font-medium text-muted-foreground">Project</dt>
+                <dt className="text-[13px] font-medium text-muted-foreground">Project</dt>
                 <dd className="mt-0.5 text-sm">{session.project}</dd>
               </div>
             )}
             {session.branch && (
               <div>
-                <dt className="text-xs font-medium text-muted-foreground">Branch</dt>
+                <dt className="text-[13px] font-medium text-muted-foreground">Branch</dt>
                 <dd className="mt-0.5 font-mono text-sm">{session.branch}</dd>
               </div>
             )}
             {session.session_id && (
               <div>
-                <dt className="text-xs font-medium text-muted-foreground">Session ID</dt>
+                <dt className="text-[13px] font-medium text-muted-foreground">Session ID</dt>
                 <dd className="mt-0.5 font-mono text-sm">{session.session_id}</dd>
               </div>
             )}
             <div>
-              <dt className="text-xs font-medium text-muted-foreground">Created</dt>
+              <dt className="text-[13px] font-medium text-muted-foreground">Created</dt>
               <dd className="mt-0.5 text-sm">{formatDate(session.created_at)}</dd>
             </div>
           </dl>

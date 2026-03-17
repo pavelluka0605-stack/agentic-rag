@@ -12,6 +12,7 @@ import {
   Inbox,
   Activity,
 } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -85,15 +86,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Memory system overview and recent activity
-        </p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Memory system overview and recent activity"
+      />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-fade-in">
         <StatCard
           title="Open Incidents"
           value={openIncidents}
@@ -129,7 +128,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick actions */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-border-subtle bg-card p-3">
         <Link href="/memory">
           <Button variant="outline" size="sm">
             <Search className="h-4 w-4" />
@@ -153,7 +152,7 @@ export default function DashboardPage() {
       {/* Two-column grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent Sessions */}
-        <Card>
+        <Card className="animate-fade-in">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <History className="h-4 w-4 text-muted-foreground" />
@@ -172,7 +171,7 @@ export default function DashboardPage() {
                 {episodes.map((ep) => (
                   <div
                     key={ep.id}
-                    className="flex items-start justify-between gap-3 rounded-md border border-border/50 p-3 transition-colors hover:bg-muted/50"
+                    className="flex items-start justify-between gap-3 rounded-lg border border-border-subtle p-3 transition-colors hover:bg-[oklch(0.195_0.008_260)]"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium leading-snug">
@@ -195,7 +194,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Open Incidents */}
-        <Card>
+        <Card className="animate-fade-in">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
@@ -214,7 +213,7 @@ export default function DashboardPage() {
                 {incidents.map((inc) => (
                   <div
                     key={inc.id}
-                    className="flex items-start justify-between gap-3 rounded-md border border-border/50 p-3 transition-colors hover:bg-muted/50"
+                    className="flex items-start justify-between gap-3 rounded-lg border border-border-subtle p-3 transition-colors hover:bg-[oklch(0.195_0.008_260)]"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -252,7 +251,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Full-width GitHub Activity */}
-      <Card>
+      <Card className="animate-fade-in">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Activity className="h-4 w-4 text-muted-foreground" />
@@ -271,7 +270,7 @@ export default function DashboardPage() {
               {events.map((ev) => (
                 <div
                   key={ev.id}
-                  className="flex items-center gap-4 rounded-md border border-border/50 px-4 py-3 transition-colors hover:bg-muted/50"
+                  className="flex items-center gap-4 rounded-lg border border-border-subtle px-4 py-3 transition-colors hover:bg-[oklch(0.195_0.008_260)]"
                 >
                   <Badge variant={eventVariant(ev.event_type)}>
                     {ev.event_type}

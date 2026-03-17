@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge'
 import { StatusDot } from '@/components/ui/status-dot'
 import { Loading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Button } from '@/components/ui/button'
-import { cn, timeAgo, truncate } from '@/lib/utils'
+import { PageHeader } from '@/components/ui/page-header'
+import { FilterTabs } from '@/components/ui/filter-tabs'
+import { timeAgo, truncate } from '@/lib/utils'
 import type { Incident } from '@/types'
 
 const STATUS_FILTERS = ['all', 'open', 'investigating', 'fixed', 'wontfix'] as const
@@ -80,26 +81,17 @@ export default function IncidentsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Incidents</h1>
-        {!loading && !error && (
-          <Badge variant="secondary">{incidents.length}</Badge>
-        )}
-      </div>
+      <PageHeader
+        title="Incidents"
+        badge={!loading && !error ? <Badge variant="secondary">{incidents.length}</Badge> : undefined}
+      />
 
       {/* Filter row */}
-      <div className="flex flex-wrap gap-2">
-        {STATUS_FILTERS.map((s) => (
-          <Button
-            key={s}
-            variant={filter === s ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilter(s)}
-          >
-            {statusLabels[s]}
-          </Button>
-        ))}
-      </div>
+      <FilterTabs
+        options={STATUS_FILTERS.map(s => ({ key: s, label: statusLabels[s] }))}
+        value={filter}
+        onChange={(v) => setFilter(v as StatusFilter)}
+      />
 
       {/* Content */}
       {loading && (
@@ -129,13 +121,13 @@ export default function IncidentsPage() {
       )}
 
       {!loading && !error && incidents.length > 0 && (
-        <Card>
+        <Card className="animate-fade-in">
           <div className="divide-y divide-border">
             {incidents.map((incident) => (
               <Link
                 key={incident.id}
                 href={`/incidents/${incident.id}`}
-                className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
+                className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-[oklch(0.195_0.008_260)]"
               >
                 <StatusDot status={statusToDot(incident.status) as any} />
 

@@ -53,9 +53,9 @@ export function SearchInput({
         onChange={handleChange}
         placeholder={placeholder}
         className={cn(
-          'flex h-9 w-full rounded-md border border-input bg-transparent py-1 pl-9 pr-8 text-sm shadow-sm transition-colors',
-          'placeholder:text-muted-foreground',
-          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          'flex h-10 w-full rounded-lg border border-border-subtle bg-[oklch(0.165_0.006_260)] py-1 pl-9 pr-8 text-sm shadow-sm transition-colors',
+          'placeholder:text-muted-foreground/50',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/50',
           'disabled:cursor-not-allowed disabled:opacity-50'
         )}
       />
@@ -63,7 +63,7 @@ export function SearchInput({
         <button
           type="button"
           onClick={handleClear}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" />
         </button>

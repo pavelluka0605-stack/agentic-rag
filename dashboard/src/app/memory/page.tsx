@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Loading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn, timeAgo, truncate } from '@/lib/utils'
+import { PageHeader } from '@/components/ui/page-header'
+import { FilterTabs } from '@/components/ui/filter-tabs'
 
 const MEMORY_TYPES = [
   { key: 'all', label: 'All', icon: Database },
@@ -119,10 +121,10 @@ export default function MemoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Memory Explorer</h1>
-        <p className="text-muted-foreground mt-1">Search and explore all memory layers</p>
-      </div>
+      <PageHeader
+        title="Memory Explorer"
+        description="Search and explore all memory layers"
+      />
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -131,7 +133,7 @@ export default function MemoryPage() {
           placeholder="Search across all memory layers..."
           value={query}
           onChange={e => setQuery(e.target.value)}
-          className="w-full rounded-lg border border-input bg-card pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full rounded-xl border border-border-subtle bg-card pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50"
         />
         {query && (
           <button
@@ -143,28 +145,16 @@ export default function MemoryPage() {
         )}
       </div>
 
-      <div className="flex gap-1 flex-wrap">
-        {MEMORY_TYPES.map(t => {
-          const Icon = t.icon
-          const count = t.key === 'all' ? results.length : results.filter(r => r._type === t.key).length
-          return (
-            <button
-              key={t.key}
-              onClick={() => setActiveFilter(t.key)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors',
-                activeFilter === t.key
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {t.label}
-              <span className="ml-0.5 text-xs opacity-70">{count}</span>
-            </button>
-          )
-        })}
-      </div>
+      <FilterTabs
+        options={MEMORY_TYPES.map(t => ({
+          key: t.key,
+          label: t.label,
+          icon: t.icon,
+          count: t.key === 'all' ? results.length : results.filter(r => r._type === t.key).length,
+        }))}
+        value={activeFilter}
+        onChange={setActiveFilter}
+      />
 
       {loading ? (
         <Loading variant="skeleton" />
@@ -175,10 +165,10 @@ export default function MemoryPage() {
           description={query ? 'Try a different search query' : 'Memory will populate as you work'}
         />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 animate-fade-in">
           {filtered.map(item => (
             <Link key={`${item._type}-${item.id}`} href={getItemLink(item)}>
-              <Card className="hover:border-primary/30 transition-colors cursor-pointer">
+              <Card className="hover:border-primary/30 hover:shadow-sm transition-colors cursor-pointer">
                 <CardContent className="flex items-start gap-3 py-3 px-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
