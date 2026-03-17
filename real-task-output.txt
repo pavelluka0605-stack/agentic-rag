@@ -1,0 +1,92 @@
+=== Dashboard Service ===
+● dashboard.service - Claude Code Task Dashboard (Next.js)
+     Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
+     Active: active (running) since Tue 2026-03-17 12:06:37 UTC; 2min 35s ago
+   Main PID: 1135265 (next-server (v1)
+      Tasks: 13 (limit: 64)
+     Memory: 78.3M (max: 256.0M available: 177.6M peak: 80.4M)
+        CPU: 1.600s
+     CGroup: /system.slice/dashboard.service
+             └─1135265 "next-server (v16.1.6)"
+
+
+=== Port 3200 ===
+LISTEN 0      511                *:3200             *:*    users:(("next-server (v1",pid=1135265,fd=18))                                                                                                                     
+
+=== Dashboard HTTP response ===
+HTTP/1.1 307 Temporary Redirect
+Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+x-nextjs-prerender: 1
+x-nextjs-prerender: 1
+
+=== Dashboard /tasks page (first 30 chars) ===
+<!DOCTYPE html><!--vP4a98jYsruqccmK5FtjS--><html lang="en" class="dark"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/
+
+=== Nginx config test ===
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+=== Nginx sites-available/webhook dashboard section ===
+    # Task Dashboard (Next.js on port 3200)
+    # Serves the main operator UI — all paths not matched above
+    location / {
+        proxy_pass http://127.0.0.1:3200;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+
+=== Nginx → dashboard proxy (HTTP, port 80) ===
+HTTP/1.1 308 Permanent Redirect
+Location: https://webhook.marbomebel.ru/
+Date: Tue, 17 Mar 2026 12:09:23 GMT
+Content-Length: 18
+
+
+=== Traefik dynamic configs ===
+total 16
+drwxr-xr-x 2 root root 4096 Mar 17 12:06 .
+drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
+-rw-r--r-- 1 root root  310 Mar 13 14:08 chat.yml
+-rw-r--r-- 1 root root  546 Mar 17 12:06 dashboard.yml
+
+=== dashboard.yml in Traefik ===
+## Traefik dynamic config — Task Dashboard
+## Deployed to /opt/n8n-traefik/dynamic/dashboard.yml
+## Traefik auto-reloads (file.watch=true)
+
+http:
+  routers:
+    dashboard-app:
+      rule: "Host(`webhook.marbomebel.ru`)"
+      entryPoints:
+        - websecure
+      service: dashboard-app
+      tls:
+        certResolver: mytlschallenge
+      # Lower priority so /webhook/* and /api/* routes from other configs win
+      priority: 10
+
+  services:
+    dashboard-app:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:3200"
+
+=== Traefik dashboard router check ===
+dashboard-app@file Host(`webhook.marbomebel.ru`) enabled
+dashboard@internal PathPrefix(`/`) enabled
+
+=== HTTPS test: webhook.marbomebel.ru ===
+HTTP/2 307 
+cache-control: s-maxage=31536000
+content-type: text/html; charset=utf-8
+date: Tue, 17 Mar 2026 12:09:31 GMT
+etag: "fibvqu9q0c4sf"
+location: /dashboard
+vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+x-nextjs-prerender: 1
+x-nextjs-prerender: 1
+
+=== HTTPS test: webhook.marbomebel.ru/tasks ===
+<!DOCTYPE html><!--vP4a98jYsruqccmK5FtjS--><html lang="en" class="dark"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/_next/static/chunks/b2c0e2bf8039c402.css" data-precedence="next"/><link rel="preload" as="script" fe
