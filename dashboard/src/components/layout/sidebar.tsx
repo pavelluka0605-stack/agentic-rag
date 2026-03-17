@@ -72,15 +72,15 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex h-screen flex-col border-r border-border bg-[oklch(0.12_0_0)] transition-all duration-200',
+        'flex h-screen flex-col border-r border-border-subtle bg-bg-deep transition-all duration-200 ease-out',
         collapsed ? 'w-16' : 'w-60'
       )}
     >
       {/* Logo */}
-      <div className="flex h-12 items-center gap-2.5 border-b border-border px-4">
-        <Terminal className="h-5 w-5 shrink-0 text-primary" />
+      <div className="flex h-14 items-center gap-2.5 border-b border-border-subtle px-4 shadow-[0_1px_8px_-2px_oklch(0.685_0.155_250_/_0.15)]">
+        <Terminal className="h-6 w-6 shrink-0 text-primary" />
         {!collapsed && (
-          <span className="text-sm font-semibold tracking-tight text-foreground">
+          <span className="text-gradient text-sm font-semibold tracking-tight opacity-90">
             Claude Code
           </span>
         )}
@@ -91,10 +91,10 @@ export function Sidebar() {
         {navGroups.map((group, gi) => (
           <div key={group.title}>
             {gi > 0 && (
-              <div className="mx-2 my-2 border-t border-border/50" />
+              <div className="mx-2 my-2.5 border-t border-border/40" />
             )}
             {!collapsed && (
-              <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
+              <p className="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
                 {group.title}
               </p>
             )}
@@ -107,13 +107,16 @@ export function Sidebar() {
                     <Link
                       href={item.href}
                       className={cn(
-                        'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors',
+                        'relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors',
                         isActive
-                          ? 'bg-primary/15 text-primary'
-                          : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                          ? 'bg-primary/12 font-medium text-primary'
+                          : 'text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground'
                       )}
                       title={collapsed ? item.label : undefined}
                     >
+                      {isActive && (
+                        <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary" />
+                      )}
                       <Icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.label}</span>}
                     </Link>
@@ -126,10 +129,10 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-border p-2">
+      <div className="border-t border-border-subtle p-2">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground/70 transition-colors hover:bg-[oklch(0.175_0.008_260)] hover:text-muted-foreground"
         >
           {collapsed ? (
             <PanelLeft className="h-4 w-4 shrink-0" />
@@ -141,9 +144,12 @@ export function Sidebar() {
           )}
         </button>
         {!collapsed && (
-          <p className="px-2.5 pt-1 text-[10px] text-muted-foreground/50">
-            v1.0.0
-          </p>
+          <div className="flex items-center gap-1.5 px-2.5 pt-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+            <p className="text-[11px] text-muted-foreground/40">
+              v1.0.0
+            </p>
+          </div>
         )}
       </div>
     </aside>

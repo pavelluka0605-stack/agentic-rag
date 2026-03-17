@@ -56,7 +56,7 @@ export default function SolutionDetailPage() {
   const commands = parseJsonField<string[]>(solution.commands)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Back link */}
       <Link
         href="/solutions"
@@ -96,7 +96,7 @@ export default function SolutionDetailPage() {
             <CardTitle className="text-base">Code</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="overflow-x-auto rounded-md bg-muted p-4 text-sm">
+            <pre className="overflow-x-auto rounded-md bg-[oklch(0.125_0.005_260)] p-4 text-sm">
               <code>{solution.code}</code>
             </pre>
           </CardContent>
@@ -113,7 +113,7 @@ export default function SolutionDetailPage() {
             {commands.map((cmd, i) => (
               <div
                 key={i}
-                className="rounded-md bg-muted px-3 py-2 font-mono text-sm"
+                className="rounded-md bg-[oklch(0.125_0.005_260)] px-3 py-2 font-mono text-sm"
               >
                 {cmd}
               </div>
@@ -131,32 +131,32 @@ export default function SolutionDetailPage() {
           <dl className="grid gap-3 sm:grid-cols-2">
             {solution.project && (
               <div>
-                <dt className="text-xs font-medium text-muted-foreground">Project</dt>
+                <dt className="text-[13px] font-medium text-muted-foreground">Project</dt>
                 <dd className="text-sm">{solution.project}</dd>
               </div>
             )}
             {solution.service && (
               <div>
-                <dt className="text-xs font-medium text-muted-foreground">Service</dt>
+                <dt className="text-[13px] font-medium text-muted-foreground">Service</dt>
                 <dd className="text-sm">{solution.service}</dd>
               </div>
             )}
             <div>
-              <dt className="text-xs font-medium text-muted-foreground">Usefulness Score</dt>
+              <dt className="text-[13px] font-medium text-muted-foreground">Usefulness Score</dt>
               <dd className="text-sm">{solution.usefulness_score}</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium text-muted-foreground">Use Count</dt>
+              <dt className="text-[13px] font-medium text-muted-foreground">Use Count</dt>
               <dd className="text-sm">{solution.use_count}</dd>
             </div>
             {solution.verified_at && (
               <div>
-                <dt className="text-xs font-medium text-muted-foreground">Verified At</dt>
+                <dt className="text-[13px] font-medium text-muted-foreground">Verified At</dt>
                 <dd className="text-sm">{formatDate(solution.verified_at)}</dd>
               </div>
             )}
             <div>
-              <dt className="text-xs font-medium text-muted-foreground">Created</dt>
+              <dt className="text-[13px] font-medium text-muted-foreground">Created</dt>
               <dd className="text-sm">{formatDate(solution.created_at)}</dd>
             </div>
           </dl>

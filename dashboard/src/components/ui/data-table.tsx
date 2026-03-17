@@ -27,15 +27,15 @@ export function DataTable<T extends Record<string, unknown>>({
 }: DataTableProps<T>) {
   if (loading) {
     return (
-      <div className={cn('rounded-lg border border-border', className)}>
+      <div className={cn('rounded-xl border border-border', className)}>
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border bg-muted/50">
+            <tr className="border-b border-border bg-[oklch(0.175_0.008_260)]">
               {columns.map((col) => (
                 <th
                   key={col.key}
                   className={cn(
-                    'px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground',
+                    'px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80',
                     col.className
                   )}
                 >
@@ -48,8 +48,8 @@ export function DataTable<T extends Record<string, unknown>>({
             {Array.from({ length: 5 }).map((_, i) => (
               <tr key={i} className="border-b border-border last:border-0">
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3">
-                    <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+                  <td key={col.key} className="px-4 py-2.5">
+                    <div className="h-4 w-3/4 shimmer rounded" />
                   </td>
                 ))}
               </tr>
@@ -64,7 +64,7 @@ export function DataTable<T extends Record<string, unknown>>({
     return (
       <div
         className={cn(
-          'flex items-center justify-center rounded-lg border border-border py-12',
+          'flex items-center justify-center rounded-xl border border-border py-16',
           className
         )}
       >
@@ -76,19 +76,19 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-lg border border-border',
+        'overflow-hidden rounded-xl border border-border',
         className
       )}
     >
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border bg-muted/50">
+            <tr className="border-b border-border bg-[oklch(0.175_0.008_260)]">
               {columns.map((col) => (
                 <th
                   key={col.key}
                   className={cn(
-                    'px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground',
+                    'px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80',
                     col.className
                   )}
                 >
@@ -104,14 +104,15 @@ export function DataTable<T extends Record<string, unknown>>({
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 className={cn(
                   'border-b border-border last:border-0 transition-colors',
+                  i % 2 === 1 && 'bg-[oklch(0.155_0.005_260)]',
                   onRowClick &&
-                    'cursor-pointer hover:bg-muted/50'
+                    'cursor-pointer hover:bg-[oklch(0.195_0.008_260)]'
                 )}
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className={cn('px-4 py-3 text-sm', col.className)}
+                    className={cn('px-4 py-2.5 text-sm', col.className)}
                   >
                     {col.render
                       ? col.render(row[col.key], row)

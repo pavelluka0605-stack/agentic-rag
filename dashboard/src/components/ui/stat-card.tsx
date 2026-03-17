@@ -29,16 +29,16 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-card p-6 shadow-sm',
+        'rounded-xl border border-border bg-card p-6 shadow-sm hover:border-border-strong transition-colors duration-150',
         className
       )}
     >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <p className="text-[13px] font-medium text-muted-foreground">{title}</p>
+        <Icon className="h-4 w-4 text-muted-foreground/70" />
       </div>
       <div className="mt-2 flex items-baseline gap-2">
-        <p className="text-2xl font-bold tracking-tight">{value}</p>
+        <p className="text-3xl font-bold tracking-tighter">{value}</p>
         {TrendIcon && (
           <TrendIcon className={cn('h-4 w-4', trendColor)} />
         )}

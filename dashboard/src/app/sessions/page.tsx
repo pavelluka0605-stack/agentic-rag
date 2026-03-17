@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Loading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import { PageHeader } from '@/components/ui/page-header'
 import { timeAgo, truncate, parseJsonField } from '@/lib/utils'
 import type { Episode } from '@/types'
 
@@ -40,12 +41,10 @@ export default function SessionsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Sessions</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Development session history and open loops
-        </p>
-      </div>
+      <PageHeader
+        title="Sessions"
+        description="Development session history and open loops"
+      />
 
       {!sessions || sessions.length === 0 ? (
         <EmptyState
@@ -54,14 +53,14 @@ export default function SessionsPage() {
           description="Sessions will appear here as you work"
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 animate-fade-in">
           {sessions.map((ep) => {
             const openLoops = parseJsonField<string[]>(ep.open_loops)
             const filesChanged = parseJsonField<string[]>(ep.files_changed)
 
             return (
               <Link key={ep.id} href={`/sessions/${ep.id}`}>
-                <Card className="transition-colors hover:bg-muted/50 cursor-pointer">
+                <Card className="transition-colors hover:bg-[oklch(0.195_0.008_260)] cursor-pointer">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">

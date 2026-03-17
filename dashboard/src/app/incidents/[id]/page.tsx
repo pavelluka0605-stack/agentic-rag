@@ -78,7 +78,7 @@ function CollapsibleSection({
     <Card>
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 p-6 pb-3 text-left"
+        className="flex w-full items-center gap-2 p-6 pb-3 text-left transition-colors hover:bg-[oklch(0.195_0.008_260)] rounded-t-lg"
       >
         {open ? (
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -170,9 +170,10 @@ export default function IncidentDetailPage() {
         </span>
       </div>
 
+      <div className="animate-fade-in space-y-6">
       {/* Error message */}
       <Section title="Error">
-        <pre className="whitespace-pre-wrap rounded-md bg-muted p-4 font-mono text-sm">
+        <pre className="whitespace-pre-wrap rounded-md bg-[oklch(0.125_0.005_260)] p-4 font-mono text-sm">
           {incident.error_message}
         </pre>
       </Section>
@@ -180,7 +181,7 @@ export default function IncidentDetailPage() {
       {/* Stack trace */}
       {incident.stack_trace && (
         <CollapsibleSection title="Stack Trace">
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 font-mono text-xs">
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-[oklch(0.125_0.005_260)] p-4 font-mono text-xs">
             {incident.stack_trace}
           </pre>
         </CollapsibleSection>
@@ -196,7 +197,7 @@ export default function IncidentDetailPage() {
       {/* Failed command */}
       {incident.failed_command && (
         <Section title="Failed Command">
-          <code className="block rounded-md bg-muted p-3 font-mono text-sm">
+          <code className="block rounded-md bg-[oklch(0.125_0.005_260)] p-3 font-mono text-sm">
             {incident.failed_command}
           </code>
         </Section>
@@ -228,7 +229,7 @@ export default function IncidentDetailPage() {
             {failedAttempts.map((attempt, i) => (
               <li
                 key={i}
-                className="rounded-md bg-muted p-3 font-mono text-xs"
+                className="rounded-md bg-[oklch(0.125_0.005_260)] p-3 font-mono text-xs"
               >
                 {typeof attempt === 'string' ? attempt : JSON.stringify(attempt)}
               </li>
@@ -242,7 +243,7 @@ export default function IncidentDetailPage() {
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           {incident.project && (
             <>
-              <dt className="text-muted-foreground">Project</dt>
+              <dt className="text-[13px] text-muted-foreground">Project</dt>
               <dd className="col-span-1 sm:col-span-2">
                 <Badge variant="outline">{incident.project}</Badge>
               </dd>
@@ -250,27 +251,27 @@ export default function IncidentDetailPage() {
           )}
           {incident.service && (
             <>
-              <dt className="text-muted-foreground">Service</dt>
+              <dt className="text-[13px] text-muted-foreground">Service</dt>
               <dd className="col-span-1 sm:col-span-2">
                 <Badge variant="secondary">{incident.service}</Badge>
               </dd>
             </>
           )}
-          <dt className="text-muted-foreground">Occurrences</dt>
+          <dt className="text-[13px] text-muted-foreground">Occurrences</dt>
           <dd className="col-span-1 sm:col-span-2">
             {incident.occurrence_count}
           </dd>
-          <dt className="text-muted-foreground">Created</dt>
+          <dt className="text-[13px] text-muted-foreground">Created</dt>
           <dd className="col-span-1 sm:col-span-2">
             {formatDate(incident.created_at)}
           </dd>
-          <dt className="text-muted-foreground">Updated</dt>
+          <dt className="text-[13px] text-muted-foreground">Updated</dt>
           <dd className="col-span-1 sm:col-span-2">
             {formatDate(incident.updated_at)}
           </dd>
           {incident.fix_verified_at && (
             <>
-              <dt className="text-muted-foreground">Fix verified</dt>
+              <dt className="text-[13px] text-muted-foreground">Fix verified</dt>
               <dd className="col-span-1 sm:col-span-2">
                 {formatDate(incident.fix_verified_at)}
               </dd>
@@ -308,6 +309,7 @@ export default function IncidentDetailPage() {
           </div>
         </Section>
       )}
+      </div>
     </div>
   )
 }

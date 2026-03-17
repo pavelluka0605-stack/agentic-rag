@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Loading } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
+import { PageHeader } from '@/components/ui/page-header'
+import { FilterTabs } from '@/components/ui/filter-tabs'
 
 const PATTERN_TYPES = ['All', 'workflow', 'command', 'pattern', 'playbook', 'snippet', 'config'] as const
 
@@ -46,23 +48,18 @@ export default function SolutionsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Solutions</h1>
-        <Badge variant="success">{verifiedCount} verified</Badge>
-      </div>
+      <PageHeader
+        title="Solutions"
+        badge={<Badge variant="success">{verifiedCount} verified</Badge>}
+      />
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        {PATTERN_TYPES.map((type) => (
-          <Button
-            key={type}
-            variant={patternType === type ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setPatternType(type)}
-          >
-            {type === 'All' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
-          </Button>
-        ))}
+      <div className="flex items-center gap-3">
+        <FilterTabs
+          options={PATTERN_TYPES.map(t => ({ key: t, label: t === 'All' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1) }))}
+          value={patternType}
+          onChange={setPatternType}
+        />
         <div className="ml-auto">
           <Button
             variant={verifiedOnly ? 'default' : 'outline'}
@@ -86,12 +83,12 @@ export default function SolutionsPage() {
           description="Try adjusting your filters or add new solutions."
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 animate-fade-in">
           {solutions.map((solution) => {
             const tags = parseJsonField<string[]>(solution.tags) ?? []
             return (
               <Link key={solution.id} href={`/solutions/${solution.id}`}>
-                <Card className="h-full transition-colors hover:border-primary/40">
+                <Card className="h-full transition-colors hover:border-primary/30 hover:shadow-sm hover:shadow-primary/5">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-base">{solution.title}</CardTitle>

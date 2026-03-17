@@ -3,14 +3,14 @@ import { cn } from '@/lib/utils'
 type Status = 'healthy' | 'degraded' | 'down' | 'unknown' | 'active' | 'fixed' | 'open'
 
 const statusColors: Record<Status, string> = {
-  healthy: 'bg-green-500',
-  active: 'bg-green-500',
-  fixed: 'bg-green-500',
-  degraded: 'bg-yellow-500',
-  warning: 'bg-yellow-500',
-  open: 'bg-yellow-500',
-  down: 'bg-red-500',
-  unknown: 'bg-gray-500',
+  healthy: 'bg-success',
+  active: 'bg-success',
+  fixed: 'bg-success',
+  degraded: 'bg-warning',
+  warning: 'bg-warning',
+  open: 'bg-warning',
+  down: 'bg-destructive',
+  unknown: 'bg-muted-foreground',
 } as Record<string, string> & Record<Status, string>
 
 export function StatusDot({
@@ -20,8 +20,9 @@ export function StatusDot({
   status: Status
   className?: string
 }) {
-  const color = statusColors[status] ?? 'bg-gray-500'
+  const color = statusColors[status] ?? 'bg-muted-foreground'
   const shouldPulse = status === 'active'
+  const isGreen = ['healthy', 'active', 'fixed'].includes(status)
 
   return (
     <span className={cn('relative inline-flex h-2.5 w-2.5', className)}>
@@ -34,7 +35,11 @@ export function StatusDot({
         />
       )}
       <span
-        className={cn('relative inline-flex h-2.5 w-2.5 rounded-full', color)}
+        className={cn(
+          'relative inline-flex h-2.5 w-2.5 rounded-full',
+          color,
+          isGreen && 'shadow-[0_0_6px_oklch(0.685_0.19_155/0.4)]'
+        )}
       />
     </span>
   )
