@@ -44,15 +44,12 @@ get_header();
 
 <div class="breadcrumbs">
     <div class="container">
-        <?php if ( function_exists( 'rank_math_the_breadcrumbs' ) ) : ?>
-            <?php rank_math_the_breadcrumbs(); ?>
-        <?php else : ?>
+        <?php // RankMath breadcrumbs disabled in rankmath-config.php; use custom breadcrumbs. ?>
             <nav class="breadcrumbs__nav" aria-label="Хлебные крошки">
                 <a href="<?php echo esc_url( home_url( '/' ) ); ?>">Главная</a>
                 <span class="breadcrumbs__sep" aria-hidden="true">&rsaquo;</span>
                 <span class="breadcrumbs__current"><?php echo esc_html( get_the_title() ); ?></span>
             </nav>
-        <?php endif; ?>
     </div>
 </div>
 

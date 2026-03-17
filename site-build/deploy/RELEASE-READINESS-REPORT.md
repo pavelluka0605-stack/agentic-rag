@@ -90,6 +90,11 @@
 | P0-003 | **P0** | `page-quiz.php` | Квиз полностью нефункционален: пустой `.quiz__steps` контейнер, неверные классы кнопок (`.quiz__nav-prev` вместо `.quiz__prev`), неверный класс прогресс-бара (`.quiz__progress-bar` вместо `.quiz__progress-fill`). JS не находил элементы — квиз не работал | **FIXED** |
 | P1-012 | **P1** | `design-tokens.css` | CSS custom property `--font-size-xs` использовалась в 4 CSS файлах но не была определена — текст элементов получал `unset` | **FIXED** |
 | P1-013 | **P1** | `nginx-kuhnirema.conf:177-188` | Nginx `add_header` в static files location block перезаписывал server-level security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS) — статические файлы отдавались без security headers | **FIXED** |
+| P0-004 | **P0** | `single-kitchen.php`, `datalayer.js`, `main.js` | `data-kitchen-id` никогда не устанавливался на `<body>` — ecommerce tracking (detail view, add-to-cart) и «Недавно просмотренные» не работали. Добавлен через `wp_body_open` | **FIXED** |
+| P0-005 | **P0** | `seo-schema.php` + `rankmath-config.php` | Дублирующиеся Schema.org Organization + LocalBusiness (тема + RankMath) — Google Search Console конфликт. Тема-схема теперь пропускается при активном RankMath | **FIXED** |
+| P0-006 | **P0** | 5 шаблонов с breadcrumbs | RankMath breadcrumbs отключены в rankmath-config.php, но шаблоны вызывали `rank_math_the_breadcrumbs()` — пустые хлебные крошки. Заменено на custom breadcrumbs | **FIXED** |
+| P1-014 | **P1** | `main.js:259`, `footer.php` | Footer accordion JS искал `.footer__accordion-toggle`, HTML использует `[data-accordion]` на `<h4>` — мобильный аккордион футера не работал | **FIXED** |
+| P1-015 | **P1** | `page-home.php:460` | Форма замера без `data-form-type="zamer"` — leads маршрутизировались на `webhook/quick-lead` вместо `webhook/zamer-lead` | **FIXED** |
 
 ### Оставшиеся (P2 + P3 — не блокируют релиз)
 
@@ -133,7 +138,7 @@
 
 Код статически валиден:
 - 0 PHP syntax errors (35 файлов проверены)
-- 0 P0/P1 дефектов (3 P0 + 13 P1 = 16 дефектов обнаружены и исправлены)
+- 0 P0/P1 дефектов (6 P0 + 15 P1 = 21 дефект обнаружен и исправлен)
 - Security audit пройден
 - Deploy scripts корректны (пути, nginx, SSL, permissions)
 - Оставшиеся дефекты: 5 P2, 7 P3 — не блокируют запуск

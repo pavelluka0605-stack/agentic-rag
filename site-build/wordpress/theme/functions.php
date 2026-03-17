@@ -253,6 +253,30 @@ function kuhni_rema_webp_upload( $mimes ) {
 }
 
 // =============================================================================
+// 8a. Add data-kitchen-id to <body> on single kitchen pages (used by datalayer.js & main.js)
+// =============================================================================
+
+add_filter( 'body_class', 'kuhni_rema_body_attributes' );
+
+function kuhni_rema_body_attributes( $classes ) {
+    if ( is_singular( 'kitchen' ) ) {
+        add_filter( 'language_attributes', 'kuhni_rema_kitchen_body_data' );
+    }
+    return $classes;
+}
+
+/**
+ * Inject data-kitchen-id on <body> via wp_body_open.
+ */
+add_action( 'wp_body_open', 'kuhni_rema_body_open_kitchen_id' );
+
+function kuhni_rema_body_open_kitchen_id() {
+    if ( is_singular( 'kitchen' ) ) {
+        echo '<script>document.body.setAttribute("data-kitchen-id","' . esc_js( get_the_ID() ) . '");</script>' . "\n";
+    }
+}
+
+// =============================================================================
 // 8. Disable unnecessary features for performance
 // =============================================================================
 

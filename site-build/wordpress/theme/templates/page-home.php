@@ -457,7 +457,7 @@ $types = array(
                 Дизайнер приедет, измерит кухню и составит 3D-проект. Это бесплатно и ни к чему не обязывает
             </p>
 
-            <form class="final-cta__form" data-kuhni-form="zamer" novalidate>
+            <form class="final-cta__form" data-kuhni-form="zamer" data-form-type="zamer" novalidate>
                 <div class="form-group">
                     <label for="final-cta-name" class="form-label">Ваше имя</label>
                     <input type="text" id="final-cta-name" name="name" class="form-input" placeholder="Как к вам обращаться?" autocomplete="given-name">
