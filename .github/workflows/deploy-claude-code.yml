@@ -22,6 +22,7 @@ on:
           - restart
           - health
           - smoke-test
+          - live-pilot
           - update-scripts
 
 jobs:
@@ -161,3 +162,20 @@ jobs:
         run: |
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "/opt/claude-code/bin/smoke-test.sh" || true
+
+      - name: Live Pilot Test
+        if: inputs.action == 'live-pilot' || github.event_name == 'push'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "bash /opt/claude-code/bin/live-pilot-test.sh" 2>&1 | tee /tmp/live-pilot-output.txt
+          echo ""
+          echo "=== LIVE PILOT OUTPUT SAVED ==="
+
+      - name: Upload pilot results
+        if: inputs.action == 'live-pilot' || github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-pilot-results
+          path: /tmp/live-pilot-output.txt
+          retention-days: 7
+        continue-on-error: true
