@@ -14,7 +14,7 @@
 | Check | Result | Details |
 |-------|--------|---------|
 | PHP Lint (35 files) | **PASS** | 0 syntax errors |
-| Template Hierarchy | **PASS** | single-kitchen.php, single-project.php, archive-kitchen.php, header-minimal.php — все в корне темы |
+| Template Hierarchy | **PASS** | single-kitchen.php, single-project.php, archive-kitchen.php, header-minimal.php, header.php, footer.php — все в корне темы |
 | Asset File Existence | **PASS** | 13 CSS/JS файлов по путям из functions.php |
 | require_once References | **PASS** | 11 inc/ файлов существуют |
 | Deploy Script Paths | **PASS** | wp-setup.sh и install-wordpress.sh оба используют `/var/www/kuhnirema` |

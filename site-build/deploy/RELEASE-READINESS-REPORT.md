@@ -95,6 +95,7 @@
 | P0-006 | **P0** | 5 шаблонов с breadcrumbs | RankMath breadcrumbs отключены в rankmath-config.php, но шаблоны вызывали `rank_math_the_breadcrumbs()` — пустые хлебные крошки. Заменено на custom breadcrumbs | **FIXED** |
 | P1-014 | **P1** | `main.js:259`, `footer.php` | Footer accordion JS искал `.footer__accordion-toggle`, HTML использует `[data-accordion]` на `<h4>` — мобильный аккордион футера не работал | **FIXED** |
 | P1-015 | **P1** | `page-home.php:460` | Форма замера без `data-form-type="zamer"` — leads маршрутизировались на `webhook/quick-lead` вместо `webhook/zamer-lead` | **FIXED** |
+| P0-007 | **P0** | `templates/header.php`, `templates/footer.php` | WordPress `get_header()` / `get_footer()` ищут файлы в корне темы, не в `templates/`. Все страницы рендерились бы без header/footer. Перемещены в корень темы | **FIXED** |
 
 ### Оставшиеся (P2 + P3 — не блокируют релиз)
 
@@ -138,7 +139,7 @@
 
 Код статически валиден:
 - 0 PHP syntax errors (35 файлов проверены)
-- 0 P0/P1 дефектов (6 P0 + 15 P1 = 21 дефект обнаружен и исправлен)
+- 0 P0/P1 дефектов (7 P0 + 15 P1 = 22 дефекта обнаружено и исправлено)
 - Security audit пройден
 - Deploy scripts корректны (пути, nginx, SSL, permissions)
 - Оставшиеся дефекты: 5 P2, 7 P3 — не блокируют запуск
