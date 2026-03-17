@@ -99,6 +99,18 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ─── PWA Standalone: safe areas for iPhone notch / home indicator ─── */
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  @media all and (display-mode: standalone) {
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+  }
+}
+
 /* ─── Scrollbar (minimal, unobtrusive) ─── */
 
 ::-webkit-scrollbar {
