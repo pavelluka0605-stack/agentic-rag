@@ -8,11 +8,11 @@ Type=simple
 User=root
 WorkingDirectory=/opt/claude-code/dashboard
 Environment=NODE_ENV=production
-Environment=PORT=3100
+Environment=PORT=3200
 Environment=MEMORY_DB_PATH=/opt/claude-code/memory/memory.db
 Environment=CONTROL_API_URL=http://127.0.0.1:3901
 EnvironmentFile=-/opt/claude-code/env/control-api.env
-ExecStart=/usr/bin/node node_modules/.bin/next start --port 3100
+ExecStart=/usr/bin/node node_modules/.bin/next start --port 3200
 Restart=on-failure
 RestartSec=5
 
