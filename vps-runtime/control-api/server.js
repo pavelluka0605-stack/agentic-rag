@@ -371,11 +371,13 @@ async function handleTaskVoice(req, res) {
       input_type: "voice",
       voice_transcript: transcript,
     });
+    taskDb.addTaskEvent(task.id, "created", "Задача создана (голосовой ввод)");
 
     // 3. Auto-interpret
     try {
       const interpretation = await llmCall(INTERPRET_SYSTEM_PROMPT, transcript);
       const updated = taskDb.updateTaskInterpretation(task.id, interpretation);
+      taskDb.addTaskEvent(task.id, "interpreted", `Задача проанализирована. Риск: ${interpretation.risk_level || "?"}`);
       return json(res, 201, updated);
     } catch (llmErr) {
       // Task created but interpretation failed — return draft task
