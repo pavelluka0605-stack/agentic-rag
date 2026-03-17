@@ -1,20 +1,29 @@
 'use client'
 
+import { useState } from 'react'
 import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
+import { CommandPalette } from '@/components/ui/command-palette'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   return (
     <div className="flex h-screen overflow-hidden bg-bg-deep">
-      <Sidebar />
+      <Sidebar mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto bg-bg-surface p-6">
+        <Topbar
+          onSearchClick={() => setCommandPaletteOpen(true)}
+          onMenuClick={() => setMobileMenuOpen(true)}
+        />
+        <main className="flex-1 overflow-y-auto bg-bg-surface p-4 sm:p-6">
           <div className="mx-auto max-w-[1400px] animate-fade-in">
             {children}
           </div>
         </main>
       </div>
+      <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
     </div>
   )
 }
