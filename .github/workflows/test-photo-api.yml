@@ -1,4 +1,4 @@
-name: "VPS Diagnostic — Dashboard & webhook.marbomebel.ru"
+name: "VPS Diagnostic — Dashboard & chat.marbomebel.ru"
 
 on:
   push:
