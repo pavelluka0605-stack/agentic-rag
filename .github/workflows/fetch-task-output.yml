@@ -36,14 +36,14 @@ jobs:
             echo "=== Dashboard Service ==="
             $SSH_CMD "systemctl status dashboard.service --no-pager 2>&1 | head -10" || true
             echo ""
-            echo "=== Port 3100 ==="
-            $SSH_CMD "ss -tlnp | grep 3100 || echo '(not listening)'"
+            echo "=== Port 3200 ==="
+            $SSH_CMD "ss -tlnp | grep 3200 || echo '(not listening)'"
             echo ""
             echo "=== Dashboard HTTP response ==="
-            $SSH_CMD "curl -sI --max-time 5 http://127.0.0.1:3100/ 2>&1 | head -5" || true
+            $SSH_CMD "curl -sI --max-time 5 http://127.0.0.1:3200/ 2>&1 | head -5" || true
             echo ""
             echo "=== Dashboard /tasks page (first 30 chars) ==="
-            $SSH_CMD "curl -s --max-time 5 http://127.0.0.1:3100/tasks 2>&1 | head -c 200" || true
+            $SSH_CMD "curl -s --max-time 5 http://127.0.0.1:3200/tasks 2>&1 | head -c 200" || true
             echo ""
             echo ""
             echo "=== Nginx → dashboard proxy ==="
