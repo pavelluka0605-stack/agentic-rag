@@ -160,9 +160,23 @@ export default function TasksPage() {
         setMediaRecorder(null)
 
         const blob = new Blob(chunks, { type: 'audio/webm' })
-        // Convert to base64
+
+        // Size guard: 10MB max (Whisper accepts 25MB, but base64 doubles size)
+        const MAX_AUDIO_BYTES = 10 * 1024 * 1024
+        if (blob.size > MAX_AUDIO_BYTES) {
+          setError(`Запись слишком длинная (${(blob.size / 1024 / 1024).toFixed(1)} МБ). Максимум 10 МБ — попробуйте короче.`)
+          return
+        }
+
+        // Convert to base64 (chunked to avoid call stack overflow)
         const buffer = await blob.arrayBuffer()
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        const bytes = new Uint8Array(buffer)
+        let binary = ''
+        const chunkSize = 8192
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+        }
+        const base64 = btoa(binary)
 
         setSubmitting(true)
         try {

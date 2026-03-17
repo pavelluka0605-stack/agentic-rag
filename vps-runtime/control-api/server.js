@@ -113,10 +113,19 @@ async function sendTelegram(text) {
 
 // ── Request body parser ──────────────────────────────────────────────────
 
-function parseBody(req) {
+function parseBody(req, maxBytes = 15 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let body = "";
-    req.on("data", (chunk) => { body += chunk; });
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        req.destroy();
+        reject(new Error(`Тело запроса слишком большое (лимит ${Math.round(maxBytes / 1024 / 1024)} МБ)`));
+        return;
+      }
+      body += chunk;
+    });
     req.on("end", () => {
       try {
         resolve(body ? JSON.parse(body) : {});
@@ -338,6 +347,13 @@ async function handleTaskVoice(req, res) {
     const body = await parseBody(req);
     if (!body.audio) return json(res, 400, { error: "audio (base64) is required" });
 
+    // Size guard: base64 decodes to ~75% of its length. Limit 10MB decoded.
+    const estimatedBytes = Math.ceil(body.audio.length * 0.75);
+    const MAX_AUDIO = 10 * 1024 * 1024;
+    if (estimatedBytes > MAX_AUDIO) {
+      return json(res, 413, { error: `Аудио слишком большое (${(estimatedBytes / 1024 / 1024).toFixed(1)} МБ). Максимум 10 МБ.` });
+    }
+
     // 1. Transcribe with Whisper
     const transcript = await whisperTranscribe(body.audio);
     if (!transcript || !transcript.trim()) {
@@ -549,7 +565,59 @@ async function handleTaskStartExec(req, res, id) {
 
   try {
     const body = await parseBody(req);
-    const updated = taskDb.startTaskExecution(id, body.execution_run_id);
+    const updated = taskDb.startTaskExecution(id, body.execution_run_id || `task-${id}`);
+
+    // Dispatch engineering packet to executor via tmux (if available)
+    const packet = task.engineering_packet
+      ? (typeof task.engineering_packet === "string" ? JSON.parse(task.engineering_packet) : task.engineering_packet)
+      : null;
+
+    if (packet) {
+      const taskDir = path.join(LOG_DIR, "..", "workspace");
+      const taskFile = path.join(taskDir, `task-${id}.md`);
+      const prompt = [
+        `# Task #${id}: ${packet.title}`,
+        "",
+        `## Objective`,
+        packet.objective,
+        "",
+        `## Scope`,
+        ...(packet.scope || []).map(s => `- ${s}`),
+        "",
+        `## Steps`,
+        ...(packet.steps || []).map((s, i) => `${i + 1}. ${s}`),
+        "",
+        `## Constraints`,
+        ...(packet.constraints || []).map(c => `- ${c}`),
+        "",
+        `## Acceptance Criteria`,
+        ...(packet.acceptance_criteria || []).map(c => `- ${c}`),
+        "",
+        `## Mode: ${packet.mode || "safe"}`,
+        "",
+        `---`,
+        `Report progress via: POST /api/tasks/${id}/progress { "message_ru": "...", "pct": N }`,
+        `Complete via: POST /api/tasks/${id}/complete { "result_summary_ru": "...", "result_detail": "..." }`,
+        `Fail via: POST /api/tasks/${id}/fail { "error": "..." }`,
+      ].join("\n");
+
+      try {
+        fs.mkdirSync(taskDir, { recursive: true });
+        fs.writeFileSync(taskFile, prompt, "utf-8");
+
+        // Try to send to tmux workspace window
+        const session = process.env.CLAUDE_TMUX_SESSION || "claude-code";
+        const tmuxUp = run(`tmux has-session -t "${session}" 2>/dev/null && echo yes`) === "yes";
+        if (tmuxUp) {
+          // Send the task file path as a prompt to Claude Code
+          run(`tmux send-keys -t "${session}:workspace" "cat ${taskFile}" Enter`);
+        }
+      } catch (dispatchErr) {
+        console.warn("[task-exec] Dispatch failed (non-fatal):", dispatchErr.message);
+        // Non-fatal: task is already 'running', external executor can still pick it up
+      }
+    }
+
     json(res, 200, updated);
   } catch (e) {
     json(res, 500, { error: e.message });
