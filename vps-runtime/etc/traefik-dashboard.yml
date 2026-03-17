@@ -1,0 +1,21 @@
+## Traefik dynamic config — Task Dashboard
+## Deployed to /opt/n8n-traefik/dynamic/dashboard.yml
+## Traefik auto-reloads (file.watch=true)
+
+http:
+  routers:
+    dashboard-app:
+      rule: "Host(`webhook.marbomebel.ru`)"
+      entryPoints:
+        - websecure
+      service: dashboard-app
+      tls:
+        certResolver: mytlschallenge
+      # Lower priority so /webhook/* and /api/* routes from other configs win
+      priority: 10
+
+  services:
+    dashboard-app:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3200"
