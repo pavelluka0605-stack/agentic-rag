@@ -124,8 +124,10 @@ jobs:
           $SSH_CMD "cd /opt/claude-code/dashboard && npm run build 2>&1 | tail -10"
           # Enable dashboard service
           $SSH_CMD "systemctl enable dashboard.service 2>/dev/null || true"
-          # Copy nginx config and reload
+          # Copy nginx config and reload (may be inactive if Traefik handles 80/443)
           $SSH_CMD "cp /opt/claude-code/etc/nginx-webhook.conf /etc/nginx/sites-available/webhook 2>/dev/null && nginx -t 2>&1 && systemctl reload nginx 2>/dev/null || true"
+          # Deploy Traefik dynamic config for dashboard (auto-reloaded by Traefik)
+          $SCP_CMD vps-runtime/etc/traefik-dashboard.yml $VPS:/opt/n8n-traefik/dynamic/dashboard.yml
 
           echo "✓ Scripts, configs, systemd units, memory server, control API, and dashboard deployed"
 

@@ -18,4 +18,4 @@ http:
     dashboard-app:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:3200"
+          - url: "http://172.17.0.1:3200"
