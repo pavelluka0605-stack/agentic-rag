@@ -27,12 +27,12 @@ export function timeAgo(dateStr: string | null): string {
   const then = new Date(dateStr).getTime()
   const diff = now - then
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 1) return 'только что'
+  if (mins < 60) return `${mins} мин назад`
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
+  if (hours < 24) return `${hours} ч назад`
   const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}d ago`
+  if (days < 30) return `${days} дн назад`
   return formatDate(dateStr)
 }
 

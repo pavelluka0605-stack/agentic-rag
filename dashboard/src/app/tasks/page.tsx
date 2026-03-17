@@ -61,6 +61,22 @@ const riskColors: Record<string, string> = {
   high: 'text-destructive',
 }
 
+const eventTypeLabels: Record<string, string> = {
+  created: 'Создана',
+  interpreted: 'Разобрана',
+  revised: 'Уточнена',
+  confirmed: 'Подтверждена',
+  started: 'Запущена',
+  progress: 'Прогресс',
+  review: 'На проверке',
+  completed: 'Выполнена',
+  failed: 'Ошибка',
+  cancelled: 'Отменена',
+  'request-review': 'Ручная проверка',
+  escalated: 'Эскалирована',
+  retried: 'Повтор',
+}
+
 // ── Main Component ──────────────────────────────────────────────
 
 export default function TasksPage() {
@@ -481,7 +497,7 @@ function TaskCard({
 
           {/* Review state — approve / reject / escalate */}
           {task.status === 'review' && (
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 space-y-3 pb-4 sm:pb-0" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
               <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
                 <h4 className="text-sm font-medium text-warning flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -489,11 +505,11 @@ function TaskCard({
                 </h4>
                 {task.error && <p className="mt-2 text-sm text-muted-foreground break-words">{task.error}</p>}
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
                 <Button
                   onClick={() => onAction(task.id, 'complete', { result_summary_ru: 'Проверка пройдена' })}
                   loading={isLoading('complete')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   Принять
@@ -502,7 +518,7 @@ function TaskCard({
                   variant="outline"
                   onClick={() => onAction(task.id, 'request-review', { reason: 'Требуется ручная проверка' })}
                   loading={isLoading('request-review')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Ручная проверка
@@ -511,7 +527,7 @@ function TaskCard({
                   variant="ghost"
                   onClick={() => onAction(task.id, 'fail', { error: 'Отклонено при проверке' })}
                   loading={isLoading('fail')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <XCircle className="h-4 w-4" />
                   Отклонить
@@ -522,7 +538,7 @@ function TaskCard({
 
           {/* Needs manual review — show reason and resolution buttons */}
           {task.status === 'needs_manual_review' && (
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 space-y-3 pb-4 sm:pb-0" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
                 <h4 className="text-sm font-medium text-destructive flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -530,11 +546,11 @@ function TaskCard({
                 </h4>
                 {task.error && <p className="mt-2 text-sm break-words">{task.error}</p>}
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
                 <Button
                   onClick={() => onAction(task.id, 'complete', { result_summary_ru: 'Решено вручную' })}
                   loading={isLoading('complete')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   Решено — принять
@@ -543,7 +559,7 @@ function TaskCard({
                   variant="ghost"
                   onClick={() => onAction(task.id, 'fail', { error: 'Не удалось решить' })}
                   loading={isLoading('fail')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <XCircle className="h-4 w-4" />
                   Не решено
@@ -563,7 +579,7 @@ function TaskCard({
                 {events.map((evt) => (
                   <div key={evt.id} className="flex items-start gap-2 text-xs">
                     <span className="text-muted-foreground/60 whitespace-nowrap shrink-0">{timeAgo(evt.created_at)}</span>
-                    <Badge variant="secondary" className="text-[10px] shrink-0">{evt.event_type}</Badge>
+                    <Badge variant="secondary" className="text-[10px] shrink-0">{eventTypeLabels[evt.event_type] || evt.event_type}</Badge>
                     {evt.detail && <span className="text-muted-foreground break-words min-w-0">{evt.detail}</span>}
                   </div>
                 ))}
@@ -573,7 +589,7 @@ function TaskCard({
 
           {/* Actions for pending tasks */}
           {task.status === 'pending' && (
-            <div className="mt-5 space-y-4">
+            <div className="mt-5 space-y-4 pb-4 sm:pb-0" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
               {/* Revision input */}
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
@@ -602,11 +618,11 @@ function TaskCard({
               </div>
 
               {/* Confirm / Cancel / Mode */}
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
                 <Button
                   onClick={() => onAction(task.id, 'confirm', { mode: 'safe' })}
                   loading={isLoading('confirm')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <Shield className="h-4 w-4" />
                   Подтвердить
@@ -615,7 +631,7 @@ function TaskCard({
                   variant="outline"
                   onClick={() => onAction(task.id, 'confirm', { mode: 'fast' })}
                   loading={isLoading('confirm')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <Zap className="h-4 w-4" />
                   Быстрый режим
@@ -624,7 +640,7 @@ function TaskCard({
                   variant="ghost"
                   onClick={() => onAction(task.id, 'cancel')}
                   loading={isLoading('cancel')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <XCircle className="h-4 w-4" />
                   Отменить
@@ -635,7 +651,7 @@ function TaskCard({
 
           {/* Confirmed — engineering packet + Execute button */}
           {task.status === 'confirmed' && engPacket && (
-            <div className="mt-5 space-y-4">
+            <div className="mt-5 space-y-4 pb-4 sm:pb-0" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
               <div className="rounded-lg border border-info/30 bg-info/5 p-3 sm:p-4 space-y-3">
                 <h4 className="text-sm font-medium text-info flex items-center gap-2">
                   <ListTodo className="h-4 w-4 shrink-0" />
@@ -662,11 +678,11 @@ function TaskCard({
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
+              <div className="grid grid-cols-1 gap-2.5 sm:flex sm:items-center">
                 <Button
                   onClick={() => onAction(task.id, 'start')}
                   loading={isLoading('start')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <Play className="h-4 w-4" />
                   Запустить
@@ -675,7 +691,7 @@ function TaskCard({
                   variant="ghost"
                   onClick={() => onAction(task.id, 'cancel')}
                   loading={isLoading('cancel')}
-                  className="w-full sm:w-auto"
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
                 >
                   <XCircle className="h-4 w-4" />
                   Отменить
@@ -686,17 +702,18 @@ function TaskCard({
 
           {/* Draft — waiting for interpretation or failed */}
           {task.status === 'draft' && (
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 space-y-3 pb-4 sm:pb-0" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin shrink-0" />
                 Анализируем задачу...
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onAction(task.id, 'interpret')}
                   loading={isLoading('interpret')}
+                  className="min-h-[44px] sm:min-h-0"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   Повторить
@@ -706,6 +723,7 @@ function TaskCard({
                   size="sm"
                   onClick={() => onAction(task.id, 'cancel')}
                   loading={isLoading('cancel')}
+                  className="min-h-[44px] sm:min-h-0"
                 >
                   <XCircle className="h-3.5 w-3.5" />
                   Отменить
