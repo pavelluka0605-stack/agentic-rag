@@ -46,21 +46,91 @@ get_header( 'minimal' );
             <p class="quiz-page__subtitle">Ответьте на 4 вопроса — мы подберём решение и назовём точную цену</p>
         </div>
 
-        <!-- Quiz Container (rendered by quiz.js) -->
+        <!-- Quiz Container -->
         <div class="quiz" id="quiz">
 
             <!-- Progress Bar -->
             <div class="quiz__progress">
-                <div class="quiz__progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                <div class="quiz__progress-fill" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div class="quiz__progress-text">Шаг 1 из 4</div>
+
+            <!-- Step 1: Layout Type -->
+            <div class="quiz__step" data-step="1">
+                <h2 class="quiz__step-title">Какая планировка вам нужна?</h2>
+                <div class="quiz__options" role="radiogroup" aria-label="Тип планировки">
+                    <div class="quiz__option">
+                        <input type="radio" name="quiz_layout" value="straight" id="layout-straight" class="quiz__radio">
+                        <label for="layout-straight" class="quiz__option-label">Прямая</label>
+                    </div>
+                    <div class="quiz__option">
+                        <input type="radio" name="quiz_layout" value="corner" id="layout-corner" class="quiz__radio">
+                        <label for="layout-corner" class="quiz__option-label">Угловая</label>
+                    </div>
+                    <div class="quiz__option">
+                        <input type="radio" name="quiz_layout" value="u-shaped" id="layout-u" class="quiz__radio">
+                        <label for="layout-u" class="quiz__option-label">П-образная</label>
+                    </div>
+                </div>
             </div>
 
-            <!-- Steps Container -->
-            <div class="quiz__steps"></div>
+            <!-- Step 2: Dimensions -->
+            <div class="quiz__step" data-step="2">
+                <h2 class="quiz__step-title">Укажите размеры кухни</h2>
+                <div class="quiz__fields">
+                    <div class="quiz__field">
+                        <label for="quiz-width" class="quiz__field-label">Длина стены (м) *</label>
+                        <input type="number" name="quiz_width" id="quiz-width" class="quiz__input" min="1" max="10" step="0.1" placeholder="3.2">
+                    </div>
+                    <div class="quiz__field">
+                        <label for="quiz-depth" class="quiz__field-label">Глубина (м)</label>
+                        <input type="number" name="quiz_depth" id="quiz-depth" class="quiz__input" min="0.3" max="3" step="0.1" placeholder="0.6">
+                    </div>
+                    <div class="quiz__field">
+                        <label for="quiz-height" class="quiz__field-label">Высота до потолка (м)</label>
+                        <input type="number" name="quiz_height" id="quiz-height" class="quiz__input" min="2" max="4" step="0.1" placeholder="2.7">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Contact Method -->
+            <div class="quiz__step" data-step="3">
+                <h2 class="quiz__step-title">Как вам удобнее получить расчёт?</h2>
+                <div class="quiz__options" role="radiogroup" aria-label="Способ связи">
+                    <div class="quiz__option">
+                        <input type="radio" name="quiz_contact_method" value="phone" id="contact-phone" class="quiz__radio">
+                        <label for="contact-phone" class="quiz__option-label">Телефон</label>
+                    </div>
+                    <div class="quiz__option">
+                        <input type="radio" name="quiz_contact_method" value="whatsapp" id="contact-whatsapp" class="quiz__radio">
+                        <label for="contact-whatsapp" class="quiz__option-label">WhatsApp</label>
+                    </div>
+                    <div class="quiz__option">
+                        <input type="radio" name="quiz_contact_method" value="telegram" id="contact-telegram" class="quiz__radio">
+                        <label for="contact-telegram" class="quiz__option-label">Telegram</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Contact Details -->
+            <div class="quiz__step" data-step="4">
+                <h2 class="quiz__step-title">Оставьте контакты для расчёта</h2>
+                <div class="quiz__fields">
+                    <div class="quiz__field">
+                        <label for="quiz-name" class="quiz__field-label">Ваше имя</label>
+                        <input type="text" name="quiz_name" id="quiz-name" class="quiz__input" placeholder="Иван">
+                    </div>
+                    <div class="quiz__field">
+                        <label for="quiz-phone" class="quiz__field-label">Телефон *</label>
+                        <input type="tel" name="quiz_phone" id="quiz-phone" class="quiz__input" placeholder="+7 (___) ___-__-__">
+                    </div>
+                </div>
+            </div>
 
             <!-- Navigation -->
             <div class="quiz__nav">
-                <button class="btn btn--outline quiz__nav-prev" type="button" disabled>Назад</button>
-                <button class="btn btn--primary quiz__nav-next" type="button">Далее</button>
+                <button class="btn btn--outline quiz__prev" type="button">Назад</button>
+                <button class="btn btn--primary quiz__next" type="button">Далее</button>
             </div>
 
         </div><!-- .quiz -->

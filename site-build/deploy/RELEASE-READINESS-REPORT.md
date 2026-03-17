@@ -13,7 +13,7 @@
 
 | Метрика | Результат |
 |---------|-----------|
-| Файлов проверено | 36 |
+| Файлов проверено | 35 |
 | Синтаксических ошибок | 0 |
 | **Статус** | **PASS** |
 
@@ -51,6 +51,8 @@
 | console.log | 0 — нет debug statements |
 | ES5 совместимость | main.js имел `let` (P1, исправлен) |
 | quiz-popup.js fallback colors | Не совпадали с design tokens (P1, исправлены) |
+| CSS `--font-size-xs` | Использовался в 4 файлах, не был определён (P1, исправлен) |
+| Quiz page-quiz.php | Пустой контейнер `.quiz__steps`, неверные селекторы — квиз не работал (P0, исправлен) |
 | **Статус** | **PASS (после исправлений)** |
 
 ### 1.5. Deploy Scripts
@@ -61,6 +63,7 @@
 | wp-setup.sh | Путь был `/var/www/kuhni-rema` вместо `/var/www/kuhnirema` (P0, исправлен) |
 | smoke-test.sh | Redirect тесты предполагали mebelit.site → main domain (P1, исправлен) |
 | nginx-kuhnirema.conf | Полный: SSL, gzip, security headers, rate limiting, HSTS |
+| nginx static location | `add_header` в location блоке перезаписывал server-level security headers (P1, исправлен) |
 | **Статус** | **PASS (после исправлений)** |
 
 ---
@@ -84,6 +87,9 @@
 | P1-009 | **P1** | `seo-schema.php:278-279` | `kitchen_facade_material` и `kitchen_type` читались как ACF поля, но это таксономии. Schema.org Product material/category были пустыми. Исправлено на `wp_get_post_terms()` | **FIXED** |
 | P1-010 | **P1** | `rankmath-config.php:304` | Неверное имя поля `contacts_phone` вместо `global_phone_main`. Телефон в RankMath Organization schema был пустым | **FIXED** |
 | P1-011 | **P1** | `page-faq.php:28` | Неверное имя поля `social_whatsapp_phone` вместо `global_whatsapp`. WhatsApp CTA на FAQ не работал | **FIXED** |
+| P0-003 | **P0** | `page-quiz.php` | Квиз полностью нефункционален: пустой `.quiz__steps` контейнер, неверные классы кнопок (`.quiz__nav-prev` вместо `.quiz__prev`), неверный класс прогресс-бара (`.quiz__progress-bar` вместо `.quiz__progress-fill`). JS не находил элементы — квиз не работал | **FIXED** |
+| P1-012 | **P1** | `design-tokens.css` | CSS custom property `--font-size-xs` использовалась в 4 CSS файлах но не была определена — текст элементов получал `unset` | **FIXED** |
+| P1-013 | **P1** | `nginx-kuhnirema.conf:177-188` | Nginx `add_header` в static files location block перезаписывал server-level security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS) — статические файлы отдавались без security headers | **FIXED** |
 
 ### Оставшиеся (P2 + P3 — не блокируют релиз)
 
@@ -91,6 +97,9 @@
 |----|----------|------|----------|
 | P2-001 | P2 | `helpers.php:37-43` | ACF price field echoed без explicit esc_html() — риск минимален (number_format на numeric field) |
 | P2-002 | P2 | `seo-meta.php`, `rankmath-config.php` | `yandex_verification`, `google_verification`, `og_default_image` не зарегистрированы в ACF — работают через wp_options fallback |
+| P2-003 | P2 | `quiz-popup.js` | `SUBMITTED_KEY` ('kuhni_form_submitted') проверяется в sessionStorage, но forms.js не устанавливает его после успешной отправки — повторная защита не работает |
+| P2-004 | P2 | `analytics.js` | Селектор `.catalog-filter` не совпадает с `.catalog-filters` в catalog.css — трекинг фильтров не сработает |
+| P2-005 | P2 | Несколько CSS файлов | Hardcoded rgba() цвета (rgba(194,97,58,...)) вместо calc от var(--color-primary) — при смене палитры потребуется ручная замена |
 | P3-001 | P3 | 10 template files | Отсутствует `defined('ABSPATH') \|\| exit` guard — неэксплуатируемо, т.к. шаблоны вызывают get_header() |
 | P3-002 | P3 | `helpers.php:193` | `aria-label` без esc_attr() — intval() уже санитизирует |
 | P3-003 | P3 | `admin-roles.php:101-107` | admin_url() без esc_url() — admin-only context |
@@ -123,10 +132,11 @@
 **Условный ДА** — при выполнении обязательных условий ниже.
 
 Код статически валиден:
-- 0 PHP syntax errors
-- 0 P0/P1 дефектов (все исправлены)
+- 0 PHP syntax errors (35 файлов проверены)
+- 0 P0/P1 дефектов (3 P0 + 13 P1 = 16 дефектов обнаружены и исправлены)
 - Security audit пройден
 - Deploy scripts корректны (пути, nginx, SSL, permissions)
+- Оставшиеся дефекты: 5 P2, 7 P3 — не блокируют запуск
 
 ### Обязательные условия перед production
 
