@@ -1,15 +1,15 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Tue Mar 17 12:50:50 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Tue Mar 17 13:53:49 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
 ● dashboard.service - Claude Code Task Dashboard (Next.js)
      Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
-     Active: active (running) since Tue 2026-03-17 12:50:38 UTC; 11s ago
+     Active: active (running) since Tue 2026-03-17 12:50:38 UTC; 1h 3min ago
    Main PID: 1144555 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 74.3M (max: 256.0M available: 181.6M peak: 78.0M)
-        CPU: 1.494s
+     Memory: 76.3M (max: 256.0M available: 179.6M peak: 78.0M)
+        CPU: 1.661s
      CGroup: /system.slice/dashboard.service
              └─1144555 "next-server (v16.1.6)"
 
@@ -23,11 +23,11 @@ Mar 17 12:50:39 fra-1-vm-ckr7 node[1144555]: ✓ Ready in 835ms
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Tue 2026-03-17 12:50:32 UTC; 18s ago
+     Active: active (running) since Tue 2026-03-17 12:50:32 UTC; 1h 3min ago
    Main PID: 1144384 (node)
       Tasks: 11 (limit: 32)
-     Memory: 8.7M (max: 128.0M available: 119.2M peak: 11.2M)
-        CPU: 161ms
+     Memory: 23.5M (max: 128.0M available: 104.4M peak: 43.6M)
+        CPU: 595ms
      CGroup: /system.slice/control-api.service
              └─1144384 /usr/bin/node server.js
 
@@ -131,7 +131,7 @@ Cache-Control: s-maxage=31536000
 ETag: "o6fj4nkp0k4sf"
 Content-Type: text/html; charset=utf-8
 Content-Length: 6207
-Date: Tue, 17 Mar 2026 12:50:50 GMT
+Date: Tue, 17 Mar 2026 13:53:49 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -141,13 +141,13 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-17T12:50:50.657Z"
+  "timestamp": "2026-03-17T13:53:49.950Z"
 }
 === 11. curl https://chat.marbomebel.ru/ ===
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Tue, 17 Mar 2026 12:50:50 GMT
+date: Tue, 17 Mar 2026 13:53:50 GMT
 etag: "o6fj4nkp0k4sf"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
@@ -242,7 +242,7 @@ openclaw                 Up 13 days (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Tue, 17 Mar 2026 12:50:51 GMT
+date: Tue, 17 Mar 2026 13:53:50 GMT
 etag: "o6fj4nkp0k4sf"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
@@ -271,6 +271,23 @@ x-nextjs-prerender: 1
     "next": "^16.1.6",
     "postcss": "^8.5.8",
     "react": "^19.2.4",
+
+=== 19. DNS resolution for chat.marbomebel.ru ===
+--- from VPS (dig) ---
+72.56.127.126
+--- from VPS (getent) ---
+72.56.127.126   chat.marbomebel.ru
+--- from external DNS (Google 8.8.8.8) ---
+72.56.127.126
+--- from external DNS (Cloudflare 1.1.1.1) ---
+72.56.127.126
+--- n8n.marbomebel.ru for comparison ---
+72.56.127.126
+--- /etc/hosts entries for marbomebel ---
+(no entries in /etc/hosts)
+--- VPS public IP ---
+72.56.127.126
+=== 20. Traefik container logs (last 20, chat.marbomebel) ===
 
 ========================================
 === DIAGNOSTIC COMPLETE ===
