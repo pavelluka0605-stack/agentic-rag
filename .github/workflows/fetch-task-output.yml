@@ -55,23 +55,20 @@ jobs:
             echo "=== Nginx → dashboard proxy (HTTP, port 80) ==="
             $SSH_CMD "curl -sI --max-time 5 -H 'Host: webhook.marbomebel.ru' http://127.0.0.1:80/ 2>&1 | head -5" || true
             echo ""
-            echo "=== Existing Traefik dynamic configs ==="
+            echo "=== Traefik dynamic configs ==="
             $SSH_CMD "ls -la /opt/n8n-traefik/dynamic/ 2>/dev/null" || true
             echo ""
-            echo "=== Existing dynamic config content ==="
-            $SSH_CMD "cat /opt/n8n-traefik/dynamic/*.yml 2>/dev/null || cat /opt/n8n-traefik/dynamic/*.yaml 2>/dev/null || echo '(no yaml files)'" || true
+            echo "=== dashboard.yml in Traefik ==="
+            $SSH_CMD "cat /opt/n8n-traefik/dynamic/dashboard.yml 2>/dev/null || echo '(not deployed yet)'" || true
             echo ""
-            echo "=== Traefik compose.yaml ==="
-            $SSH_CMD "cat /opt/n8n-traefik/compose.yaml 2>/dev/null" || true
+            echo "=== Traefik dashboard router check ==="
+            $SSH_CMD "docker exec n8n-traefik-traefik-1 wget -qO- http://localhost:8080/api/http/routers 2>/dev/null | python3 -c 'import sys,json; [print(r[\"name\"],r[\"rule\"],r[\"status\"]) for r in json.load(sys.stdin) if \"dashboard\" in r.get(\"name\",\"\")]' 2>/dev/null || echo '(no dashboard router)'" || true
             echo ""
-            echo "=== Host gateway / extra_hosts check ==="
-            $SSH_CMD "docker inspect n8n-traefik-traefik-1 --format '{{json .HostConfig.ExtraHosts}}' 2>/dev/null" || true
+            echo "=== HTTPS test: webhook.marbomebel.ru ==="
+            $SSH_CMD "curl -skI --max-time 10 --connect-to webhook.marbomebel.ru:443:127.0.0.1:443 https://webhook.marbomebel.ru/ 2>&1 | head -10" || true
             echo ""
-            echo "=== VPS host IP (for Traefik routing) ==="
-            $SSH_CMD "ip route get 1 2>/dev/null | awk '{print \$7; exit}'" || true
-            echo ""
-            echo "=== Direct dashboard /tasks via port 3200 ==="
-            $SSH_CMD "curl -s --max-time 5 http://127.0.0.1:3200/tasks 2>&1 | head -c 300" || true
+            echo "=== HTTPS test: webhook.marbomebel.ru/tasks ==="
+            $SSH_CMD "curl -sk --max-time 10 --connect-to webhook.marbomebel.ru:443:127.0.0.1:443 https://webhook.marbomebel.ru/tasks 2>&1 | head -c 300" || true
           } > real-task-output.txt
           cat real-task-output.txt
 
