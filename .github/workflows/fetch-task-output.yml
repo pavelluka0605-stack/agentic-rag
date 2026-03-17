@@ -1,0 +1,47 @@
+name: "Fetch Real Task Output"
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/*"
+    paths:
+      - ".github/workflows/fetch-task-output.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Fetch output from VPS
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          $SSH_CMD "cat /opt/claude-code/logs/real-task-output.txt 2>/dev/null" > real-task-output.txt || echo "(no output)" > real-task-output.txt
+          echo "=== Output size: $(wc -c < real-task-output.txt) bytes ==="
+          cat real-task-output.txt
+
+      - name: Commit output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f real-task-output.txt
+          git diff --cached --quiet && echo "No changes" || {
+            git commit -m "ops: real task output from VPS [skip ci]"
+            git push origin main
+          }
