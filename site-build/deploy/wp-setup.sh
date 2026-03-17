@@ -4,7 +4,7 @@
 #
 # Run AFTER WordPress is installed and kuhni-rema theme is activated.
 # Requires: wp-cli, active WordPress installation.
-# Usage: bash wp-setup.sh [--path=/var/www/kuhni-rema]
+# Usage: bash wp-setup.sh [--path=/var/www/kuhnirema]
 #
 # Idempotent: safe to run multiple times.
 # =============================================================================
