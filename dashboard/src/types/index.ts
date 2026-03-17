@@ -164,14 +164,41 @@ export type MemoryType = 'policies' | 'episodes' | 'incidents' | 'solutions' | '
 export type TaskStatus = 'draft' | 'pending' | 'confirmed' | 'running' | 'review' | 'needs_manual_review' | 'done' | 'failed' | 'cancelled'
 export type TaskMode = 'fast' | 'safe'
 
+export interface TaskOption {
+  id: string
+  title: string
+  description: string
+  pros: string[]
+  cons: string[]
+  effort: 'low' | 'medium' | 'high'
+  speed: 'fast' | 'medium' | 'slow'
+  risk: 'low' | 'medium' | 'high'
+  recommended: boolean
+  recommendation_reason?: string
+}
+
 export interface TaskInterpretation {
   understood: string
   expected_outcome: string
   affected_areas: string[]
   constraints: string[]
-  plan: string[]
+  plan?: string[]
+  options?: TaskOption[]
   risk_level: 'low' | 'medium' | 'high'
   risk_note: string
+}
+
+export interface TaskPhaseStep {
+  text_ru: string
+  status: 'pending' | 'active' | 'done' | 'blocked'
+  ts: string | null
+}
+
+export interface TaskPhase {
+  id: string
+  name_ru: string
+  status: 'pending' | 'active' | 'done' | 'blocked'
+  steps: TaskPhaseStep[]
 }
 
 export interface TaskEngineeringPacket {
@@ -181,6 +208,8 @@ export interface TaskEngineeringPacket {
   steps: string[]
   constraints: string[]
   acceptance_criteria: string[]
+  not_doing?: string[]
+  phases?: Array<{ id: string; name_ru: string; steps_ru: string[] }>
   mode: TaskMode
 }
 
@@ -202,10 +231,12 @@ export interface Task {
   input_type: 'text' | 'voice'
   voice_transcript: string | null
   interpretation: string | null       // JSON string of TaskInterpretation
+  chosen_option: string | null        // JSON string of TaskOption
   status: TaskStatus
   mode: TaskMode
   revisions: string | null            // JSON string of TaskRevision[]
   engineering_packet: string | null   // JSON string of TaskEngineeringPacket
+  execution_phases: string | null     // JSON string of TaskPhase[]
   execution_run_id: string | null
   progress: string | null             // JSON string of TaskProgress[]
   result_summary_ru: string | null

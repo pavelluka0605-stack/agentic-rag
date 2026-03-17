@@ -26,6 +26,7 @@ export class MemoryDB {
       this.db.exec(sql);
     }
     this._expandTaskStatuses();
+    this._addTaskColumns();
   }
 
   // Expand task status CHECK constraint to include review states
@@ -93,6 +94,22 @@ export class MemoryDB {
         console.log("[db] Expanded task statuses to include review states");
       } catch (e) {
         console.warn("[db] Task status expansion failed (may already be done):", e.message);
+      }
+    }
+  }
+
+  // Migration 004: add chosen_option + execution_phases columns
+  _addTaskColumns() {
+    const newCols = [
+      ["chosen_option", "TEXT"],       // JSON: selected solution option
+      ["execution_phases", "TEXT"],     // JSON: phase/step tracking for live view
+    ];
+    for (const [col, type] of newCols) {
+      try {
+        this.db.exec(`ALTER TABLE tasks ADD COLUMN ${col} ${type}`);
+        console.log(`[db] Added column tasks.${col}`);
+      } catch {
+        // Column already exists — safe to ignore
       }
     }
   }
@@ -516,6 +533,22 @@ export class MemoryDB {
       UPDATE tasks SET revisions = ?, raw_input = ?, status = 'draft', updated_at = datetime('now')
       WHERE id = ?
     `).run(JSON.stringify(revisions), updatedInput, id);
+    return this.getTask(id);
+  }
+
+  chooseOption(id, option) {
+    this.db.prepare(`
+      UPDATE tasks SET chosen_option = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(typeof option === "object" ? JSON.stringify(option) : option, id);
+    return this.getTask(id);
+  }
+
+  setExecutionPhases(id, phases) {
+    this.db.prepare(`
+      UPDATE tasks SET execution_phases = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(typeof phases === "object" ? JSON.stringify(phases) : phases, id);
     return this.getTask(id);
   }
 
