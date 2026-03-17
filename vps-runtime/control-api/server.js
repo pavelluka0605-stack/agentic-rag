@@ -377,7 +377,7 @@ async function handleTaskVoice(req, res) {
     try {
       const interpretation = await llmCall(INTERPRET_SYSTEM_PROMPT, transcript);
       const updated = taskDb.updateTaskInterpretation(task.id, interpretation);
-      taskDb.addTaskEvent(task.id, "interpreted", `Задача проанализирована. Риск: ${interpretation.risk_level || "?"}`);
+      taskDb.addTaskEvent(task.id, "interpreted", `Задача проанализирована. Риск: ${{ low: "низкий", medium: "средний", high: "высокий" }[interpretation.risk_level] || "?"}`);
       return json(res, 201, updated);
     } catch (llmErr) {
       // Task created but interpretation failed — return draft task
@@ -417,7 +417,7 @@ async function handleTaskInterpret(req, res, id) {
     // Single LLM call for interpretation
     const interpretation = await llmCall(INTERPRET_SYSTEM_PROMPT, task.raw_input);
     const updated = taskDb.updateTaskInterpretation(id, interpretation);
-    taskDb.addTaskEvent(id, "interpreted", `Задача проанализирована. Риск: ${interpretation.risk_level || "?"}`);
+    taskDb.addTaskEvent(id, "interpreted", `Задача проанализирована. Риск: ${{ low: "низкий", medium: "средний", high: "высокий" }[interpretation.risk_level] || "?"}`);
     json(res, 200, updated);
   } catch (e) {
     json(res, 500, { error: `Interpretation failed: ${e.message}` });
@@ -466,11 +466,12 @@ async function handleTaskConfirm(req, res, id) {
 
     // Notify Telegram
     const interp = typeof task.interpretation === "string" ? JSON.parse(task.interpretation) : task.interpretation;
+    const riskRu = { low: "низкий", medium: "средний", high: "высокий" }[interp?.risk_level] || "?";
     await sendTelegram(
       `<b>Задача подтверждена</b>\n\n` +
       `<b>Задача:</b> ${interp?.understood || task.raw_input.slice(0, 200)}\n` +
       `<b>Режим:</b> ${mode === "fast" ? "Быстрый" : "Безопасный"}\n` +
-      `<b>Риск:</b> ${interp?.risk_level || "?"}`
+      `<b>Риск:</b> ${riskRu}`
     );
 
     json(res, 200, updated);
@@ -527,16 +528,51 @@ async function handleTaskComplete(req, res, id) {
 
   try {
     const body = await parseBody(req);
+
+    // Build a meaningful result summary, even if caller didn't provide one
+    let summaryRu = body.result_summary_ru;
+    if (!summaryRu) {
+      // Try LLM-generated summary from task context
+      try {
+        const interp = task.interpretation
+          ? (typeof task.interpretation === "string" ? JSON.parse(task.interpretation) : task.interpretation)
+          : null;
+        const taskTitle = interp?.understood || task.raw_input?.slice(0, 200) || "";
+        const progressArr = task.progress ? JSON.parse(task.progress) : [];
+        const lastProgress = progressArr.length > 0 ? progressArr[progressArr.length - 1] : null;
+        const progressHint = lastProgress ? `\nПоследний прогресс: ${lastProgress.message || JSON.stringify(lastProgress)}` : "";
+
+        const fallbackPrompt = `Задача: ${taskTitle}${progressHint}\n\nСформулируй краткий итог выполнения задачи (2-3 предложения на русском). Что было сделано, что изменилось. Без JSON, просто текст.`;
+        const generated = await llmCall("Ты кратко резюмируешь выполненные задачи на русском языке. Отвечай только текстом, без JSON.", fallbackPrompt);
+        if (typeof generated === "string" && generated.trim()) {
+          summaryRu = generated.trim();
+        } else if (typeof generated === "object" && generated !== null) {
+          summaryRu = JSON.stringify(generated);
+        }
+      } catch {
+        // LLM failed — use structured fallback from task data
+      }
+      // Final static fallback if LLM also failed
+      if (!summaryRu) {
+        const interp2 = task.interpretation
+          ? (typeof task.interpretation === "string" ? JSON.parse(task.interpretation) : task.interpretation)
+          : null;
+        summaryRu = interp2?.understood
+          ? `Выполнено: ${interp2.understood}`
+          : `Задача выполнена (описание: ${(task.raw_input || "").slice(0, 150) || "не указано"})`;
+      }
+    }
+
     const updated = taskDb.completeTask(id, {
-      result_summary_ru: body.result_summary_ru,
+      result_summary_ru: summaryRu,
       result_detail: body.result_detail,
     });
-    taskDb.addTaskEvent(id, "completed", body.result_summary_ru || "Задача выполнена");
+    taskDb.addTaskEvent(id, "completed", summaryRu);
 
     // Send result to Telegram
     await sendTelegram(
-      `<b>Задача #${id} выполнена</b>\n\n` +
-      `${body.result_summary_ru || "Результат не указан"}`
+      `<b>Задача #${id} выполнена ✅</b>\n\n` +
+      summaryRu
     );
     taskDb.setTaskTelegramNotified(id);
 
@@ -559,7 +595,7 @@ async function handleTaskFail(req, res, id) {
     const updated = taskDb.failTask(id, body.error || "Unknown error");
     taskDb.addTaskEvent(id, "failed", body.error || "Неизвестная ошибка");
 
-    await sendTelegram(`<b>Задача #${id} не выполнена</b>\n\n<b>Ошибка:</b> ${body.error || "Неизвестная ошибка"}`);
+    await sendTelegram(`<b>Задача #${id} не выполнена ❌</b>\n\n<b>Ошибка:</b> ${body.error || "Неизвестная ошибка"}`);
     taskDb.setTaskTelegramNotified(id);
 
     json(res, 200, updated);
