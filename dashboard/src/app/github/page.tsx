@@ -92,7 +92,7 @@ export default function GitHubPage() {
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border animate-fade-in">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[700px] text-sm">
             <thead>
               <tr className="border-b border-border bg-[oklch(0.175_0.008_260)]">
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>

@@ -162,7 +162,7 @@ export default function SystemHealthPage() {
               <RotateCw className="h-3.5 w-3.5" />
               Restart
             </Button>
-            <div className="mx-2 h-6 w-px bg-border-subtle" />
+            <div className="mx-2 hidden h-6 w-px bg-border-subtle sm:block" />
             <Button
               size="sm"
               variant="ghost"
@@ -223,11 +223,11 @@ export default function SystemHealthPage() {
               {health.services.map((svc) => (
                 <div
                   key={svc.name}
-                  className="flex items-center gap-3 rounded-lg border border-border-subtle px-4 py-3"
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-border-subtle px-3 py-3 sm:flex-nowrap sm:gap-3 sm:px-4"
                 >
                   <StatusDot status={svc.status as 'healthy' | 'degraded' | 'down' | 'unknown'} />
                   <span className="font-medium text-sm">{svc.name}</span>
-                  <span className="flex-1 text-sm text-muted-foreground">{svc.detail}</span>
+                  <span className="hidden flex-1 truncate text-sm text-muted-foreground sm:inline">{svc.detail}</span>
                   <Badge variant={svc.status === 'healthy' ? 'success' : svc.status === 'down' ? 'destructive' : 'warning'}>
                     {svc.status}
                   </Badge>
