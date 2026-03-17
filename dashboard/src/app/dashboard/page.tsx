@@ -98,8 +98,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Dashboard"
-        description="Memory system overview and recent activity — pipeline test OK"
+        title="Панель управления"
+        description="Обзор системы памяти и последняя активность"
       />
 
       {/* Resume Session CTA */}
@@ -111,14 +111,14 @@ export default function DashboardPage() {
                 <Play className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Resume: {truncate(latestSession.summary, 80)}</p>
+                <p className="text-sm font-semibold">Продолжить: {truncate(latestSession.summary, 80)}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">{timeAgo(latestSession.created_at)}</span>
                   {latestSession.project && <Badge variant="secondary">{latestSession.project}</Badge>}
                   {latestOpenLoops && latestOpenLoops.length > 0 && (
                     <span className="inline-flex items-center gap-1 text-xs text-warning">
                       <CircleDot className="h-3 w-3" />
-                      {latestOpenLoops.length} open loop{latestOpenLoops.length > 1 ? 's' : ''}
+                      {latestOpenLoops.length} незакр. задач
                     </span>
                   )}
                 </div>
@@ -126,7 +126,7 @@ export default function DashboardPage() {
             </div>
             <Link href={`/sessions/${latestSession.id}`}>
               <Button size="sm" className="w-full shrink-0 sm:w-auto">
-                Continue <ArrowRight className="h-3.5 w-3.5" />
+                Продолжить <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </Link>
           </CardContent>
@@ -136,30 +136,30 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-fade-in">
         <StatCard
-          title="Open Incidents"
+          title="Открытые инциденты"
           value={openIncidents}
           icon={AlertTriangle}
           className={openIncidents > 0 ? 'border-destructive/50 bg-destructive/5' : undefined}
-          description={openIncidents > 0 ? 'Requires attention' : 'All clear'}
+          description={openIncidents > 0 ? 'Требует внимания' : 'Всё чисто'}
         />
         <StatCard
-          title="Verified Solutions"
+          title="Проверенные решения"
           value={verifiedSolutions}
           icon={Lightbulb}
           className="border-success/50 bg-success/5"
-          description="Proven fixes"
+          description="Подтверждённые фиксы"
         />
         <StatCard
-          title="Recent Sessions"
+          title="Последние сессии"
           value={totalEpisodes}
           icon={History}
-          description="Total episodes"
+          description="Всего эпизодов"
         />
         <StatCard
-          title="GitHub Events"
+          title="События GitHub"
           value={totalGithubEvents}
           icon={GitBranch}
-          description="Tracked events"
+          description="Отслеживаемые события"
         />
       </div>
 
@@ -168,19 +168,19 @@ export default function DashboardPage() {
         <Link href="/memory">
           <Button variant="outline" size="sm">
             <Search className="h-4 w-4" />
-            Search Memory
+            Поиск по памяти
           </Button>
         </Link>
         <Link href="/incidents">
           <Button variant="outline" size="sm">
             <AlertTriangle className="h-4 w-4" />
-            View Incidents
+            Инциденты
           </Button>
         </Link>
         <Link href="/health">
           <Button variant="outline" size="sm">
             <ShieldCheck className="h-4 w-4" />
-            System Health
+            Здоровье системы
             {healthStatus && (
               <StatusDot status={healthStatus === 'healthy' ? 'healthy' : healthStatus === 'degraded' ? 'degraded' : 'down'} />
             )}
@@ -189,7 +189,7 @@ export default function DashboardPage() {
         <Link href="/health">
           <Button variant="outline" size="sm">
             <Zap className="h-4 w-4" />
-            Remote Control
+            Удалённое управление
           </Button>
         </Link>
       </div>
@@ -202,17 +202,17 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <History className="h-4 w-4 text-muted-foreground" />
-                Recent Sessions
+                Последние сессии
               </CardTitle>
-              <Link href="/sessions" className="text-xs text-primary hover:underline">View all</Link>
+              <Link href="/sessions" className="text-xs text-primary hover:underline">Все</Link>
             </div>
           </CardHeader>
           <CardContent>
             {!episodes || episodes.length === 0 ? (
               <EmptyState
                 icon={History}
-                title="No sessions yet"
-                description="Sessions will appear here as you work"
+                title="Сессий пока нет"
+                description="Сессии появятся здесь по мере работы"
               />
             ) : (
               <div className="space-y-3">
@@ -255,17 +255,17 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                Open Incidents
+                Открытые инциденты
               </CardTitle>
-              <Link href="/incidents" className="text-xs text-primary hover:underline">View all</Link>
+              <Link href="/incidents" className="text-xs text-primary hover:underline">Все</Link>
             </div>
           </CardHeader>
           <CardContent>
             {!incidents || incidents.length === 0 ? (
               <EmptyState
                 icon={AlertTriangle}
-                title="No open incidents"
-                description="All clear — no unresolved incidents"
+                title="Нет открытых инцидентов"
+                description="Всё чисто — нерешённых инцидентов нет"
               />
             ) : (
               <div className="space-y-3">
@@ -308,17 +308,17 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-base">
               <Activity className="h-4 w-4 text-muted-foreground" />
-              Recent GitHub Activity
+              Активность GitHub
             </CardTitle>
-            <Link href="/github" className="text-xs text-primary hover:underline">View all</Link>
+            <Link href="/github" className="text-xs text-primary hover:underline">Все</Link>
           </div>
         </CardHeader>
         <CardContent>
           {!events || events.length === 0 ? (
             <EmptyState
               icon={Inbox}
-              title="No GitHub events"
-              description="Events will appear when the webhook receives activity"
+              title="Нет событий GitHub"
+              description="События появятся при получении активности через webhook"
             />
           ) : (
             <div className="space-y-2">
