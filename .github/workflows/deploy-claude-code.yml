@@ -202,6 +202,25 @@ jobs:
           SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
           $SSH_CMD "bash /opt/claude-code/bin/run-real-task.sh 2>&1 | tee /opt/claude-code/logs/real-task-output.txt"
 
+      - name: Dashboard status check
+        if: github.event_name == 'push'
+        run: |
+          SSH_CMD="ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          echo "=== Dashboard Service ==="
+          $SSH_CMD "systemctl status dashboard.service --no-pager 2>&1 | head -15" || true
+          echo ""
+          echo "=== Dashboard Port ==="
+          $SSH_CMD "ss -tlnp | grep 3100" || echo "(port 3100 not listening)"
+          echo ""
+          echo "=== Dashboard HTTP ==="
+          $SSH_CMD "curl -sI --max-time 5 http://127.0.0.1:3100/ 2>&1 | head -5" || echo "(no response)"
+          echo ""
+          echo "=== Dashboard /tasks ==="
+          $SSH_CMD "curl -s --max-time 5 http://127.0.0.1:3100/tasks 2>&1 | head -20" || echo "(no response)"
+          echo ""
+          echo "=== Nginx proxy test ==="
+          $SSH_CMD "curl -sI --max-time 5 https://webhook.marbomebel.ru/ 2>&1 | head -5" || echo "(nginx not proxying)"
+
       - name: Fetch task output from VPS
         if: always()
         run: |
