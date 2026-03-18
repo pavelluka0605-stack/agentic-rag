@@ -11,6 +11,8 @@ import type {
   HealthService,
   MemoryType,
   Task,
+  ChatThread,
+  ChatMessage,
 } from '@/types'
 import type { ProjectInfo } from '@/lib/db'
 
@@ -244,6 +246,71 @@ export async function taskAction(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...data }),
+  })
+}
+
+// --- Chats ---
+
+export async function fetchChatThreads(opts?: {
+  status?: string
+  limit?: number
+  offset?: number
+}): Promise<ChatThread[]> {
+  const query = buildQuery({
+    status: opts?.status,
+    limit: opts?.limit,
+    offset: opts?.offset,
+  })
+  return apiFetch<ChatThread[]>(`/api/chats${query}`)
+}
+
+export async function fetchChatThread(id: number): Promise<ChatThread & { linkedTasks: { id: number; raw_input: string; status: string; created_at: string }[] }> {
+  return apiFetch(`/api/chats/${id}`)
+}
+
+export async function createChatThread(title?: string): Promise<ChatThread> {
+  return apiFetch<ChatThread>('/api/chats', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+}
+
+export async function updateChatThread(id: number, data: { title?: string; status?: string }): Promise<ChatThread> {
+  return apiFetch<ChatThread>(`/api/chats/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteChatThread(id: number): Promise<{ deleted: boolean }> {
+  return apiFetch(`/api/chats/${id}`, { method: 'DELETE' })
+}
+
+export async function fetchChatMessages(threadId: number, opts?: {
+  limit?: number
+  offset?: number
+  before?: number
+}): Promise<ChatMessage[]> {
+  const query = buildQuery({
+    limit: opts?.limit,
+    offset: opts?.offset,
+    before: opts?.before,
+  })
+  return apiFetch<ChatMessage[]>(`/api/chats/${threadId}/messages${query}`)
+}
+
+export async function sendChatMessage(threadId: number, data: {
+  role: 'user' | 'assistant'
+  content: string
+  task_proposal?: unknown
+  attachments?: unknown[]
+}): Promise<ChatMessage> {
+  return apiFetch<ChatMessage>(`/api/chats/${threadId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
   })
 }
 

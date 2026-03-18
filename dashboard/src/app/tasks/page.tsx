@@ -58,14 +58,23 @@ import type {
 // ── Status helpers ─────────────────────────────────────────────
 
 const statusConfig: Record<TaskStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'info' }> = {
-  draft: { label: 'Анализ...', variant: 'secondary' },
+  // New statuses
+  draft: { label: 'Черновик', variant: 'secondary' },
+  discussion: { label: 'Обсуждение', variant: 'info' },
+  ready_for_execution: { label: 'Готова к запуску', variant: 'info' },
+  executing: { label: 'Выполняется', variant: 'default' },
+  verifying: { label: 'Проверка', variant: 'warning' },
+  needs_input: { label: 'Ожидает ввода', variant: 'warning' },
+  done: { label: 'Выполнена', variant: 'success' },
+  failed: { label: 'Ошибка', variant: 'destructive' },
+  canceled: { label: 'Отменена', variant: 'secondary' },
+  trashed: { label: 'В корзине', variant: 'secondary' },
+  // Legacy statuses (backward compat)
   pending: { label: 'Выбор стратегии', variant: 'warning' },
-  confirmed: { label: 'Готова к запуску', variant: 'info' },
+  confirmed: { label: 'Подтверждена', variant: 'info' },
   running: { label: 'Выполняется', variant: 'default' },
   review: { label: 'На проверке', variant: 'warning' },
   needs_manual_review: { label: 'Ручная проверка', variant: 'destructive' },
-  done: { label: 'Выполнена', variant: 'success' },
-  failed: { label: 'Ошибка', variant: 'destructive' },
   cancelled: { label: 'Отменена', variant: 'secondary' },
 }
 
@@ -683,11 +692,22 @@ function TaskCard({
                 {riskLabels[interpretation.risk_level] || interpretation.risk_level}
               </span>
             )}
-            {/* Running task: show active phase inline */}
-            {task.status === 'running' && activePhase && (
+            {/* Running/executing task: show active phase inline */}
+            {(task.status === 'running' || task.status === 'executing') && activePhase && (
               <span className="text-xs text-primary font-medium">
                 {activePhase.name_ru} ({completedPhases}/{totalPhases})
               </span>
+            )}
+            {/* Linked chat indicator */}
+            {task.chat_thread_id && (
+              <a
+                href={`/chat?thread=${task.chat_thread_id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <MessageSquare className="h-3 w-3" />
+                Чат
+              </a>
             )}
           </div>
         </div>

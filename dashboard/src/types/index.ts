@@ -160,8 +160,62 @@ export interface HealthService {
 
 export type MemoryType = 'policies' | 'episodes' | 'incidents' | 'solutions' | 'decisions' | 'contexts' | 'github_events'
 
+// Chat types
+export interface ChatThread {
+  id: number
+  title: string | null
+  status: 'active' | 'archived'
+  last_message_preview: string | null
+  message_count: number
+  linked_task_ids: string | null  // JSON array of task IDs
+  created_at: string
+  updated_at: string
+}
+
+export interface ChatMessage {
+  id: number
+  thread_id: number
+  role: 'user' | 'assistant'
+  content: string
+  task_proposal: string | null     // JSON: proposed task formulation
+  attachments: string | null       // JSON array of { name, type, url }
+  created_at: string
+}
+
+export interface TaskProposal {
+  understood: string               // "Вот как я понял задачу"
+  options: TaskProposalOption[]
+  ready_to_submit: boolean
+}
+
+export interface TaskProposalOption {
+  id: string
+  title: string
+  description: string
+  pros: string[]
+  cons: string[]
+  effort: 'low' | 'medium' | 'high'
+}
+
 // Task Pipeline types
-export type TaskStatus = 'draft' | 'pending' | 'confirmed' | 'running' | 'review' | 'needs_manual_review' | 'done' | 'failed' | 'cancelled'
+export type TaskStatus =
+  | 'draft'
+  | 'discussion'
+  | 'ready_for_execution'
+  | 'executing'
+  | 'verifying'
+  | 'needs_input'
+  | 'done'
+  | 'failed'
+  | 'canceled'
+  | 'trashed'
+  // Legacy statuses (backward compat with existing data)
+  | 'pending'
+  | 'confirmed'
+  | 'running'
+  | 'review'
+  | 'needs_manual_review'
+  | 'cancelled'
 export type TaskMode = 'fast' | 'safe'
 
 export interface TaskOption {
@@ -227,6 +281,7 @@ export interface TaskRevision {
 export interface Task {
   id: number
   project: string | null
+  chat_thread_id: number | null
   raw_input: string
   input_type: 'text' | 'voice'
   voice_transcript: string | null
