@@ -259,11 +259,24 @@ export async function sendChatMessage(
   role: 'user' | 'assistant' | 'system',
   content: string,
   taskId?: number
-): Promise<ChatMessage> {
-  return apiFetch<ChatMessage>(`/api/chat/threads/${threadId}/messages`, {
+): Promise<{ userMessage: ChatMessage; assistantMessage?: ChatMessage } | ChatMessage> {
+  return apiFetch(`/api/chat/threads/${threadId}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role, content, task_id: taskId }),
+  })
+}
+
+export async function createTaskFromChat(
+  threadId: number,
+  messageId: number,
+  proposalIndex: number,
+  description: string
+): Promise<{ task_id: number; message_id: number; proposal_index: number }> {
+  return apiFetch(`/api/chat/threads/${threadId}/create-task`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message_id: messageId, proposal_index: proposalIndex, description }),
   })
 }
 

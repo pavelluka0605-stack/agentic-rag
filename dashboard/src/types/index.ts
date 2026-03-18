@@ -252,6 +252,21 @@ export interface ChatMessage {
   thread_id: number
   role: 'user' | 'assistant' | 'system'
   content: string
-  task_id: number | null       // optional link to a spawned Task
+  metadata: string | null      // JSON string of ChatMessageMeta (for structured proposals)
+  task_id: number | null       // link to a spawned Task (set after explicit confirmation)
   created_at: string
+}
+
+export interface ChatProposal {
+  title: string
+  description: string
+  pros: string[]
+  cons: string[]
+}
+
+export interface ChatMessageMeta {
+  is_task_request: boolean
+  understood: string | null
+  proposals: ChatProposal[]
+  missing: string[]            // what is unclear or missing from the request
 }
