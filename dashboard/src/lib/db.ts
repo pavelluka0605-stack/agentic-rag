@@ -37,7 +37,7 @@ export function getDb(): Database.Database | null {
       return null
     }
     db = new Database(dbPath, { readonly: true, fileMustExist: true })
-    db.pragma('journal_mode = WAL')
+    try { db.pragma('journal_mode = WAL') } catch { /* readonly — skip WAL */ }
     return db
   } catch (err) {
     console.error(`[db] Failed to open database: ${err}`)
