@@ -226,6 +226,47 @@ export async function taskAction(
   })
 }
 
+// --- Chat ---
+
+import type { ChatThread, ChatMessage } from '@/types'
+
+export async function fetchChatThreads(opts?: {
+  limit?: number
+  offset?: number
+}): Promise<ChatThread[]> {
+  const query = buildQuery({ limit: opts?.limit, offset: opts?.offset })
+  return apiFetch<ChatThread[]>(`/api/chat/threads${query}`)
+}
+
+export async function fetchChatThread(id: number): Promise<ChatThread> {
+  return apiFetch<ChatThread>(`/api/chat/threads/${id}`)
+}
+
+export async function createChatThread(message?: string): Promise<ChatThread> {
+  return apiFetch<ChatThread>('/api/chat/threads', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  })
+}
+
+export async function fetchChatMessages(threadId: number): Promise<ChatMessage[]> {
+  return apiFetch<ChatMessage[]>(`/api/chat/threads/${threadId}/messages`)
+}
+
+export async function sendChatMessage(
+  threadId: number,
+  role: 'user' | 'assistant' | 'system',
+  content: string,
+  taskId?: number
+): Promise<ChatMessage> {
+  return apiFetch<ChatMessage>(`/api/chat/threads/${threadId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role, content, task_id: taskId }),
+  })
+}
+
 // --- Health ---
 
 export interface HealthResponse {

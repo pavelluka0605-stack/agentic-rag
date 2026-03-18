@@ -235,3 +235,23 @@ export interface SearchResult {
   content?: string
   [key: string]: unknown
 }
+
+// Chat entities (independent from Tasks)
+
+export interface ChatThread {
+  id: number
+  title: string | null
+  created_at: string
+  updated_at: string
+  last_message: string | null
+  message_count: number
+}
+
+export interface ChatMessage {
+  id: number
+  thread_id: number
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  task_id: number | null       // optional link to a spawned Task
+  created_at: string
+}
