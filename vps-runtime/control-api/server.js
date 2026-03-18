@@ -656,10 +656,13 @@ async function handleTaskComplete(req, res, id) {
         const taskTitle = interp?.understood || task.raw_input?.slice(0, 200) || "";
         const progressArr = task.progress ? JSON.parse(task.progress) : [];
         const lastProgress = progressArr.length > 0 ? progressArr[progressArr.length - 1] : null;
-        const progressHint = lastProgress ? `\nПоследний прогресс: ${lastProgress.message || JSON.stringify(lastProgress)}` : "";
+        const progressHint = lastProgress ? `\nПоследний прогресс: ${lastProgress.message_ru || lastProgress.message || JSON.stringify(lastProgress)}` : "";
+        const allProgressHints = progressArr.length > 1
+          ? `\nВсе шаги: ${progressArr.map(p => p.message_ru || p.message || "").filter(Boolean).join(" → ")}`
+          : "";
 
-        const fallbackPrompt = `Задача: ${taskTitle}${progressHint}\n\nСформулируй краткий итог выполнения (2-3 предложения). Верни JSON: {"summary": "текст итога"}`;
-        const generated = await llmCall("Ты кратко резюмируешь выполненные задачи на русском языке. Отвечай JSON: {\"summary\": \"...\"}", fallbackPrompt);
+        const fallbackPrompt = `Задача: ${taskTitle}${progressHint}${allProgressHints}\n\nЗадача ПОЛНОСТЬЮ ВЫПОЛНЕНА (статус: done). Опиши что было сделано в прошедшем времени (2-3 предложения). Верни JSON: {"summary": "текст итога"}`;
+        const generated = await llmCall("Ты кратко резюмируешь ВЫПОЛНЕННЫЕ задачи на русском языке. Всегда пиши в прошедшем времени — задача уже завершена. Отвечай JSON: {\"summary\": \"...\"}", fallbackPrompt);
         // llmCall returns parsed JSON object, extract summary field
         const text = generated?.summary || generated?.text || generated?.result;
         if (text && typeof text === "string" && text.trim()) {
@@ -673,9 +676,36 @@ async function handleTaskComplete(req, res, id) {
         const interp2 = task.interpretation
           ? (typeof task.interpretation === "string" ? JSON.parse(task.interpretation) : task.interpretation)
           : null;
-        summaryRu = interp2?.understood
-          ? `Выполнено: ${interp2.understood}`
-          : `Задача выполнена (описание: ${(task.raw_input || "").slice(0, 150) || "не указано"})`;
+        const progressArr2 = task.progress ? JSON.parse(task.progress) : [];
+        const lastMsg = progressArr2.length > 0
+          ? (progressArr2[progressArr2.length - 1].message_ru || progressArr2[progressArr2.length - 1].message || "")
+          : "";
+        if (lastMsg) {
+          summaryRu = `Задача завершена. Последний этап: ${lastMsg}`;
+        } else {
+          summaryRu = interp2?.understood
+            ? `Задача завершена: ${interp2.understood}`
+            : `Задача выполнена успешно.`;
+        }
+      }
+    }
+
+    // Finalize all execution phases — mark everything as done
+    if (task.execution_phases) {
+      try {
+        const phases = typeof task.execution_phases === "string"
+          ? JSON.parse(task.execution_phases) : task.execution_phases;
+        const now = new Date().toISOString();
+        for (const phase of phases) {
+          phase.status = "done";
+          for (const step of phase.steps) {
+            if (step.status !== "done") step.status = "done";
+            if (!step.ts) step.ts = now;
+          }
+        }
+        taskDb.setExecutionPhases(id, phases);
+      } catch {
+        // Non-fatal: phase finalization failed
       }
     }
 
