@@ -550,17 +550,7 @@ async function handleTaskConfirm(req, res, id) {
 
     taskDb.addTaskEvent(id, "confirmed", `Подтверждена. Режим: ${mode === "fast" ? "быстрый" : "безопасный"}`);
 
-    // Notify Telegram — include chosen option info
-    const interp = typeof task.interpretation === "string" ? JSON.parse(task.interpretation) : task.interpretation;
-    const riskRu = { low: "низкий", medium: "средний", high: "высокий" }[interp?.risk_level] || "?";
-    const chosenInfo = chosenOpt ? `\n<b>Подход:</b> ${chosenOpt.title}` : "";
-    await sendTelegram(
-      `<b>Задача подтверждена</b>\n\n` +
-      `<b>Задача:</b> ${interp?.understood || task.raw_input.slice(0, 200)}\n` +
-      `<b>Режим:</b> ${mode === "fast" ? "Быстрый" : "Безопасный"}\n` +
-      `<b>Риск:</b> ${riskRu}` +
-      chosenInfo
-    );
+    // Telegram: critical-only policy — confirmed is not critical, skip notification
 
     json(res, 200, updated);
   } catch (e) {
@@ -620,13 +610,7 @@ async function handleTaskProgress(req, res, id) {
       }
     }
 
-    // Send progress to Telegram only on milestones (first update, 25/50/75/100%)
-    const progressArr = updated.progress ? JSON.parse(updated.progress) : [];
-    const isMilestone = progressArr.length === 1
-      || (body.pct != null && [25, 50, 75, 100].includes(body.pct));
-    if (isMilestone) {
-      await sendTelegram(`<b>Прогресс задачи #${id}</b>\n${body.message_ru}${body.pct != null ? ` (${body.pct}%)` : ""}`);
-    }
+    // Telegram: critical-only policy — progress milestones are not critical, skip notification
 
     json(res, 200, updated);
   } catch (e) {
@@ -715,12 +699,7 @@ async function handleTaskComplete(req, res, id) {
     });
     taskDb.addTaskEvent(id, "completed", summaryRu);
 
-    // Send result to Telegram
-    await sendTelegram(
-      `<b>Задача #${id} выполнена ✅</b>\n\n` +
-      summaryRu
-    );
-    taskDb.setTaskTelegramNotified(id);
+    // Telegram: critical-only policy — completed is not critical, skip notification
 
     json(res, 200, updated);
   } catch (e) {
