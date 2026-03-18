@@ -1,34 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { listThreads, createThread, addMessage, getThread } from '@/lib/chat-db'
+import { listThreads, createThread, addMessage, getThread, listMessages } from '@/lib/chat-db'
+import { generateReply } from '@/lib/llm'
 
-// GET /api/chat/threads — list threads
+// GET /api/chat/threads
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const limit = parseInt(searchParams.get('limit') || '50')
   const offset = parseInt(searchParams.get('offset') || '0')
 
   try {
-    const threads = listThreads(limit, offset)
-    return NextResponse.json(threads)
+    return NextResponse.json(listThreads(limit, offset))
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
 
-// POST /api/chat/threads — create thread + optional first message
+// POST /api/chat/threads — create thread + first message + assistant reply
 // Body: { message?: string }
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
     const thread = createThread()
 
+    let assistantMessage = null
+
     if (body.message && typeof body.message === 'string' && body.message.trim()) {
       addMessage(thread.id, 'user', body.message.trim())
+
+      // Generate assistant reply for the first message
+      const allMessages = listMessages(thread.id)
+      const { content, metadata } = await generateReply(allMessages)
+      assistantMessage = addMessage(thread.id, 'assistant', content, {
+        metadata: metadata ? JSON.stringify(metadata) : undefined,
+      })
     }
 
-    // Re-fetch to include computed fields (last_message, message_count, title)
     const full = getThread(thread.id)
-    return NextResponse.json(full, { status: 201 })
+    return NextResponse.json({
+      thread: full,
+      assistantMessage,
+    }, { status: 201 })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

@@ -136,11 +136,18 @@ function ChatPageInner() {
         setInputText('')
         await loadThreads()
       } else {
-        const thread = await createChatThread(text)
+        // Create new thread — API returns thread + assistant reply
+        const { thread, assistantMessage } = await createChatThread(text)
         setInputText('')
         await loadThreads()
         setSelectedId(thread.id)
         router.replace(`/chat?thread=${thread.id}`, { scroll: false })
+        // Load the full message list (user msg + assistant reply)
+        if (thread.id) {
+          const msgs = await fetchChatMessages(thread.id)
+          setMessages(msgs)
+          setSelectedThread(thread)
+        }
       }
     } catch (err) {
       setError(`Ошибка: ${err}`)
