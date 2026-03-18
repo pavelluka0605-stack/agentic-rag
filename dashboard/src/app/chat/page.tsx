@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   Send,
@@ -68,12 +69,27 @@ const statusIcon: Record<string, typeof CheckCircle2> = {
 // ── Main Chat Page ─────────────────────────────────────────
 
 export default function ChatPage() {
+  return (
+    <Suspense>
+      <ChatPageInner />
+    </Suspense>
+  )
+}
+
+function ChatPageInner() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    const threadParam = searchParams.get('thread')
+    return threadParam ? parseInt(threadParam, 10) || null : null
+  })
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [taskEvents, setTaskEvents] = useState<TaskEvent[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
+  const [threadNotFound, setThreadNotFound] = useState(false)
 
   // Input
   const [inputText, setInputText] = useState('')
@@ -111,12 +127,16 @@ export default function ChatPage() {
 
   const loadTaskDetail = useCallback(async (id: number) => {
     setDetailLoading(true)
+    setThreadNotFound(false)
     try {
       const task = await fetchTask(id, { events: true }) as Task & { events?: TaskEvent[] }
       setSelectedTask(task)
       setTaskEvents(task.events || [])
-    } catch {
-      // silent
+    } catch (err) {
+      // If thread not found (404), show graceful error
+      if (String(err).includes('404') || String(err).includes('not found')) {
+        setThreadNotFound(true)
+      }
     } finally {
       setDetailLoading(false)
     }
@@ -151,6 +171,7 @@ export default function ChatPage() {
       await taskAction(task.id, 'interpret')
       await loadTasks()
       setSelectedId(task.id)
+      router.replace(`/chat?thread=${task.id}`, { scroll: false })
     } catch (err) {
       setError(`Ошибка: ${err}`)
     } finally {
@@ -227,6 +248,8 @@ export default function ChatPage() {
   function selectThread(id: number) {
     setSelectedId(id)
     setError(null)
+    setThreadNotFound(false)
+    router.replace(`/chat?thread=${id}`, { scroll: false })
   }
 
   function goBack() {
@@ -234,6 +257,8 @@ export default function ChatPage() {
     setSelectedTask(null)
     setTaskEvents([])
     setError(null)
+    setThreadNotFound(false)
+    router.replace('/chat', { scroll: false })
   }
 
   // ── Render ──────────────────────────────────────────────
@@ -262,7 +287,7 @@ export default function ChatPage() {
           <button
             onClick={() => { setSelectedId(null); textareaRef.current?.focus() }}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-            title="Новая задача"
+            title="Новый чат"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -278,8 +303,8 @@ export default function ChatPage() {
             <div className="px-4 py-8">
               <EmptyState
                 icon={MessageSquare}
-                title="Нет задач"
-                description="Создайте первую задачу"
+                title="Нет чатов"
+                description="Напишите сообщение, чтобы начать"
               />
             </div>
           ) : (
@@ -339,7 +364,7 @@ export default function ChatPage() {
               ref={textareaRef}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Новая задача..."
+              placeholder="Новое сообщение..."
               rows={1}
               className="min-w-0 flex-1 resize-none rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
               onKeyDown={(e) => {
@@ -376,9 +401,9 @@ export default function ChatPage() {
             <div className="w-full max-w-lg space-y-6">
               <div className="text-center">
                 <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                <h2 className="mt-3 text-lg font-semibold">Новая задача</h2>
+                <h2 className="mt-3 text-lg font-semibold">Новый чат</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Опишите задачу — Claude выполнит её автономно
+                  Напишите сообщение — Claude разберётся
                 </p>
               </div>
               <form onSubmit={handleSubmit} className="space-y-3">
@@ -386,7 +411,7 @@ export default function ChatPage() {
                   ref={textareaRef}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Опишите задачу..."
+                  placeholder="Напишите сообщение..."
                   rows={3}
                   className="w-full resize-none rounded-lg border border-border-subtle bg-bg-deep px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
                   onKeyDown={(e) => {
@@ -447,7 +472,18 @@ export default function ChatPage() {
 
             {/* Messages area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {detailLoading && !selectedTask ? (
+              {threadNotFound ? (
+                <div className="flex flex-1 flex-col items-center justify-center py-16">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground/30" />
+                  <h3 className="mt-3 text-sm font-medium">Чат не найден</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Чат #{selectedId} не существует или был удалён
+                  </p>
+                  <Button size="sm" variant="outline" className="mt-4" onClick={goBack}>
+                    <ArrowLeft className="h-3.5 w-3.5" /> К списку чатов
+                  </Button>
+                </div>
+              ) : detailLoading && !selectedTask ? (
                 <div className="flex h-32 items-center justify-center">
                   <Loading size="sm" />
                 </div>
@@ -626,7 +662,7 @@ export default function ChatPage() {
                   <textarea
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    placeholder="Следующая задача..."
+                    placeholder="Следующее сообщение..."
                     rows={1}
                     className="min-w-0 flex-1 resize-none rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
                     onKeyDown={(e) => {
