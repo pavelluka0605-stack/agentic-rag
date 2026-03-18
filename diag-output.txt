@@ -1,15 +1,15 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Wed Mar 18 15:20:45 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Wed Mar 18 16:47:11 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
 ● dashboard.service - Claude Code Task Dashboard (Next.js)
      Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
-     Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 3h 22min ago
+     Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 4h 49min ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 116.3M (max: 256.0M available: 139.6M peak: 123.8M)
-        CPU: 4.495s
+     Memory: 117.9M (max: 256.0M available: 138.0M peak: 123.8M)
+        CPU: 5.193s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -23,11 +23,11 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 3h 22min ago
+     Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 4h 49min ago
    Main PID: 1364558 (node)
       Tasks: 11 (limit: 32)
-     Memory: 13.7M (max: 128.0M available: 114.2M peak: 128.0M swap: 14.3M swap peak: 81.0M)
-        CPU: 4.456s
+     Memory: 17.5M (max: 128.0M available: 110.4M peak: 128.0M swap: 14.1M swap peak: 81.0M)
+        CPU: 4.655s
      CGroup: /system.slice/control-api.service
              └─1364558 /usr/bin/node server.js
 
@@ -132,7 +132,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Wed, 18 Mar 2026 15:20:45 GMT
+Date: Wed, 18 Mar 2026 16:47:11 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,7 +142,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-18T15:20:45.400Z"
+  "timestamp": "2026-03-18T16:47:11.661Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -193,7 +193,7 @@ drwxr-xr-x 8 root root 4096 Mar 13 13:57 ..
 NAMES                    STATUS                 PORTS
 mebelit-wp-wordpress-1   Up 3 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
 mebelit-wp-db-1          Up 3 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
-n8n-traefik-traefik-1    Up 4 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+n8n-traefik-traefik-1    Up 5 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
 n8n-postgres-1           Up 9 days              5432/tcp
 n8n-voice-app-1          Up 9 days              80/tcp
 n8n-n8n-1                Up 8 days              5678/tcp
@@ -208,7 +208,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Wed, 18 Mar 2026 15:20:45 GMT
+date: Wed, 18 Mar 2026 16:47:12 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
