@@ -789,24 +789,28 @@ async function handleTaskStartExec(req, res, id) {
     const updated = taskDb.startTaskExecution(id, body.execution_run_id || `task-${id}`);
     taskDb.addTaskEvent(id, "dispatched", `Задача отправлена на выполнение${taskFile ? ` → ${path.basename(taskFile)}` : ""}`);
 
-    // Try to send to tmux (non-fatal — external executor can still pick up the file)
+    // Try to send to tmux — record dispatch outcome explicitly
+    let dispatchConfirmed = false;
     if (taskFile) {
       try {
         const session = process.env.CLAUDE_TMUX_SESSION || "claude-code";
         const tmuxUp = run(`tmux has-session -t "${session}" 2>/dev/null && echo yes`) === "yes";
         if (tmuxUp) {
           run(`tmux send-keys -t "${session}:workspace" "cat ${taskFile}" Enter`);
-          taskDb.addTaskEvent(id, "running", "Передано в tmux-сессию");
+          dispatchConfirmed = true;
+          taskDb.addTaskEvent(id, "executor_ack", "Команда отправлена в tmux-сессию. Ожидаем первый прогресс.");
         } else {
-          taskDb.addTaskEvent(id, "running", "tmux недоступен — ожидание внешнего исполнителя");
+          taskDb.addTaskEvent(id, "executor_no_ack", "tmux недоступен — исполнитель не подтвердил получение задачи");
         }
       } catch (tmuxErr) {
-        console.warn("[task-exec] tmux dispatch failed (non-fatal):", tmuxErr.message);
-        taskDb.addTaskEvent(id, "running", `tmux ошибка (не критично): ${tmuxErr.message}`);
+        console.warn("[task-exec] tmux dispatch failed:", tmuxErr.message);
+        taskDb.addTaskEvent(id, "executor_no_ack", `tmux ошибка: ${tmuxErr.message}. Исполнитель не подтвердил получение.`);
       }
+    } else {
+      taskDb.addTaskEvent(id, "executor_no_ack", "Нет engineering packet — файл задачи не создан");
     }
 
-    json(res, 200, updated);
+    json(res, 200, { ...updated, dispatch_confirmed: dispatchConfirmed });
   } catch (e) {
     json(res, 500, { error: e.message });
   }
@@ -929,10 +933,43 @@ const server = http.createServer(async (req, res) => {
 
 await initTaskDb();
 
+// ── Stall watchdog ────────────────────────────────────────────────────────
+// Every 30s, check for tasks stuck in "running" with zero progress for >90s.
+// Escalate them to needs_manual_review so they surface in dashboard + Telegram.
+
+const STALL_CHECK_INTERVAL_MS = 30_000;
+const STALL_THRESHOLD_SECONDS = 90;
+
+async function checkStalledTasks() {
+  if (!taskDb) return;
+  try {
+    const stalled = taskDb.getStalledTasks(STALL_THRESHOLD_SECONDS);
+    for (const task of stalled) {
+      const stallReason = `Задача зависла: нет прогресса более ${STALL_THRESHOLD_SECONDS} секунд после запуска. Исполнитель не отвечает.`;
+      taskDb.requestManualReview(task.id, stallReason);
+      taskDb.addTaskEvent(task.id, "stall_detected", stallReason);
+      console.warn(`[stall-watchdog] Task #${task.id} stalled — escalated to needs_manual_review`);
+
+      // Telegram: stall is critical
+      await sendTelegram(
+        `<b>⚠️ Задача #${task.id} зависла</b>\n\n` +
+        `Нет прогресса более ${STALL_THRESHOLD_SECONDS}с после запуска.\n` +
+        `Статус изменён на «нужна ручная проверка».`
+      );
+    }
+  } catch (e) {
+    console.error("[stall-watchdog] Check failed:", e.message);
+  }
+}
+
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`[control-api] Listening on 127.0.0.1:${PORT}`);
   console.log(`[control-api] Auth: ${TOKEN ? "enabled" : "disabled (set CONTROL_API_TOKEN)"}`);
   console.log(`[control-api] Task DB: ${taskDb ? "ready" : "not available"}`);
   console.log(`[control-api] LLM: ${OPENAI_API_KEY ? "configured" : "not configured"}`);
   console.log(`[control-api] Telegram: ${TG_BOT_TOKEN && TG_CHAT_ID ? "configured" : "not configured"}`);
+  console.log(`[control-api] Stall watchdog: every ${STALL_CHECK_INTERVAL_MS / 1000}s, threshold ${STALL_THRESHOLD_SECONDS}s`);
+
+  // Start stall watchdog
+  setInterval(checkStalledTasks, STALL_CHECK_INTERVAL_MS);
 });

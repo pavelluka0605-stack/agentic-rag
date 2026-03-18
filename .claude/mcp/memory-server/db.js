@@ -645,6 +645,21 @@ export class MemoryDB {
     return this.getTask(id);
   }
 
+  // ── Stall detection ────────────────────────────────────────────────────────
+
+  /**
+   * Find tasks stuck in 'running' with no progress for longer than `stallSeconds`.
+   * Returns array of task rows.
+   */
+  getStalledTasks(stallSeconds = 90) {
+    return this.db.prepare(`
+      SELECT * FROM tasks
+      WHERE status = 'running'
+        AND (progress IS NULL OR progress = '[]')
+        AND updated_at <= datetime('now', '-' || ? || ' seconds')
+    `).all(stallSeconds);
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   _ftsQuery(text) {

@@ -694,13 +694,22 @@ function TaskCard({
                 </div>
               )}
 
-              {/* No progress yet */}
-              {(!progress || progress.length === 0) && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Задача запущена, ожидаем первые данные...
-                </div>
-              )}
+              {/* No progress yet — detect stall */}
+              {(!progress || progress.length === 0) && (() => {
+                const waitingSec = Math.floor((Date.now() - new Date(task.updated_at).getTime()) / 1000)
+                const isStalled = waitingSec > 90
+                return isStalled ? (
+                  <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-3">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>Задача зависла — нет данных от исполнителя уже {Math.floor(waitingSec / 60)} мин. Возможно, исполнитель не запустился.</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Задача запущена, ожидаем первые данные...
+                  </div>
+                )
+              })()}
 
               {/* Stage E: Owner Controls */}
               <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center pt-2 border-t border-border-subtle" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
