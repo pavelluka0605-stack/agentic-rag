@@ -27,6 +27,8 @@
 //   POST /api/tasks/:id/fail     — mark failed
 //   POST /api/tasks/:id/review   — move to review state
 //   POST /api/tasks/:id/request-review — escalate to manual review
+//   POST /api/tasks/:id/retry    — retry failed/stalled task (re-execute or re-interpret)
+//   GET  /api/tasks/:id/transitions — allowed status transitions from current state
 //   GET  /api/tasks/:id/events   — task lifecycle events
 //
 // Security: Bearer token auth via CONTROL_API_TOKEN env var
@@ -48,6 +50,34 @@ const MEMORY_DB = process.env.MEMORY_DB_PATH || "/opt/claude-code/memory/memory.
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN || "";
 const TG_CHAT_ID = process.env.TG_CHAT_ID || "";
+
+// ── Task State Machine ──────────────────────────────────────────────────
+// Centralized transition rules. Key = current status, value = set of valid target statuses.
+// Any transition not listed here is rejected with 400.
+
+const TRANSITIONS = {
+  draft:               new Set(["pending", "cancelled"]),
+  pending:             new Set(["draft", "confirmed", "cancelled"]),
+  confirmed:           new Set(["running", "done", "failed", "cancelled"]),
+  running:             new Set(["review", "needs_manual_review", "done", "failed", "cancelled"]),
+  review:              new Set(["running", "needs_manual_review", "done", "failed", "cancelled"]),
+  needs_manual_review: new Set(["running", "confirmed", "done", "failed", "cancelled"]),
+  done:                new Set([]),   // terminal
+  failed:              new Set(["draft", "confirmed"]),  // retry paths
+  cancelled:           new Set(["draft"]),               // reopen path
+};
+
+function validateTransition(currentStatus, targetStatus) {
+  const allowed = TRANSITIONS[currentStatus];
+  if (!allowed) return { ok: false, error: `Unknown status '${currentStatus}'` };
+  if (!allowed.has(targetStatus)) {
+    return {
+      ok: false,
+      error: `Переход '${currentStatus}' → '${targetStatus}' запрещён. Допустимо: ${[...allowed].join(", ") || "нет переходов (терминальный статус)"}`,
+    };
+  }
+  return { ok: true };
+}
 
 // ── Database (lazy init at startup) ──────────────────────────────────────
 
@@ -449,7 +479,8 @@ async function handleTaskInterpret(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (task.status !== "draft") return json(res, 400, { error: `Cannot interpret task in status '${task.status}'` });
+  const v = validateTransition(task.status, "pending");
+  if (!v.ok) return json(res, 400, { error: v.error });
 
   try {
     // Single LLM call for interpretation
@@ -466,9 +497,8 @@ async function handleTaskRevise(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (!["pending", "draft"].includes(task.status)) {
-    return json(res, 400, { error: `Cannot revise task in status '${task.status}'` });
-  }
+  const v = validateTransition(task.status, "draft");
+  if (!v.ok && task.status !== "draft") return json(res, 400, { error: v.error });
 
   try {
     const body = await parseBody(req);
@@ -487,7 +517,7 @@ async function handleTaskChooseOption(req, res, id) {
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
   if (task.status !== "pending") {
-    return json(res, 400, { error: `Cannot choose option for task in status '${task.status}'. Must be 'pending'.` });
+    return json(res, 400, { error: `Выбор варианта доступен только в статусе 'pending'. Текущий: '${task.status}'.` });
   }
 
   try {
@@ -514,9 +544,8 @@ async function handleTaskConfirm(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (task.status !== "pending") {
-    return json(res, 400, { error: `Cannot confirm task in status '${task.status}'. Must be 'pending'.` });
-  }
+  const v = validateTransition(task.status, "confirmed");
+  if (!v.ok) return json(res, 400, { error: v.error });
 
   try {
     const body = await parseBody(req);
@@ -562,9 +591,8 @@ async function handleTaskCancel(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (["done", "failed", "cancelled"].includes(task.status)) {
-    return json(res, 400, { error: `Task already ${task.status}` });
-  }
+  const v = validateTransition(task.status, "cancelled");
+  if (!v.ok) return json(res, 400, { error: v.error });
   const updated = taskDb.cancelTask(id);
   taskDb.addTaskEvent(id, "cancelled", "Задача отменена");
   json(res, 200, updated);
@@ -622,9 +650,8 @@ async function handleTaskComplete(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (!["running", "confirmed", "review", "needs_manual_review"].includes(task.status)) {
-    return json(res, 400, { error: `Cannot complete task in status '${task.status}'. Must be 'running', 'confirmed', 'review', or 'needs_manual_review'.` });
-  }
+  const v = validateTransition(task.status, "done");
+  if (!v.ok) return json(res, 400, { error: v.error });
 
   try {
     const body = await parseBody(req);
@@ -711,9 +738,8 @@ async function handleTaskFail(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (!["running", "confirmed", "review", "needs_manual_review"].includes(task.status)) {
-    return json(res, 400, { error: `Cannot fail task in status '${task.status}'. Must be 'running', 'confirmed', 'review', or 'needs_manual_review'.` });
-  }
+  const v = validateTransition(task.status, "failed");
+  if (!v.ok) return json(res, 400, { error: v.error });
 
   try {
     const body = await parseBody(req);
@@ -733,9 +759,8 @@ async function handleTaskStartExec(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (task.status !== "confirmed") {
-    return json(res, 400, { error: `Cannot start execution for task in status '${task.status}'. Must be 'confirmed'.` });
-  }
+  const v = validateTransition(task.status, "running");
+  if (!v.ok) return json(res, 400, { error: v.error });
 
   try {
     const body = await parseBody(req);
@@ -843,9 +868,8 @@ async function handleTaskReview(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (task.status !== "running") {
-    return json(res, 400, { error: `Cannot request review for task in status '${task.status}'. Must be 'running'.` });
-  }
+  const v = validateTransition(task.status, "review");
+  if (!v.ok) return json(res, 400, { error: v.error });
 
   try {
     const body = await parseBody(req);
@@ -866,9 +890,8 @@ async function handleTaskRequestManualReview(req, res, id) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const task = taskDb.getTask(id);
   if (!task) return json(res, 404, { error: "Task not found" });
-  if (!["running", "review"].includes(task.status)) {
-    return json(res, 400, { error: `Cannot request manual review for task in status '${task.status}'. Must be 'running' or 'review'.` });
-  }
+  const v = validateTransition(task.status, "needs_manual_review");
+  if (!v.ok) return json(res, 400, { error: v.error });
 
   try {
     const body = await parseBody(req);
@@ -883,6 +906,75 @@ async function handleTaskRequestManualReview(req, res, id) {
   } catch (e) {
     json(res, 500, { error: e.message });
   }
+}
+
+async function handleTaskRetry(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+
+  // Retry is only valid from failed or needs_manual_review
+  // failed → confirmed (re-execute with same packet) or draft (re-interpret)
+  // needs_manual_review → confirmed (re-execute)
+  const body = await parseBody(req);
+  const strategy = body.strategy || "re-execute"; // "re-execute" | "re-interpret"
+
+  let targetStatus;
+  if (strategy === "re-interpret") {
+    targetStatus = "draft";
+  } else {
+    // Re-execute: go to confirmed if we have an engineering packet, otherwise draft
+    targetStatus = task.engineering_packet ? "confirmed" : "draft";
+  }
+
+  const v = validateTransition(task.status, targetStatus);
+  if (!v.ok) return json(res, 400, { error: v.error });
+
+  // Count previous retries from event trail
+  const events = taskDb.getTaskEvents(id);
+  const retryCount = events.filter(e => e.event_type === "retried").length;
+
+  if (targetStatus === "draft") {
+    // Reset interpretation for re-analysis
+    taskDb.db.prepare(`
+      UPDATE tasks SET status = 'draft', error = NULL, updated_at = datetime('now') WHERE id = ?
+    `).run(id);
+  } else {
+    // Reset to confirmed — keep engineering_packet, clear error/progress
+    taskDb.db.prepare(`
+      UPDATE tasks SET status = 'confirmed', error = NULL, progress = '[]', updated_at = datetime('now') WHERE id = ?
+    `).run(id);
+    // Reset execution phases to pending
+    if (task.execution_phases) {
+      try {
+        const phases = typeof task.execution_phases === "string"
+          ? JSON.parse(task.execution_phases) : task.execution_phases;
+        for (const phase of phases) {
+          phase.status = "pending";
+          for (const step of phase.steps) {
+            step.status = "pending";
+            step.ts = null;
+          }
+        }
+        taskDb.setExecutionPhases(id, phases);
+      } catch { /* non-fatal */ }
+    }
+  }
+
+  taskDb.addTaskEvent(id, "retried", `Повторная попытка #${retryCount + 1} (стратегия: ${strategy === "re-interpret" ? "переанализ" : "перезапуск"})`);
+  const updated = taskDb.getTask(id);
+  json(res, 200, updated);
+}
+
+async function handleTaskTransitions(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  const allowed = TRANSITIONS[task.status];
+  json(res, 200, {
+    current: task.status,
+    allowed: allowed ? [...allowed] : [],
+  });
 }
 
 // ── Router ──────────────────────────────────────────────────────────────────
@@ -936,6 +1028,8 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "POST" && action === "fail") return handleTaskFail(req, res, taskId);
       if (req.method === "POST" && action === "review") return handleTaskReview(req, res, taskId);
       if (req.method === "POST" && action === "request-review") return handleTaskRequestManualReview(req, res, taskId);
+      if (req.method === "POST" && action === "retry") return handleTaskRetry(req, res, taskId);
+      if (req.method === "GET" && action === "transitions") return handleTaskTransitions(req, res, taskId);
     }
 
     json(res, 404, { error: "Not found" });

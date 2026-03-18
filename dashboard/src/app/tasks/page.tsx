@@ -107,6 +107,12 @@ const eventTypeLabels: Record<string, string> = {
   manual_review_needed: 'Ручная проверка',
   escalated: 'Эскалирована',
   retried: 'Повтор',
+  executor_started: 'Исполнитель запущен',
+  executor_spawn_failed: 'Ошибка запуска',
+  executor_fallback_tmux: 'Fallback (tmux)',
+  executor_no_ack: 'Исполнитель не запущен',
+  stall_detected: 'Зависание',
+  dispatch_failed: 'Ошибка отправки',
 }
 
 // ── Main Component ──────────────────────────────────────────────
@@ -811,8 +817,44 @@ function TaskCard({
                 </h4>
                 {task.error && <p className="mt-2 text-sm break-words">{task.error}</p>}
               </div>
+
+              {/* Diagnostics */}
+              {events && events.length > 0 && (() => {
+                const retryCount = events.filter(e => e.event_type === 'retried').length
+                const lastEvent = events[events.length - 1]
+                const diagEvents = events.filter(e =>
+                  ['executor_spawn_failed', 'executor_no_ack', 'executor_fallback_tmux', 'stall_detected', 'dispatch_failed'].includes(e.event_type)
+                )
+                return (diagEvents.length > 0 || retryCount > 0) ? (
+                  <div className="rounded-lg border border-border-subtle bg-bg-inset p-3 space-y-1.5">
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Диагностика</h4>
+                    {retryCount > 0 && (
+                      <p className="text-xs text-muted-foreground">Попыток: {retryCount}</p>
+                    )}
+                    {diagEvents.map((de, i) => (
+                      <p key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                        <span className="text-warning shrink-0">•</span>
+                        <span className="break-words">{de.detail}</span>
+                      </p>
+                    ))}
+                    <p className="text-xs text-muted-foreground/60">
+                      Последнее событие: {eventTypeLabels[lastEvent.event_type] || lastEvent.event_type} — {timeAgo(lastEvent.created_at)}
+                    </p>
+                  </div>
+                ) : null
+              })()}
+
               <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
                 <Button
+                  onClick={() => onAction(task.id, 'retry', { strategy: 're-execute' })}
+                  loading={isLoading('retry')}
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Перезапустить
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => onAction(task.id, 'complete', { result_summary_ru: 'Решено вручную' })}
                   loading={isLoading('complete')}
                   className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
@@ -849,14 +891,67 @@ function TaskCard({
             </div>
           )}
 
-          {/* Error (failed) */}
-          {task.status === 'failed' && task.error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-              <h4 className="text-sm font-medium text-destructive flex items-center gap-2">
-                <XCircle className="h-4 w-4" />
-                Ошибка
-              </h4>
-              <p className="mt-2 text-sm">{task.error}</p>
+          {/* Error (failed) — with diagnostics and retry */}
+          {task.status === 'failed' && (
+            <div className="space-y-3" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}>
+              {task.error && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                  <h4 className="text-sm font-medium text-destructive flex items-center gap-2">
+                    <XCircle className="h-4 w-4" />
+                    Ошибка
+                  </h4>
+                  <p className="mt-2 text-sm break-words">{task.error}</p>
+                </div>
+              )}
+
+              {/* Diagnostics */}
+              {events && events.length > 0 && (() => {
+                const retryCount = events.filter(e => e.event_type === 'retried').length
+                const lastEvent = events[events.length - 1]
+                const diagEvents = events.filter(e =>
+                  ['executor_spawn_failed', 'executor_no_ack', 'executor_fallback_tmux', 'stall_detected', 'dispatch_failed'].includes(e.event_type)
+                )
+                return (diagEvents.length > 0 || retryCount > 0) ? (
+                  <div className="rounded-lg border border-border-subtle bg-bg-inset p-3 space-y-1.5">
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Диагностика</h4>
+                    {retryCount > 0 && (
+                      <p className="text-xs text-muted-foreground">Попыток: {retryCount}</p>
+                    )}
+                    {diagEvents.map((de, i) => (
+                      <p key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                        <span className="text-warning shrink-0">•</span>
+                        <span className="break-words">{de.detail}</span>
+                      </p>
+                    ))}
+                    <p className="text-xs text-muted-foreground/60">
+                      Последнее событие: {eventTypeLabels[lastEvent.event_type] || lastEvent.event_type} — {timeAgo(lastEvent.created_at)}
+                    </p>
+                  </div>
+                ) : null
+              })()}
+
+              {/* Retry actions */}
+              <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center">
+                {task.engineering_packet && (
+                  <Button
+                    onClick={() => onAction(task.id, 'retry', { strategy: 're-execute' })}
+                    loading={isLoading('retry')}
+                    className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Перезапустить
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => onAction(task.id, 'retry', { strategy: 're-interpret' })}
+                  loading={isLoading('retry')}
+                  className="w-full min-h-[44px] sm:w-auto sm:min-h-0"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Переанализировать
+                </Button>
+              </div>
             </div>
           )}
 

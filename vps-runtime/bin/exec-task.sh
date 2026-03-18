@@ -103,17 +103,51 @@ Do NOT call any API endpoints — just do the work and output results."
 api_post "progress" '{"message_ru":"Анализирую задачу и планирую выполнение...","pct":10,"phase_id":"analysis","phase_status":"active","step_index":0,"step_status":"done"}'
 log "Analysis phase started"
 
-# ── Execute via claude -p ───────────────────────────────────────────────────
+# ── Execute via claude -p with heartbeat ────────────────────────────────────
 
 log "Starting claude -p execution..."
 
 CLAUDE_OUTPUT_FILE="$LOG_DIR/exec-output-${TASK_ID}.txt"
+EXECUTION_TIMEOUT=${CLAUDE_EXEC_TIMEOUT:-600}  # 10 min default
 
-# Run claude in print mode (non-interactive, single prompt, outputs result)
-claude -p "$PROMPT" > "$CLAUDE_OUTPUT_FILE" 2>&1
+# Background heartbeat: send progress every 30s while claude is running
+_heartbeat_pid=""
+_start_heartbeat() {
+  (
+    local elapsed=0
+    while true; do
+      sleep 30
+      elapsed=$((elapsed + 30))
+      local pct=$((10 + elapsed * 70 / EXECUTION_TIMEOUT))
+      [ $pct -gt 80 ] && pct=80
+      api_post "progress" "{\"message_ru\":\"Выполняется... (${elapsed}с)\",\"pct\":$pct,\"phase_id\":\"implementation\",\"phase_status\":\"active\"}" >/dev/null 2>&1
+    done
+  ) &
+  _heartbeat_pid=$!
+}
+
+_stop_heartbeat() {
+  if [ -n "$_heartbeat_pid" ]; then
+    kill "$_heartbeat_pid" 2>/dev/null
+    wait "$_heartbeat_pid" 2>/dev/null
+    _heartbeat_pid=""
+  fi
+}
+trap _stop_heartbeat EXIT
+
+_start_heartbeat
+
+# Run claude in print mode with timeout
+timeout "$EXECUTION_TIMEOUT" claude -p "$PROMPT" > "$CLAUDE_OUTPUT_FILE" 2>&1
 CLAUDE_EXIT=$?
 
-log "claude -p exited with code: $CLAUDE_EXIT"
+_stop_heartbeat
+
+if [ $CLAUDE_EXIT -eq 124 ]; then
+  log "claude -p timed out after ${EXECUTION_TIMEOUT}s"
+else
+  log "claude -p exited with code: $CLAUDE_EXIT"
+fi
 
 # ── Read output ─────────────────────────────────────────────────────────────
 
@@ -130,7 +164,16 @@ RESULT_DETAIL_JSON=$(printf '%s' "$RESULT_DETAIL" | python3 -c 'import sys,json;
 
 # ── Report result ───────────────────────────────────────────────────────────
 
-if [ $CLAUDE_EXIT -eq 0 ] && [ -n "$CLAUDE_OUTPUT" ]; then
+if [ $CLAUDE_EXIT -eq 124 ]; then
+  # Timeout
+  ERROR_MSG="Исполнитель: claude превысил таймаут (${EXECUTION_TIMEOUT}с)"
+  if [ -n "$CLAUDE_OUTPUT" ]; then
+    ERROR_MSG="$ERROR_MSG. Частичный вывод: ${CLAUDE_OUTPUT:0:300}"
+  fi
+  ERROR_JSON=$(printf '%s' "$ERROR_MSG" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))' 2>/dev/null || echo '"Таймаут исполнителя"')
+  api_post "fail" "{\"error\":$ERROR_JSON}"
+  log "Task #$TASK_ID timed out"
+elif [ $CLAUDE_EXIT -eq 0 ] && [ -n "$CLAUDE_OUTPUT" ]; then
   # Success — report implementation phase done, then complete
   api_post "progress" '{"message_ru":"Выполнение завершено, формирую результат...","pct":90,"phase_id":"implementation","phase_status":"done"}'
 

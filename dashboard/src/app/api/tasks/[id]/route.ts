@@ -37,7 +37,7 @@ export async function POST(
       return NextResponse.json({ error: 'action is required' }, { status: 400 })
     }
 
-    const validActions = ['interpret', 'revise', 'choose-option', 'confirm', 'cancel', 'start', 'progress', 'complete', 'fail', 'review', 'request-review']
+    const validActions = ['interpret', 'revise', 'choose-option', 'confirm', 'cancel', 'start', 'progress', 'complete', 'fail', 'review', 'request-review', 'retry']
     if (!validActions.includes(action)) {
       return NextResponse.json({ error: `Invalid action: ${action}` }, { status: 400 })
     }
