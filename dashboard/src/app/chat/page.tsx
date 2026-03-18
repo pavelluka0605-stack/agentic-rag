@@ -258,7 +258,7 @@ export default function ChatPage() {
       >
         {/* Thread list header */}
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-4">
-          <h2 className="text-sm font-semibold">Задачи</h2>
+          <h2 className="text-sm font-semibold">Чаты</h2>
           <button
             onClick={() => { setSelectedId(null); textareaRef.current?.focus() }}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
@@ -324,6 +324,41 @@ export default function ChatPage() {
               })}
             </div>
           )}
+        </div>
+
+        {/* New chat input at bottom of thread list */}
+        <div className="shrink-0 border-t border-border-subtle p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {error && selectedId == null && (
+            <div className="mb-2 rounded-lg border border-destructive/50 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {error}
+              <button onClick={() => setError(null)} className="ml-2 underline">Скрыть</button>
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <textarea
+              ref={textareaRef}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Новая задача..."
+              rows={1}
+              className="min-w-0 flex-1 resize-none rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit(e)
+              }}
+            />
+            <Button type="submit" size="sm" disabled={!inputText.trim() || submitting} loading={submitting}>
+              <Send className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant={recording ? 'destructive' : 'outline'}
+              size="sm"
+              onClick={handleVoiceToggle}
+              disabled={submitting}
+            >
+              <Mic className={cn('h-4 w-4', recording && 'animate-pulse')} />
+            </Button>
+          </form>
         </div>
       </div>
 
