@@ -361,12 +361,20 @@ export function getTaskEvents(taskId: number): import('@/types').TaskEvent[] {
   )
 }
 
-export function getTaskStats(): { total: number; draft: number; pending: number; running: number; done: number; failed: number } {
-  const defaults = { total: 0, draft: 0, pending: 0, running: 0, done: 0, failed: 0 }
+export function getTaskStats(): {
+  total: number; draft: number; pending: number; confirmed: number;
+  running: number; review: number; needs_manual_review: number;
+  done: number; failed: number
+} {
+  const defaults = {
+    total: 0, draft: 0, pending: 0, confirmed: 0,
+    running: 0, review: 0, needs_manual_review: 0,
+    done: 0, failed: 0,
+  }
   try {
     const total = queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM tasks')
     if (total) defaults.total = total.cnt
-    for (const status of ['draft', 'pending', 'running', 'done', 'failed'] as const) {
+    for (const status of ['draft', 'pending', 'confirmed', 'running', 'review', 'needs_manual_review', 'done', 'failed'] as const) {
       const row = queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM tasks WHERE status = ?', [status])
       if (row) defaults[status] = row.cnt
     }
