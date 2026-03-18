@@ -242,8 +242,8 @@ export async function fetchChatThread(id: number): Promise<ChatThread> {
   return apiFetch<ChatThread>(`/api/chat/threads/${id}`)
 }
 
-export async function createChatThread(message?: string): Promise<ChatThread> {
-  return apiFetch<ChatThread>('/api/chat/threads', {
+export async function createChatThread(message?: string): Promise<{ thread: ChatThread; assistantMessage: ChatMessage | null }> {
+  return apiFetch('/api/chat/threads', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message }),
