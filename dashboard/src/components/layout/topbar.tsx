@@ -6,6 +6,7 @@ import { Search, RefreshCw, Command, Menu } from 'lucide-react'
 
 const pathTitles: Record<string, string> = {
   '/dashboard': 'Dashboard',
+  '/chat': 'Чат',
   '/sessions': 'Sessions',
   '/memory': 'Memory',
   '/incidents': 'Incidents',

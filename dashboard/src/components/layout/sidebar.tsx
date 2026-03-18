@@ -17,6 +17,7 @@ import {
   Terminal,
   X,
   ListTodo,
+  MessageSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -36,6 +37,7 @@ const navGroups: NavGroup[] = [
     title: 'Main',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { label: 'Чат', href: '/chat', icon: MessageSquare },
       { label: 'Задачи', href: '/tasks', icon: ListTodo },
     ],
   },
