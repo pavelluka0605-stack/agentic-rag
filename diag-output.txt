@@ -1,118 +1,118 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Tue Mar 17 12:42:53 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Wed Mar 18 13:11:41 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
 ● dashboard.service - Claude Code Task Dashboard (Next.js)
      Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
-     Active: active (running) since Tue 2026-03-17 12:06:37 UTC; 36min ago
-   Main PID: 1135265 (next-server (v1)
+     Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 1h 13min ago
+   Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 79.2M (max: 256.0M available: 176.7M peak: 80.4M)
-        CPU: 1.676s
+     Memory: 114.9M (max: 256.0M available: 141.0M peak: 116.6M)
+        CPU: 2.899s
      CGroup: /system.slice/dashboard.service
-             └─1135265 "next-server (v16.1.6)"
+             └─1364737 "next-server (v16.1.6)"
 
-Mar 17 12:06:37 fra-1-vm-ckr7 systemd[1]: Started dashboard.service - Claude Code Task Dashboard (Next.js).
-Mar 17 12:06:37 fra-1-vm-ckr7 node[1135265]: ▲ Next.js 16.1.6
-Mar 17 12:06:37 fra-1-vm-ckr7 node[1135265]: - Local:         http://localhost:3200
-Mar 17 12:06:37 fra-1-vm-ckr7 node[1135265]: - Network:       http://72.56.127.126:3200
-Mar 17 12:06:37 fra-1-vm-ckr7 node[1135265]: ✓ Starting...
-Mar 17 12:06:38 fra-1-vm-ckr7 node[1135265]: ✓ Ready in 849ms
+Mar 18 11:57:51 fra-1-vm-ckr7 systemd[1]: Started dashboard.service - Claude Code Task Dashboard (Next.js).
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ▲ Next.js 16.1.6
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: - Local:         http://localhost:3200
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: - Network:       http://72.56.127.126:3200
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Starting...
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Tue 2026-03-17 12:06:33 UTC; 36min ago
-   Main PID: 1135094 (node)
+     Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 1h 13min ago
+   Main PID: 1364558 (node)
       Tasks: 11 (limit: 32)
-     Memory: 23.8M (max: 128.0M available: 104.1M peak: 43.9M)
-        CPU: 570ms
+     Memory: 13.2M (max: 128.0M available: 114.7M peak: 128.0M swap: 14.3M swap peak: 81.0M)
+        CPU: 4.195s
      CGroup: /system.slice/control-api.service
-             └─1135094 /usr/bin/node server.js
+             └─1364558 /usr/bin/node server.js
 
-Mar 17 12:06:33 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Listening on 127.0.0.1:3901
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Task DB: ready
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] LLM: configured
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Telegram: configured
+Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Listening on 127.0.0.1:3901
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB: ready
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] LLM: configured
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Telegram: configured
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Stall watchdog: every 30s, threshold 90s
 
 === 3. Ports listening (3200, 3901, 3847, 3900, 80, 443) ===
-LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=1135094,fd=21))                                                                                                                                
+LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=1364558,fd=21))                                                                                                                                
 LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
 LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
-LISTEN 0      511          0.0.0.0:3847       0.0.0.0:*    users:(("node /opt/claud",pid=829221,fd=20))                                                                                                                      
 LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
 LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=577310,fd=7))                                                                                                                          
-LISTEN 0      511                *:3200             *:*    users:(("next-server (v1",pid=1135265,fd=18))                                                                                                                     
+LISTEN 0      511                *:3200             *:*    users:(("next-server (v1",pid=1364737,fd=18))                                                                                                                     
 
 === 4. Dashboard logs (last 30 lines) ===
-Mar 17 11:33:47 fra-1-vm-ckr7 systemd[1]: Stopping dashboard.service - Claude Code Task Dashboard (Next.js)...
-Mar 17 11:33:47 fra-1-vm-ckr7 systemd[1]: dashboard.service: Deactivated successfully.
-Mar 17 11:33:47 fra-1-vm-ckr7 systemd[1]: Stopped dashboard.service - Claude Code Task Dashboard (Next.js).
-Mar 17 11:33:47 fra-1-vm-ckr7 systemd[1]: dashboard.service: Consumed 1.528s CPU time, 78.9M memory peak, 0B memory swap peak.
-Mar 17 11:33:47 fra-1-vm-ckr7 systemd[1]: Started dashboard.service - Claude Code Task Dashboard (Next.js).
-Mar 17 11:33:48 fra-1-vm-ckr7 node[1118853]: ▲ Next.js 16.1.6
-Mar 17 11:33:48 fra-1-vm-ckr7 node[1118853]: - Local:         http://localhost:3200
-Mar 17 11:33:48 fra-1-vm-ckr7 node[1118853]: - Network:       http://72.56.127.126:3200
-Mar 17 11:33:48 fra-1-vm-ckr7 node[1118853]: ✓ Starting...
-Mar 17 11:33:48 fra-1-vm-ckr7 node[1118853]: ✓ Ready in 819ms
-Mar 17 12:02:24 fra-1-vm-ckr7 systemd[1]: Stopping dashboard.service - Claude Code Task Dashboard (Next.js)...
-Mar 17 12:02:24 fra-1-vm-ckr7 systemd[1]: dashboard.service: Deactivated successfully.
-Mar 17 12:02:24 fra-1-vm-ckr7 systemd[1]: Stopped dashboard.service - Claude Code Task Dashboard (Next.js).
-Mar 17 12:02:24 fra-1-vm-ckr7 systemd[1]: dashboard.service: Consumed 1.854s CPU time, 80.0M memory peak, 0B memory swap peak.
-Mar 17 12:02:24 fra-1-vm-ckr7 systemd[1]: Started dashboard.service - Claude Code Task Dashboard (Next.js).
-Mar 17 12:02:24 fra-1-vm-ckr7 node[1130585]: ▲ Next.js 16.1.6
-Mar 17 12:02:24 fra-1-vm-ckr7 node[1130585]: - Local:         http://localhost:3200
-Mar 17 12:02:24 fra-1-vm-ckr7 node[1130585]: - Network:       http://72.56.127.126:3200
-Mar 17 12:02:24 fra-1-vm-ckr7 node[1130585]: ✓ Starting...
-Mar 17 12:02:25 fra-1-vm-ckr7 node[1130585]: ✓ Ready in 863ms
-Mar 17 12:06:36 fra-1-vm-ckr7 systemd[1]: Stopping dashboard.service - Claude Code Task Dashboard (Next.js)...
-Mar 17 12:06:37 fra-1-vm-ckr7 systemd[1]: dashboard.service: Deactivated successfully.
-Mar 17 12:06:37 fra-1-vm-ckr7 systemd[1]: Stopped dashboard.service - Claude Code Task Dashboard (Next.js).
-Mar 17 12:06:37 fra-1-vm-ckr7 systemd[1]: dashboard.service: Consumed 1.662s CPU time, 77.7M memory peak, 0B memory swap peak.
-Mar 17 12:06:37 fra-1-vm-ckr7 systemd[1]: Started dashboard.service - Claude Code Task Dashboard (Next.js).
-Mar 17 12:06:37 fra-1-vm-ckr7 node[1135265]: ▲ Next.js 16.1.6
-Mar 17 12:06:37 fra-1-vm-ckr7 node[1135265]: - Local:         http://localhost:3200
-Mar 17 12:06:37 fra-1-vm-ckr7 node[1135265]: - Network:       http://72.56.127.126:3200
-Mar 17 12:06:37 fra-1-vm-ckr7 node[1135265]: ✓ Starting...
-Mar 17 12:06:38 fra-1-vm-ckr7 node[1135265]: ✓ Ready in 849ms
+Mar 18 11:15:58 fra-1-vm-ckr7 systemd[1]: Stopping dashboard.service - Claude Code Task Dashboard (Next.js)...
+Mar 18 11:15:58 fra-1-vm-ckr7 systemd[1]: dashboard.service: Deactivated successfully.
+Mar 18 11:15:58 fra-1-vm-ckr7 systemd[1]: Stopped dashboard.service - Claude Code Task Dashboard (Next.js).
+Mar 18 11:15:58 fra-1-vm-ckr7 systemd[1]: dashboard.service: Consumed 7.301s CPU time, 126.2M memory peak, 0B memory swap peak.
+Mar 18 11:15:58 fra-1-vm-ckr7 systemd[1]: Started dashboard.service - Claude Code Task Dashboard (Next.js).
+Mar 18 11:15:58 fra-1-vm-ckr7 node[1353287]: ▲ Next.js 16.1.6
+Mar 18 11:15:58 fra-1-vm-ckr7 node[1353287]: - Local:         http://localhost:3200
+Mar 18 11:15:58 fra-1-vm-ckr7 node[1353287]: - Network:       http://72.56.127.126:3200
+Mar 18 11:15:58 fra-1-vm-ckr7 node[1353287]: ✓ Starting...
+Mar 18 11:15:59 fra-1-vm-ckr7 node[1353287]: ✓ Ready in 912ms
+Mar 18 11:37:26 fra-1-vm-ckr7 systemd[1]: Stopping dashboard.service - Claude Code Task Dashboard (Next.js)...
+Mar 18 11:37:26 fra-1-vm-ckr7 systemd[1]: dashboard.service: Deactivated successfully.
+Mar 18 11:37:26 fra-1-vm-ckr7 systemd[1]: Stopped dashboard.service - Claude Code Task Dashboard (Next.js).
+Mar 18 11:37:26 fra-1-vm-ckr7 systemd[1]: dashboard.service: Consumed 2.666s CPU time, 121.7M memory peak, 0B memory swap peak.
+Mar 18 11:37:26 fra-1-vm-ckr7 systemd[1]: Started dashboard.service - Claude Code Task Dashboard (Next.js).
+Mar 18 11:37:27 fra-1-vm-ckr7 node[1359145]: ▲ Next.js 16.1.6
+Mar 18 11:37:27 fra-1-vm-ckr7 node[1359145]: - Local:         http://localhost:3200
+Mar 18 11:37:27 fra-1-vm-ckr7 node[1359145]: - Network:       http://72.56.127.126:3200
+Mar 18 11:37:27 fra-1-vm-ckr7 node[1359145]: ✓ Starting...
+Mar 18 11:37:27 fra-1-vm-ckr7 node[1359145]: ✓ Ready in 879ms
+Mar 18 11:57:51 fra-1-vm-ckr7 systemd[1]: Stopping dashboard.service - Claude Code Task Dashboard (Next.js)...
+Mar 18 11:57:51 fra-1-vm-ckr7 systemd[1]: dashboard.service: Deactivated successfully.
+Mar 18 11:57:51 fra-1-vm-ckr7 systemd[1]: Stopped dashboard.service - Claude Code Task Dashboard (Next.js).
+Mar 18 11:57:51 fra-1-vm-ckr7 systemd[1]: dashboard.service: Consumed 3.026s CPU time, 115.6M memory peak, 0B memory swap peak.
+Mar 18 11:57:51 fra-1-vm-ckr7 systemd[1]: Started dashboard.service - Claude Code Task Dashboard (Next.js).
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ▲ Next.js 16.1.6
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: - Local:         http://localhost:3200
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: - Network:       http://72.56.127.126:3200
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Starting...
+Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 
 === 5. Control API logs (last 20 lines) ===
-Mar 17 12:02:20 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
-Mar 17 12:02:20 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
-Mar 17 12:02:20 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
-Mar 17 12:02:20 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 17 12:02:20 fra-1-vm-ckr7 node[1130379]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 17 12:02:20 fra-1-vm-ckr7 node[1130379]: [control-api] Listening on 127.0.0.1:3901
-Mar 17 12:02:20 fra-1-vm-ckr7 node[1130379]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 17 12:02:20 fra-1-vm-ckr7 node[1130379]: [control-api] Task DB: ready
-Mar 17 12:02:20 fra-1-vm-ckr7 node[1130379]: [control-api] LLM: configured
-Mar 17 12:02:20 fra-1-vm-ckr7 node[1130379]: [control-api] Telegram: configured
-Mar 17 12:06:32 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
-Mar 17 12:06:32 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
-Mar 17 12:06:32 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
-Mar 17 12:06:33 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Listening on 127.0.0.1:3901
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Task DB: ready
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] LLM: configured
-Mar 17 12:06:33 fra-1-vm-ckr7 node[1135094]: [control-api] Telegram: configured
+Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [db] Added column tasks.deleted_at
+Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Listening on 127.0.0.1:3901
+Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Task DB: ready
+Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] LLM: configured
+Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Telegram: configured
+Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Stall watchdog: every 30s, threshold 90s
+Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
+Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
+Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
+Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: control-api.service: Consumed 4.142s CPU time, 128.0M memory peak, 79.1M memory swap peak.
+Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Listening on 127.0.0.1:3901
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB: ready
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] LLM: configured
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Telegram: configured
+Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Stall watchdog: every 30s, threshold 90s
 
 === 6. Dashboard .next/ build exists? ===
-total 172
-drwxr-xr-x 9 root root  4096 Mar 17 12:06 .
-drwxr-xr-x 5 root root  4096 Mar 17 11:15 ..
--rw-r--r-- 1 root root    21 Mar 17 12:06 BUILD_ID
--rw-r--r-- 1 root root  1376 Mar 17 12:06 app-path-routes-manifest.json
-drwxr-xr-x 3 root root  4096 Mar 17 12:06 build
--rw-r--r-- 1 root root   494 Mar 17 12:06 build-manifest.json
+total 180
+drwxr-xr-x 9 root root  4096 Mar 18 11:57 .
+drwxr-xr-x 6 root root  4096 Mar 17 16:48 ..
+-rw-r--r-- 1 root root    21 Mar 18 11:57 BUILD_ID
+-rw-r--r-- 1 root root  1607 Mar 18 11:57 app-path-routes-manifest.json
+drwxr-xr-x 3 root root  4096 Mar 18 11:57 build
+-rw-r--r-- 1 root root   494 Mar 18 11:57 build-manifest.json
 drwxr-xr-x 2 root root  4096 Mar 17 11:16 cache
-drwxr-xr-x 2 root root  4096 Mar 17 12:06 diagnostics
--rw-r--r-- 1 root root   111 Mar 17 12:06 export-marker.json
+drwxr-xr-x 2 root root  4096 Mar 18 11:57 diagnostics
+-rw-r--r-- 1 root root   111 Mar 18 11:57 export-marker.json
 
 === 7. Dashboard .env.local ===
 MEMORY_DB_PATH=/opt/claude-code/memory/memory.db
@@ -129,20 +129,20 @@ location: /dashboard
 x-nextjs-stale-time: 300
 X-Powered-By: Next.js
 Cache-Control: s-maxage=31536000
-ETag: "fibvqu9q0c4sf"
+ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
-Content-Length: 6207
-Date: Tue, 17 Mar 2026 12:42:53 GMT
+Content-Length: 8075
+Date: Wed, 18 Mar 2026 13:11:41 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
 
 === 9. curl localhost:3200/tasks ===
-<!DOCTYPE html><!--vP4a98jYsruqccmK5FtjS--><html lang="en" class="dark"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/_next/static/chunks/b2c0e2bf8039c402.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/72e142f30eb8f380.js"/><script src="/_next/static/chunks/82abf2d65f5428ae.js" async=""></script><script src="/_next/static/chunks/f2f58a7e93290fbb.js" async=""></script><script src="/_next/static/chunks/38eb66a58ed5ffd7.js" async=""></script><script src="/_next/static/chunks/turbopack-b2b4436af9bffbac.js" async=""></script><script src="/_next/static/chunks/c2fbe19ee7dcd4e4.js" async=""></script><script src="/_next/static/chunks/d29fbabafbdc3b84.js" async=""></script><script src="/_next/static/chunks/c3719c5cb0ff22e3.js" async=""></script><script src="/_next/static/chunks/ff1a16fafef87110.js" async=""></script><script src="/_next/static/chunks/d2be314c3ece3fbe.js" async=""></script><script src="/_next/static/chunks/703e485fff36a47c.js" async=""></script><script src="/_next/static/chunks/623c17490a7ba51d.js" async=""></script><title>Claude Code Dashboard</title><meta name="description" content="Development intelligence dashboard"/><script src="/_next/static/chunks/a6dad97d9634a72d.js" noModule=""></script></head><body class="antialiased"><div hidden=""><!--$--><!--/$--></div><div class="flex h-screen overflow-hidden bg-bg-deep"><aside class="flex h-screen flex-col border-r border-border-subtle bg-bg-deep transition-all duration-200 ease-out w-60 fixed inset-y-0 left-0 z-50 md:static md:z-auto -translate-x-full md:translate-x-0"><div class="flex h-14 items-center gap-2.5 border-b border-border-subtle px-4 shadow-[0_1px_8px_-2px_oklch(0.685_0.155_250_/_0.15)]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal h-6 w-6 shrink-0 text-primary" aria-hidden="true"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg><span class="text-gradient text-sm font-semibold tracking-tight opacity-90 flex-1">Claude Code</span></div><nav class="flex-1 overflow-y-auto px-2 py-3"><div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Main</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard h-4 w-4 shrink-0" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg><span>Dashboard</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors bg-primary/12 font-medium text-primary" href="/tasks"><span class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary"></span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-todo h-4 w-4 shrink-0" aria-hidden="true"><path d="M13 5h8"></path><path d="M13 12h8"></path><path d="M13 19h8"></path><path d="m3 17 2 2 4-4"></path><rect x="3" y="4" width="6" height="6" rx="1"></rect></svg><span>Задачи</span></a></li></ul></div><div><div class="mx-2 my-2.5 border-t border-border/40"></div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Work</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/sessions"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-history h-4 w-4 shrink-0" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg><span>Sessions</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/memory"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-brain h-4 w-4 shrink-0" aria-hidden="true"><path d="M12 18V5"></path><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path><path d="M18 18a4 4 0 0 0 2-7.464"></path><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path><path d="M6 18a4 4 0 0 1-2-7.464"></path><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path></svg><span>Memory</span></a></li></ul></div><div><div class="mx-2 my-2.5 border-t border-border/40"></div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Issues</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/incidents"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-triangle-alert h-4 w-4 shrink-0" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg><span>Incidents</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/solutions"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lightbulb h-4 w-4 shrink-0" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg><span>Solutions</span></a></li></ul></div><div><div class="mx-2 my-2.5 border-t border-border/40"></div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">External</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/projects"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-kanban h-4 w-4 shrink-0" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path><path d="M8 10v4"></path><path d="M12 10v2"></path><path d="M16 10v6"></path></svg><span>Projects</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/github"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-github h-4 w-4 shrink-0" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg><span>GitHub</span></a></li></ul></div><div><div class="mx-2 my-2.5 border-t border-border/40"></div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">System</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/health"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity h-4 w-4 shrink-0" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg><span>System Health</span></a></li></ul></div></nav><div class="border-t border-border-subtle p-2"><button class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground/70 transition-colors hover:bg-[oklch(0.175_0.008_260)] hover:text-muted-foreground"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left-close h-4 w-4 shrink-0" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg><span>Collapse</span></button><div class="flex items-center gap-1.5 px-2.5 pt-1.5"><span class="h-1.5 w-1.5 rounded-full bg-success"></span><p class="text-[11px] text-muted-foreground/40">v1.0.0</p></div></div></aside><div class="flex flex-1 flex-col overflow-hidden"><header class="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border-subtle bg-[oklch(0.145_0.005_260)]/80 px-6 backdrop-blur-md"><div class="flex items-center gap-3"><button class="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground md:hidden" title="Open menu"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu h-5 w-5" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg></button><div class="flex flex-col justify-center"><h1 class="text-base font-semibold text-foreground">Dashboard</h1></div></div><div class="flex items-center gap-1"><button class="flex h-8 items-center gap-2 rounded-lg border border-border-subtle bg-bg-inset px-3 text-sm text-muted-foreground/60 transition-colors hover:bg-bg-overlay hover:text-muted-foreground" title="Search (Cmd+K)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search h-3.5 w-3.5" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg><span class="hidden sm:inline">Search...</span><kbd class="ml-1 hidden rounded border border-border-subtle px-1 py-0.5 font-mono text-[10px] sm:inline-block"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-command inline h-2.5 w-2.5" aria-hidden="true"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"></path></svg>K</kbd></button><button class="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground" title="Refresh"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw h-4 w-4" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg></button></div></header><main class="flex-1 overflow-y-auto bg-bg-surface p-4 sm:p-6"><div class="mx-auto max-w-[1400px] animate-fade-in"><div class="flex h-[60vh] items-center justify-center"><svg class="animate-spin text-muted-foreground h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div><!--$--><!--/$--></div></main></div></div><script src="/_next/static/chunks/72e142f30eb8f380.js" id="_R_" async=""></script><script>(self.__next_f=self.__next_f||[]).push([0])</script><script>self.__next_f.push([1,"1:\"$Sreact.fragment\"\n2:I[1661,[\"/_next/static/chunks/c2fbe19ee7dcd4e4.js\",\"/_next/static/chunks/d29fbabafbdc3b84.js\",\"/_next/static/chunks/c3719c5cb0ff22e3.js\"],\"Providers\"]\n3:I[44787,[\"/_next/static/chunks/c2fbe19ee7dcd4e4.js\",\"/_next/static/chunks/d29fbabafbdc3b84.js\",\"/_next/static/chunks/c3719c5cb0ff22e3.js\"],\"AppShell\"]\n4:I[39756,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"default\"]\n5:I[58298,[\"/_next/static/chunks/c2fbe19ee7dcd4e4.js\",\"/_next/static/chunks/d29fbabafbdc3b84.js\",\"/_next/static/chunks/c3719c5cb0ff22e3.js\",\"/_next/static/chunks/703e485fff36a47c.js\"],\"default\"]\n6:I[37457,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"default\"]\n7:I[47257,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"ClientPageRoot\"]\n8:I[8412,[\"/_next/static/chunks/c2fbe19ee7dcd4e4.js\",\"/_next/static/chunks/d29fbabafbdc3b84.js\",\"/_next/static/chunks/c3719c5cb0ff22e3.js\",\"/_next/static/chunks/623c17490a7ba51d.js\"],\"default\"]\nb:I[97367,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"OutletBoundary\"]\nc:\"$Sreact.suspense\"\ne:I[97367,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"ViewportBoundary\"]\n10:I[97367,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"MetadataBoundary\"]\n12:I[68027,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"default\"]\n:HL[\"/_next/static/chunks/b2c0e2bf8039c402.css\",\"style\"]\n"])</script><script>self.__next_f.push([1,"0:{\"P\":null,\"b\":\"vP4a98jYsruqccmK5FtjS\",\"c\":[\"\",\"tasks\"],\"q\":\"\",\"i\":false,\"f\":[[[\"\",{\"children\":[\"tasks\",{\"children\":[\"__PAGE__\",{}]}]},\"$undefined\",\"$undefined\",true],[[\"$\",\"$1\",\"c\",{\"children\":[[[\"$\",\"link\",\"0\",{\"rel\":\"stylesheet\",\"href\":\"/_next/static/chunks/b2c0e2bf8039c402.css\",\"precedence\":\"next\",\"crossOrigin\":\"$undefined\",\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-0\",{\"src\":\"/_next/static/chunks/c2fbe19ee7dcd4e4.js\",\"async\":true,\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-1\",{\"src\":\"/_next/static/chunks/d29fbabafbdc3b84.js\",\"async\":true,\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-2\",{\"src\":\"/_next/static/chunks/c3719c5cb0ff22e3.js\",\"async\":true,\"nonce\":\"$undefined\"}]],[\"$\",\"html\",null,{\"lang\":\"en\",\"className\":\"dark\",\"children\":[\"$\",\"body\",null,{\"className\":\"antialiased\",\"children\":[\"$\",\"$L2\",null,{\"children\":[\"$\",\"$L3\",null,{\"children\":[\"$\",\"$L4\",null,{\"parallelRouterKey\":\"children\",\"error\":\"$5\",\"errorStyles\":[],\"errorScripts\":[[\"$\",\"script\",\"script-0\",{\"src\":\"/_next/static/chunks/703e485fff36a47c.js\",\"async\":true}]],\"template\":[\"$\",\"$L6\",null,{}],\"templateStyles\":\"$undefined\",\"templateScripts\":\"$undefined\",\"notFound\":[[[\"$\",\"title\",null,{\"children\":\"404: This page could not be found.\"}],[\"$\",\"div\",null,{\"style\":{\"fontFamily\":\"system-ui,\\\"Segoe UI\\\",Roboto,Helvetica,Arial,sans-serif,\\\"Apple Color Emoji\\\",\\\"Segoe UI Emoji\\\"\",\"height\":\"100vh\",\"textAlign\":\"center\",\"display\":\"flex\",\"flexDirection\":\"column\",\"alignItems\":\"center\",\"justifyContent\":\"center\"},\"children\":[\"$\",\"div\",null,{\"children\":[[\"$\",\"style\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\"}}],[\"$\",\"h1\",null,{\"className\":\"next-error-h1\",\"style\":{\"display\":\"inline-block\",\"margin\":\"0 20px 0 0\",\"padding\":\"0 23px 0 0\",\"fontSize\":24,\"fontWeight\":500,\"verticalAlign\":\"top\",\"lineHeight\":\"49px\"},\"children\":404}],[\"$\",\"div\",null,{\"style\":{\"display\":\"inline-block\"},\"children\":[\"$\",\"h2\",null,{\"style\":{\"fontSize\":14,\"fontWeight\":400,\"lineHeight\":\"49px\",\"margin\":0},\"children\":\"This page could not be found.\"}]}]]}]}]],[]],\"forbidden\":\"$undefined\",\"unauthorized\":\"$undefined\"}]}]}]}]}]]}],{\"children\":[[\"$\",\"$1\",\"c\",{\"children\":[null,[\"$\",\"$L4\",null,{\"parallelRouterKey\":\"children\",\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"$L6\",null,{}],\"templateStyles\":\"$undefined\",\"templateScripts\":\"$undefined\",\"notFound\":\"$undefined\",\"forbidden\":\"$undefined\",\"unauthorized\":\"$undefined\"}]]}],{\"children\":[[\"$\",\"$1\",\"c\",{\"children\":[[\"$\",\"$L7\",null,{\"Component\":\"$8\",\"serverProvidedParams\":{\"searchParams\":{},\"params\":{},\"promises\":[\"$@9\",\"$@a\"]}}],[[\"$\",\"script\",\"script-0\",{\"src\":\"/_next/static/chunks/623c17490a7ba51d.js\",\"async\":true,\"nonce\":\"$undefined\"}]],[\"$\",\"$Lb\",null,{\"children\":[\"$\",\"$c\",null,{\"name\":\"Next.MetadataOutlet\",\"children\":\"$@d\"}]}]]}],{},null,false,false]},null,false,false]},null,false,false],[\"$\",\"$1\",\"h\",{\"children\":[null,[\"$\",\"$Le\",null,{\"children\":\"$Lf\"}],[\"$\",\"div\",null,{\"hidden\":true,\"children\":[\"$\",\"$L10\",null,{\"children\":[\"$\",\"$c\",null,{\"name\":\"Next.Metadata\",\"children\":\"$L11\"}]}]}],null]}],false]],\"m\":\"$undefined\",\"G\":[\"$12\",[]],\"S\":true}\n"])</script><script>self.__next_f.push([1,"9:{}\na:\"$0:f:0:1:1:children:1:children:0:props:children:0:props:serverProvidedParams:params\"\n"])</script><script>self.__next_f.push([1,"f:[[\"$\",\"meta\",\"0\",{\"charSet\":\"utf-8\"}],[\"$\",\"meta\",\"1\",{\"name\":\"viewport\",\"content\":\"width=device-width, initial-scale=1\"}]]\n"])</script><script>self.__next_f.push([1,"d:null\n11:[[\"$\",\"title\",\"0\",{\"children\":\"Claude Code Dashboard\"}],[\"$\",\"meta\",\"1\",{\"name\":\"description\",\"content\":\"Development intelligence dashboard\"}]]\n"])</script></body></html>
+<!DOCTYPE html><!--rHweH9CQc56UNSSRtHPux--><html lang="ru" class="dark"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no"/><link rel="stylesheet" href="/_next/static/chunks/5e6d590d2219925f.css" data-precedence="next"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/72e142f30eb8f380.js"/><script src="/_next/static/chunks/82abf2d65f5428ae.js" async=""></script><script src="/_next/static/chunks/f2f58a7e93290fbb.js" async=""></script><script src="/_next/static/chunks/38eb66a58ed5ffd7.js" async=""></script><script src="/_next/static/chunks/turbopack-b2b4436af9bffbac.js" async=""></script><script src="/_next/static/chunks/58603066aa678b2e.js" async=""></script><script src="/_next/static/chunks/f269cf86c973984b.js" async=""></script><script src="/_next/static/chunks/0953ed588a6cc766.js" async=""></script><script src="/_next/static/chunks/ff1a16fafef87110.js" async=""></script><script src="/_next/static/chunks/d2be314c3ece3fbe.js" async=""></script><script src="/_next/static/chunks/703e485fff36a47c.js" async=""></script><script src="/_next/static/chunks/02888925cec974a8.js" async=""></script><script src="/_next/static/chunks/82ef4dac06903bf5.js" async=""></script><meta name="theme-color" content="#1a1b2e"/><title>Claude Code — Панель управления</title><meta name="description" content="Задачи, мониторинг и управление системой"/><link rel="manifest" href="/manifest.json"/><meta name="mobile-web-app-capable" content="yes"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-title" content="Claude Code"/><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/><link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png"/><link rel="icon" href="/icon-512.png" sizes="512x512" type="image/png"/><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" type="image/png"/><script src="/_next/static/chunks/a6dad97d9634a72d.js" noModule=""></script></head><body class="antialiased"><div hidden=""><!--$--><!--/$--></div><div class="flex h-[100dvh] overflow-hidden bg-bg-deep"><aside class="flex h-screen flex-col border-r border-border-subtle bg-bg-deep transition-all duration-200 ease-out w-60 fixed inset-y-0 left-0 z-50 md:static md:z-auto -translate-x-full md:translate-x-0"><div class="flex h-14 items-center gap-2.5 border-b border-border-subtle px-4 shadow-[0_1px_8px_-2px_oklch(0.685_0.155_250_/_0.15)]"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal h-6 w-6 shrink-0 text-primary" aria-hidden="true"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg><span class="text-gradient text-sm font-semibold tracking-tight opacity-90 flex-1">Claude Code</span></div><nav class="flex-1 overflow-y-auto px-2 py-3"><div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Основное</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/chat"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-circle h-4 w-4 shrink-0" aria-hidden="true"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"></path></svg><span>Чат</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors bg-primary/12 font-medium text-primary" href="/tasks"><span class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary"></span><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-todo h-4 w-4 shrink-0" aria-hidden="true"><path d="M13 5h8"></path><path d="M13 12h8"></path><path d="M13 19h8"></path><path d="m3 17 2 2 4-4"></path><rect x="3" y="4" width="6" height="6" rx="1"></rect></svg><span>Задачи</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard h-4 w-4 shrink-0" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg><span>Обзор</span></a></li></ul></div><div><div class="mx-2 my-2.5 border-t border-border/40"></div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Работа</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/sessions"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-history h-4 w-4 shrink-0" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg><span>Сессии</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/memory"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-brain h-4 w-4 shrink-0" aria-hidden="true"><path d="M12 18V5"></path><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path><path d="M18 18a4 4 0 0 0 2-7.464"></path><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path><path d="M6 18a4 4 0 0 1-2-7.464"></path><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path></svg><span>Память</span></a></li></ul></div><div><div class="mx-2 my-2.5 border-t border-border/40"></div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Проблемы</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/incidents"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-triangle-alert h-4 w-4 shrink-0" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg><span>Инциденты</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/solutions"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lightbulb h-4 w-4 shrink-0" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg><span>Решения</span></a></li></ul></div><div><div class="mx-2 my-2.5 border-t border-border/40"></div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Внешнее</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/projects"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-kanban h-4 w-4 shrink-0" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path><path d="M8 10v4"></path><path d="M12 10v2"></path><path d="M16 10v6"></path></svg><span>Проекты</span></a></li><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/github"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-github h-4 w-4 shrink-0" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg><span>GitHub</span></a></li></ul></div><div><div class="mx-2 my-2.5 border-t border-border/40"></div><p class="mb-1.5 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Система</p><ul class="space-y-0.5"><li><a class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors text-muted-foreground hover:bg-[oklch(0.175_0.008_260)] hover:text-foreground" href="/health"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-activity h-4 w-4 shrink-0" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg><span>Здоровье</span></a></li></ul></div></nav><div class="border-t border-border-subtle p-2"><button class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground/70 transition-colors hover:bg-[oklch(0.175_0.008_260)] hover:text-muted-foreground"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-panel-left-close h-4 w-4 shrink-0" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg><span>Свернуть</span></button><div class="flex items-center gap-1.5 px-2.5 pt-1.5"><span class="h-1.5 w-1.5 rounded-full bg-success"></span><p class="text-[11px] text-muted-foreground/40">v1.0.0</p></div></div></aside><div class="flex min-w-0 flex-1 flex-col overflow-hidden"><header class="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border-subtle bg-[oklch(0.145_0.005_260)]/80 px-6 backdrop-blur-md"><div class="flex items-center gap-3"><button class="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground md:hidden" title="Меню"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu h-5 w-5" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg></button><div class="flex flex-col justify-center"><h1 class="text-base font-semibold text-foreground">Задачи</h1></div></div><div class="flex items-center gap-1"><button class="flex h-8 items-center gap-2 rounded-lg border border-border-subtle bg-bg-inset px-3 text-sm text-muted-foreground/60 transition-colors hover:bg-bg-overlay hover:text-muted-foreground" title="Поиск (Cmd+K)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search h-3.5 w-3.5" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg><span class="hidden sm:inline">Поиск...</span><kbd class="ml-1 hidden rounded border border-border-subtle px-1 py-0.5 font-mono text-[10px] sm:inline-block"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-command inline h-2.5 w-2.5" aria-hidden="true"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"></path></svg>K</kbd></button><button class="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground" title="Обновить"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw h-4 w-4" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg></button></div></header><main class="flex-1 overflow-y-auto overflow-x-hidden bg-bg-surface p-3 sm:p-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"><div class="mx-auto max-w-[1400px] w-full animate-fade-in"><div class="flex h-[60vh] items-center justify-center"><svg class="animate-spin text-muted-foreground h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div><!--$--><!--/$--></div></main></div></div><script src="/_next/static/chunks/72e142f30eb8f380.js" id="_R_" async=""></script><script>(self.__next_f=self.__next_f||[]).push([0])</script><script>self.__next_f.push([1,"1:\"$Sreact.fragment\"\n2:I[1661,[\"/_next/static/chunks/58603066aa678b2e.js\",\"/_next/static/chunks/f269cf86c973984b.js\",\"/_next/static/chunks/0953ed588a6cc766.js\"],\"Providers\"]\n3:I[44787,[\"/_next/static/chunks/58603066aa678b2e.js\",\"/_next/static/chunks/f269cf86c973984b.js\",\"/_next/static/chunks/0953ed588a6cc766.js\"],\"AppShell\"]\n4:I[39756,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"default\"]\n5:I[58298,[\"/_next/static/chunks/58603066aa678b2e.js\",\"/_next/static/chunks/f269cf86c973984b.js\",\"/_next/static/chunks/0953ed588a6cc766.js\",\"/_next/static/chunks/703e485fff36a47c.js\"],\"default\"]\n6:I[37457,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"default\"]\n7:I[47257,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"ClientPageRoot\"]\n8:I[8412,[\"/_next/static/chunks/58603066aa678b2e.js\",\"/_next/static/chunks/f269cf86c973984b.js\",\"/_next/static/chunks/0953ed588a6cc766.js\",\"/_next/static/chunks/02888925cec974a8.js\",\"/_next/static/chunks/82ef4dac06903bf5.js\"],\"default\"]\nb:I[97367,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"OutletBoundary\"]\nc:\"$Sreact.suspense\"\ne:I[97367,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"ViewportBoundary\"]\n10:I[97367,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"MetadataBoundary\"]\n12:I[68027,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"default\"]\n:HL[\"/_next/static/chunks/5e6d590d2219925f.css\",\"style\"]\n"])</script><script>self.__next_f.push([1,"0:{\"P\":null,\"b\":\"rHweH9CQc56UNSSRtHPux\",\"c\":[\"\",\"tasks\"],\"q\":\"\",\"i\":false,\"f\":[[[\"\",{\"children\":[\"tasks\",{\"children\":[\"__PAGE__\",{}]}]},\"$undefined\",\"$undefined\",true],[[\"$\",\"$1\",\"c\",{\"children\":[[[\"$\",\"link\",\"0\",{\"rel\":\"stylesheet\",\"href\":\"/_next/static/chunks/5e6d590d2219925f.css\",\"precedence\":\"next\",\"crossOrigin\":\"$undefined\",\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-0\",{\"src\":\"/_next/static/chunks/58603066aa678b2e.js\",\"async\":true,\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-1\",{\"src\":\"/_next/static/chunks/f269cf86c973984b.js\",\"async\":true,\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-2\",{\"src\":\"/_next/static/chunks/0953ed588a6cc766.js\",\"async\":true,\"nonce\":\"$undefined\"}]],[\"$\",\"html\",null,{\"lang\":\"ru\",\"className\":\"dark\",\"children\":[\"$\",\"body\",null,{\"className\":\"antialiased\",\"children\":[\"$\",\"$L2\",null,{\"children\":[\"$\",\"$L3\",null,{\"children\":[\"$\",\"$L4\",null,{\"parallelRouterKey\":\"children\",\"error\":\"$5\",\"errorStyles\":[],\"errorScripts\":[[\"$\",\"script\",\"script-0\",{\"src\":\"/_next/static/chunks/703e485fff36a47c.js\",\"async\":true}]],\"template\":[\"$\",\"$L6\",null,{}],\"templateStyles\":\"$undefined\",\"templateScripts\":\"$undefined\",\"notFound\":[[[\"$\",\"title\",null,{\"children\":\"404: This page could not be found.\"}],[\"$\",\"div\",null,{\"style\":{\"fontFamily\":\"system-ui,\\\"Segoe UI\\\",Roboto,Helvetica,Arial,sans-serif,\\\"Apple Color Emoji\\\",\\\"Segoe UI Emoji\\\"\",\"height\":\"100vh\",\"textAlign\":\"center\",\"display\":\"flex\",\"flexDirection\":\"column\",\"alignItems\":\"center\",\"justifyContent\":\"center\"},\"children\":[\"$\",\"div\",null,{\"children\":[[\"$\",\"style\",null,{\"dangerouslySetInnerHTML\":{\"__html\":\"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}\"}}],[\"$\",\"h1\",null,{\"className\":\"next-error-h1\",\"style\":{\"display\":\"inline-block\",\"margin\":\"0 20px 0 0\",\"padding\":\"0 23px 0 0\",\"fontSize\":24,\"fontWeight\":500,\"verticalAlign\":\"top\",\"lineHeight\":\"49px\"},\"children\":404}],[\"$\",\"div\",null,{\"style\":{\"display\":\"inline-block\"},\"children\":[\"$\",\"h2\",null,{\"style\":{\"fontSize\":14,\"fontWeight\":400,\"lineHeight\":\"49px\",\"margin\":0},\"children\":\"This page could not be found.\"}]}]]}]}]],[]],\"forbidden\":\"$undefined\",\"unauthorized\":\"$undefined\"}]}]}]}]}]]}],{\"children\":[[\"$\",\"$1\",\"c\",{\"children\":[null,[\"$\",\"$L4\",null,{\"parallelRouterKey\":\"children\",\"error\":\"$undefined\",\"errorStyles\":\"$undefined\",\"errorScripts\":\"$undefined\",\"template\":[\"$\",\"$L6\",null,{}],\"templateStyles\":\"$undefined\",\"templateScripts\":\"$undefined\",\"notFound\":\"$undefined\",\"forbidden\":\"$undefined\",\"unauthorized\":\"$undefined\"}]]}],{\"children\":[[\"$\",\"$1\",\"c\",{\"children\":[[\"$\",\"$L7\",null,{\"Component\":\"$8\",\"serverProvidedParams\":{\"searchParams\":{},\"params\":{},\"promises\":[\"$@9\",\"$@a\"]}}],[[\"$\",\"script\",\"script-0\",{\"src\":\"/_next/static/chunks/02888925cec974a8.js\",\"async\":true,\"nonce\":\"$undefined\"}],[\"$\",\"script\",\"script-1\",{\"src\":\"/_next/static/chunks/82ef4dac06903bf5.js\",\"async\":true,\"nonce\":\"$undefined\"}]],[\"$\",\"$Lb\",null,{\"children\":[\"$\",\"$c\",null,{\"name\":\"Next.MetadataOutlet\",\"children\":\"$@d\"}]}]]}],{},null,false,false]},null,false,false]},null,false,false],[\"$\",\"$1\",\"h\",{\"children\":[null,[\"$\",\"$Le\",null,{\"children\":\"$Lf\"}],[\"$\",\"div\",null,{\"hidden\":true,\"children\":[\"$\",\"$L10\",null,{\"children\":[\"$\",\"$c\",null,{\"name\":\"Next.Metadata\",\"children\":\"$L11\"}]}]}],null]}],false]],\"m\":\"$undefined\",\"G\":[\"$12\",[]],\"S\":true}\n"])</script><script>self.__next_f.push([1,"9:{}\na:\"$0:f:0:1:1:children:1:children:0:props:children:0:props:serverProvidedParams:params\"\n"])</script><script>self.__next_f.push([1,"f:[[\"$\",\"meta\",\"0\",{\"charSet\":\"utf-8\"}],[\"$\",\"meta\",\"1\",{\"name\":\"viewport\",\"content\":\"width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no\"}],[\"$\",\"meta\",\"2\",{\"name\":\"theme-color\",\"content\":\"#1a1b2e\"}]]\n"])</script><script>self.__next_f.push([1,"13:I[27201,[\"/_next/static/chunks/ff1a16fafef87110.js\",\"/_next/static/chunks/d2be314c3ece3fbe.js\"],\"IconMark\"]\nd:null\n11:[[\"$\",\"title\",\"0\",{\"children\":\"Claude Code — Панель управления\"}],[\"$\",\"meta\",\"1\",{\"name\":\"description\",\"content\":\"Задачи, мониторинг и управление системой\"}],[\"$\",\"link\",\"2\",{\"rel\":\"manifest\",\"href\":\"/manifest.json\",\"crossOrigin\":\"$undefined\"}],[\"$\",\"meta\",\"3\",{\"name\":\"mobile-web-app-capable\",\"content\":\"yes\"}],[\"$\",\"meta\",\"4\",{\"name\":\"mobile-web-app-capable\",\"content\":\"yes\"}],[\"$\",\"meta\",\"5\",{\"name\":\"apple-mobile-web-app-title\",\"content\":\"Claude Code\"}],[\"$\",\"meta\",\"6\",{\"name\":\"apple-mobile-web-app-status-bar-style\",\"content\":\"black-translucent\"}],[\"$\",\"link\",\"7\",{\"rel\":\"icon\",\"href\":\"/icon-192.png\",\"sizes\":\"192x192\",\"type\":\"image/png\"}],[\"$\",\"link\",\"8\",{\"rel\":\"icon\",\"href\":\"/icon-512.png\",\"sizes\":\"512x512\",\"type\":\"image/png\"}],[\"$\",\"link\",\"9\",{\"rel\":\"apple-touch-icon\",\"href\":\"/apple-touch-icon.png\",\"sizes\":\"180x180\",\"type\":\"image/png\"}],[\"$\",\"$L13\",\"10\",{}]]\n"])</script></body></html>
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-17T12:42:53.792Z"
+  "timestamp": "2026-03-18T13:11:41.567Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -150,30 +150,32 @@ Keep-Alive: timeout=5
 === 12. curl https://webhook.marbomebel.ru/tasks ===
 
 === 13. Traefik dynamic configs ===
-total 16
-drwxr-xr-x 2 root root 4096 Mar 17 12:06 .
+total 12
+drwxr-xr-x 2 root root 4096 Mar 17 12:50 .
 drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root  310 Mar 13 14:08 chat.yml
--rw-r--r-- 1 root root  546 Mar 17 12:06 dashboard.yml
+-rw-r--r-- 1 root root  671 Mar 18 11:57 dashboard.yml
 --- dashboard.yml ---
 ## Traefik dynamic config — Task Dashboard
 ## Deployed to /opt/n8n-traefik/dynamic/dashboard.yml
 ## Traefik auto-reloads (file.watch=true)
+## Domain: chat.marbomebel.ru
+##
+## ALL traffic goes to Next.js dashboard (port 3200).
+## Dashboard reads SQLite directly for GET, proxies mutations to Control API.
+## This ensures the UI works even when Control API is temporarily down.
 
 http:
   routers:
-    dashboard-app:
-      rule: "Host(`webhook.marbomebel.ru`)"
+    dashboard:
+      rule: "Host(`chat.marbomebel.ru`)"
       entryPoints:
         - websecure
-      service: dashboard-app
+      service: dashboard
       tls:
         certResolver: mytlschallenge
-      # Lower priority so /webhook/* and /api/* routes from other configs win
-      priority: 10
 
   services:
-    dashboard-app:
+    dashboard:
       loadBalancer:
         servers:
           - url: "http://172.17.0.1:3200"
@@ -189,32 +191,30 @@ drwxr-xr-x 8 root root 4096 Mar 13 13:57 ..
 
 === 15. Docker containers ===
 NAMES                    STATUS                 PORTS
-mebelit-wp-wordpress-1   Up 2 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
-mebelit-wp-db-1          Up 2 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
-n8n-traefik-traefik-1    Up 3 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
-n8n-postgres-1           Up 8 days              5432/tcp
-n8n-voice-app-1          Up 8 days              80/tcp
-n8n-n8n-1                Up 7 days              5678/tcp
-openclaw                 Up 13 days (healthy)   
+mebelit-wp-wordpress-1   Up 3 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
+mebelit-wp-db-1          Up 3 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
+n8n-traefik-traefik-1    Up 4 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+n8n-postgres-1           Up 9 days              5432/tcp
+n8n-voice-app-1          Up 9 days              80/tcp
+n8n-n8n-1                Up 8 days              5678/tcp
+openclaw                 Up 2 weeks (healthy)   
 
 === 16. PM2 processes ===
-┌────┬────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
-│ id │ name           │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
-├────┼────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
-│ 0  │ claude-chat    │ default     │ 1.0.0   │ fork    │ 829221   │ 2D     │ 0    │ online    │ 0%       │ 65.9mb   │ root     │ disabled │
-└────┴────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
 
 === 17. chat.marbomebel.ru status ===
-HTTP/2 200 
-access-control-allow-headers: Content-Type, Authorization
-access-control-allow-methods: GET, POST, OPTIONS
-access-control-allow-origin: *
-cache-control: no-cache, no-store, must-revalidate
+HTTP/2 307 
+cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Tue, 17 Mar 2026 12:42:54 GMT
-etag: W/"73bd-zU+7p9NZdhUh0qzf7zf2gQq6p3w"
-expires: 0
-pragma: no-cache
+date: Wed, 18 Mar 2026 13:11:42 GMT
+etag: "jfce4it1hf65d"
+location: /dashboard
+vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+x-nextjs-cache: HIT
+x-nextjs-prerender: 1
+x-nextjs-prerender: 1
 
 === 18. Dashboard package.json exists? ===
 {
