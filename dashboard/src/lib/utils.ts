@@ -5,10 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Ensure UTC timestamps from SQLite (no timezone marker) are parsed correctly */
+function ensureUtc(dateStr: string): string {
+  // SQLite datetime('now') returns "YYYY-MM-DD HH:MM:SS" without Z
+  // new Date() would interpret that as local time → wrong offset
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+    return dateStr.replace(' ', 'T') + 'Z'
+  }
+  return dateStr
+}
+
 export function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
   try {
-    const d = new Date(dateStr)
+    const d = new Date(ensureUtc(dateStr))
     return d.toLocaleDateString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
@@ -24,7 +34,7 @@ export function formatDate(dateStr: string | null): string {
 export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '—'
   const now = Date.now()
-  const then = new Date(dateStr).getTime()
+  const then = new Date(ensureUtc(dateStr)).getTime()
   const diff = now - then
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'только что'
