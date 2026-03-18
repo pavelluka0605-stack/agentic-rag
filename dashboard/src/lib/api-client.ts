@@ -169,14 +169,35 @@ export async function fetchTasks(opts?: {
   project?: string
   limit?: number
   offset?: number
+  deleted?: boolean
 }): Promise<Task[]> {
   const query = buildQuery({
     status: opts?.status,
     project: opts?.project,
     limit: opts?.limit,
     offset: opts?.offset,
+    deleted: opts?.deleted ? '1' : undefined,
   })
   return apiFetch<Task[]>(`/api/tasks${query}`)
+}
+
+export async function fetchDeletedTasks(opts?: {
+  limit?: number
+  offset?: number
+}): Promise<Task[]> {
+  return fetchTasks({ ...opts, deleted: true })
+}
+
+export async function permanentDeleteTask(id: number): Promise<{ id: number; deleted: boolean }> {
+  return apiFetch(`/api/tasks/${id}`, { method: 'DELETE' })
+}
+
+export async function bulkSoftDelete(data: { ids?: number[]; status?: string }): Promise<{ deleted: number }> {
+  return apiFetch('/api/tasks/bulk-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
 }
 
 export async function fetchTask(id: number, opts?: { events?: boolean }): Promise<Task> {

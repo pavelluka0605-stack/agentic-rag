@@ -327,10 +327,16 @@ export function getTasks(opts: {
   project?: string
   limit?: number
   offset?: number
+  deleted?: boolean
 } = {}): import('@/types').Task[] {
   const conditions: string[] = []
   const params: unknown[] = []
 
+  if (opts.deleted) {
+    conditions.push('deleted_at IS NOT NULL')
+  } else {
+    conditions.push('deleted_at IS NULL')
+  }
   if (opts.status) {
     conditions.push('status = ?')
     params.push(opts.status)
@@ -348,6 +354,11 @@ export function getTasks(opts: {
     `SELECT * FROM tasks ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   )
+}
+
+export function getDeletedTaskCount(): number {
+  const row = queryOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM tasks WHERE deleted_at IS NOT NULL')
+  return row?.cnt ?? 0
 }
 
 export function getTask(id: number): import('@/types').Task | null {

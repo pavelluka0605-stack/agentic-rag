@@ -243,6 +243,7 @@ export interface Task {
   result_detail: string | null
   error: string | null
   telegram_notified: number
+  deleted_at: string | null
   created_at: string
   updated_at: string
 }

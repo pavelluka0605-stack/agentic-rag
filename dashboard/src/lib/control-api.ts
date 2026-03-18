@@ -76,3 +76,10 @@ export async function controlPost<T = Record<string, unknown>>(
     body: body ? JSON.stringify(body) : undefined,
   })
 }
+
+// Generic DELETE helper
+export async function controlDelete<T = Record<string, unknown>>(
+  path: string
+): Promise<T | null> {
+  return controlFetch<T>(path, { method: 'DELETE' })
+}

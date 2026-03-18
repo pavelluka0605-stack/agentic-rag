@@ -28,6 +28,10 @@
 //   POST /api/tasks/:id/review   — move to review state
 //   POST /api/tasks/:id/request-review — escalate to manual review
 //   POST /api/tasks/:id/retry    — retry failed/stalled task (re-execute or re-interpret)
+//   POST /api/tasks/:id/delete   — soft delete (move to trash)
+//   POST /api/tasks/:id/restore  — restore from trash
+//   DELETE /api/tasks/:id        — permanent delete (must be in trash first)
+//   POST /api/tasks/bulk-delete  — bulk soft delete by ids or status
 //   GET  /api/tasks/:id/transitions — allowed status transitions from current state
 //   GET  /api/tasks/:id/events   — task lifecycle events
 //
@@ -459,12 +463,21 @@ async function handleTaskVoice(req, res) {
 async function handleTaskList(req, res) {
   if (!taskDb) return json(res, 503, { error: "Task DB not available" });
   const url = new URL(req.url, `http://${req.headers.host}`);
+  const deleted = url.searchParams.get("deleted") === "1";
   const tasks = taskDb.getTasks({
     status: url.searchParams.get("status") || undefined,
     project: url.searchParams.get("project") || undefined,
     limit: parseInt(url.searchParams.get("limit") || "20"),
     offset: parseInt(url.searchParams.get("offset") || "0"),
+    deleted,
   });
+
+  // Include trash count in response header for badge
+  if (!deleted) {
+    const trashCount = taskDb.getDeletedCount();
+    res.setHeader("X-Trash-Count", String(trashCount));
+  }
+
   json(res, 200, tasks);
 }
 
@@ -977,6 +990,80 @@ async function handleTaskTransitions(req, res, id) {
   });
 }
 
+// ── Soft Delete statuses: which can be deleted directly, which need confirmation, which are blocked
+const DIRECT_DELETE_STATUSES = new Set(["done", "failed", "cancelled"]);
+const CONFIRM_DELETE_STATUSES = new Set(["draft", "pending", "confirmed", "review", "needs_manual_review"]);
+const BLOCKED_DELETE_STATUSES = new Set(["running"]); // must stop first
+
+async function handleTaskSoftDelete(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (task.deleted_at) return json(res, 400, { error: "Задача уже в корзине" });
+
+  if (BLOCKED_DELETE_STATUSES.has(task.status)) {
+    return json(res, 400, {
+      error: `Нельзя удалить задачу в статусе «${task.status}». Сначала остановите выполнение.`,
+      needs_stop: true,
+    });
+  }
+
+  const updated = taskDb.softDeleteTask(id);
+  json(res, 200, updated);
+}
+
+async function handleTaskRestore(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (!task.deleted_at) return json(res, 400, { error: "Задача не в корзине" });
+
+  const updated = taskDb.restoreTask(id);
+  json(res, 200, updated);
+}
+
+async function handleTaskPermanentDelete(req, res, id) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  const task = taskDb.getTask(id);
+  if (!task) return json(res, 404, { error: "Task not found" });
+  if (!task.deleted_at) {
+    return json(res, 400, { error: "Нельзя удалить навсегда — задача не в корзине. Сначала переместите в корзину." });
+  }
+
+  const result = taskDb.permanentDeleteTask(id);
+  json(res, 200, result);
+}
+
+async function handleBulkSoftDelete(req, res) {
+  if (!taskDb) return json(res, 503, { error: "Task DB not available" });
+  try {
+    const body = await parseBody(req);
+    let count = 0;
+
+    if (body.ids && Array.isArray(body.ids)) {
+      // Validate: none of the tasks are in running status
+      for (const tid of body.ids) {
+        const t = taskDb.getTask(tid);
+        if (t && BLOCKED_DELETE_STATUSES.has(t.status)) {
+          return json(res, 400, { error: `Задача #${tid} в статусе «${t.status}» — нельзя удалить. Сначала остановите.` });
+        }
+      }
+      count = taskDb.bulkSoftDelete(body.ids);
+    } else if (body.status) {
+      if (BLOCKED_DELETE_STATUSES.has(body.status)) {
+        return json(res, 400, { error: `Нельзя массово удалять задачи в статусе «${body.status}»` });
+      }
+      count = taskDb.bulkSoftDeleteByStatus(body.status);
+    } else {
+      return json(res, 400, { error: "Нужен ids (массив) или status (строка)" });
+    }
+
+    json(res, 200, { deleted: count });
+  } catch (e) {
+    json(res, 500, { error: e.message });
+  }
+}
+
 // ── Router ──────────────────────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -1007,6 +1094,7 @@ const server = http.createServer(async (req, res) => {
 
     // Task pipeline routes
     if (req.method === "POST" && urlPath === "/api/tasks/voice") return handleTaskVoice(req, res);
+    if (req.method === "POST" && urlPath === "/api/tasks/bulk-delete") return handleBulkSoftDelete(req, res);
     if (req.method === "POST" && urlPath === "/api/tasks") return handleTaskCreate(req, res);
     if (req.method === "GET" && urlPath === "/api/tasks") return handleTaskList(req, res);
 
@@ -1029,6 +1117,9 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "POST" && action === "review") return handleTaskReview(req, res, taskId);
       if (req.method === "POST" && action === "request-review") return handleTaskRequestManualReview(req, res, taskId);
       if (req.method === "POST" && action === "retry") return handleTaskRetry(req, res, taskId);
+      if (req.method === "POST" && action === "delete") return handleTaskSoftDelete(req, res, taskId);
+      if (req.method === "POST" && action === "restore") return handleTaskRestore(req, res, taskId);
+      if (req.method === "DELETE" && !action) return handleTaskPermanentDelete(req, res, taskId);
       if (req.method === "GET" && action === "transitions") return handleTaskTransitions(req, res, taskId);
     }
 

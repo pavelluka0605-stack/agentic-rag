@@ -103,6 +103,7 @@ export class MemoryDB {
     const newCols = [
       ["chosen_option", "TEXT"],       // JSON: selected solution option
       ["execution_phases", "TEXT"],     // JSON: phase/step tracking for live view
+      ["deleted_at", "TEXT"],           // Soft delete timestamp (ISO)
     ];
     for (const [col, type] of newCols) {
       try {
@@ -504,9 +505,14 @@ export class MemoryDB {
     return this.db.prepare("SELECT * FROM tasks WHERE id = ?").get(id);
   }
 
-  getTasks({ status, project, limit = 20, offset = 0 } = {}) {
+  getTasks({ status, project, limit = 20, offset = 0, deleted = false } = {}) {
     let sql = "SELECT * FROM tasks WHERE 1=1";
     const params = [];
+    if (deleted) {
+      sql += " AND deleted_at IS NOT NULL";
+    } else {
+      sql += " AND deleted_at IS NULL";
+    }
     if (status) { sql += " AND status = ?"; params.push(status); }
     if (project) { sql += " AND project = ?"; params.push(project); }
     sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?";
@@ -655,9 +661,69 @@ export class MemoryDB {
     return this.db.prepare(`
       SELECT * FROM tasks
       WHERE status = 'running'
+        AND deleted_at IS NULL
         AND (progress IS NULL OR progress = '[]')
         AND updated_at <= datetime('now', '-' || ? || ' seconds')
     `).all(stallSeconds);
+  }
+
+  // ── Soft delete / Restore / Permanent delete ─────────────────────────────
+
+  softDeleteTask(id) {
+    this.db.prepare(`
+      UPDATE tasks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?
+    `).run(id);
+    this.addTaskEvent(id, "soft_deleted", "Задача перемещена в корзину");
+    return this.getTask(id);
+  }
+
+  restoreTask(id) {
+    this.db.prepare(`
+      UPDATE tasks SET deleted_at = NULL, updated_at = datetime('now') WHERE id = ?
+    `).run(id);
+    this.addTaskEvent(id, "restored", "Задача восстановлена из корзины");
+    return this.getTask(id);
+  }
+
+  permanentDeleteTask(id) {
+    this.addTaskEvent(id, "permanently_deleted", "Задача удалена навсегда");
+    this.db.prepare("DELETE FROM task_events WHERE task_id = ?").run(id);
+    this.db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
+    return { id, deleted: true };
+  }
+
+  bulkSoftDelete(ids) {
+    const stmt = this.db.prepare(`
+      UPDATE tasks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?
+    `);
+    const eventStmt = this.db.prepare(`
+      INSERT INTO task_events (task_id, event_type, detail) VALUES (?, 'soft_deleted', 'Задача перемещена в корзину (массовое удаление)')
+    `);
+    const tx = this.db.transaction((taskIds) => {
+      let count = 0;
+      for (const tid of taskIds) {
+        const r = stmt.run(tid);
+        if (r.changes > 0) {
+          eventStmt.run(tid);
+          count++;
+        }
+      }
+      return count;
+    });
+    return tx(ids);
+  }
+
+  bulkSoftDeleteByStatus(status) {
+    const tasks = this.db.prepare(
+      "SELECT id FROM tasks WHERE status = ? AND deleted_at IS NULL"
+    ).all(status);
+    const ids = tasks.map(t => t.id);
+    if (ids.length === 0) return 0;
+    return this.bulkSoftDelete(ids);
+  }
+
+  getDeletedCount() {
+    return this.db.prepare("SELECT COUNT(*) as count FROM tasks WHERE deleted_at IS NOT NULL").get().count;
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────

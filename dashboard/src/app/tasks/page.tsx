@@ -24,6 +24,8 @@ import {
   ArrowLeft,
   HelpCircle,
   Ban,
+  Trash2,
+  Undo2,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -34,10 +36,13 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { timeAgo, parseJsonField, truncate } from '@/lib/utils'
 import {
   fetchTasks,
+  fetchDeletedTasks,
   fetchTask,
   createTask,
   createVoiceTask,
   taskAction,
+  permanentDeleteTask,
+  bulkSoftDelete,
 } from '@/lib/api-client'
 import type {
   Task,
@@ -113,6 +118,9 @@ const eventTypeLabels: Record<string, string> = {
   executor_no_ack: 'Исполнитель не запущен',
   stall_detected: 'Зависание',
   dispatch_failed: 'Ошибка отправки',
+  soft_deleted: 'В корзину',
+  restored: 'Восстановлена',
+  permanently_deleted: 'Удалена навсегда',
 }
 
 // ── Main Component ──────────────────────────────────────────────
@@ -136,6 +144,19 @@ export default function TasksPage() {
   const [revisionText, setRevisionText] = useState('')
   const [taskEvents, setTaskEvents] = useState<Record<number, TaskEvent[]>>({})
 
+  // Trash view
+  const [showTrash, setShowTrash] = useState(false)
+  const [trashTasks, setTrashTasks] = useState<Task[]>([])
+  const [trashCount, setTrashCount] = useState(0)
+  const [trashLoading, setTrashLoading] = useState(false)
+
+  // Delete confirmation dialog
+  const [confirmDelete, setConfirmDelete] = useState<{ taskId: number; title: string } | null>(null)
+  const [confirmPermanent, setConfirmPermanent] = useState<{ taskId: number; title: string } | null>(null)
+
+  // Bulk action loading
+  const [bulkLoading, setBulkLoading] = useState(false)
+
   const loadTasks = useCallback(async () => {
     try {
       const data = await fetchTasks({ limit: 30 })
@@ -148,11 +169,31 @@ export default function TasksPage() {
     }
   }, [])
 
+  const loadTrash = useCallback(async () => {
+    setTrashLoading(true)
+    try {
+      const data = await fetchDeletedTasks({ limit: 50 })
+      setTrashTasks(data)
+      setTrashCount(data.length)
+    } catch (e) {
+      setError(`Ошибка загрузки корзины: ${e}`)
+    } finally {
+      setTrashLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadTasks()
-    const interval = setInterval(loadTasks, 3000) // 3s for live feel
+    // Also get trash count on mount
+    fetchDeletedTasks({ limit: 1 }).then(d => setTrashCount(d.length)).catch(() => {})
+    const interval = setInterval(loadTasks, 3000)
     return () => clearInterval(interval)
   }, [loadTasks])
+
+  // When switching to trash tab, load deleted tasks
+  useEffect(() => {
+    if (showTrash) loadTrash()
+  }, [showTrash, loadTrash])
 
   // ── Submit new task ──────────────────────────────────
 
@@ -213,6 +254,66 @@ export default function TasksPage() {
     await handleAction(taskId, 'revise', { text: revisionText.trim() })
     setRevisionText('')
     await handleAction(taskId, 'interpret')
+  }
+
+  // ── Delete actions ────────────────────────────────
+
+  async function handleSoftDelete(taskId: number) {
+    setActionLoading(`${taskId}-delete`)
+    try {
+      await taskAction(taskId, 'delete')
+      setConfirmDelete(null)
+      setActiveTaskId(null)
+      await loadTasks()
+      setTrashCount(c => c + 1)
+    } catch (e) {
+      setError(`Ошибка удаления: ${e}`)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleRestore(taskId: number) {
+    setActionLoading(`${taskId}-restore`)
+    try {
+      await taskAction(taskId, 'restore')
+      await loadTrash()
+      await loadTasks()
+      setTrashCount(c => Math.max(0, c - 1))
+    } catch (e) {
+      setError(`Ошибка восстановления: ${e}`)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handlePermanentDelete(taskId: number) {
+    setActionLoading(`${taskId}-permanent`)
+    try {
+      await permanentDeleteTask(taskId)
+      setConfirmPermanent(null)
+      await loadTrash()
+      setTrashCount(c => Math.max(0, c - 1))
+    } catch (e) {
+      setError(`Ошибка удаления: ${e}`)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleBulkDelete(status: string) {
+    setBulkLoading(true)
+    try {
+      const result = await bulkSoftDelete({ status })
+      if (result.deleted > 0) {
+        await loadTasks()
+        setTrashCount(c => c + result.deleted)
+      }
+    } catch (e) {
+      setError(`Ошибка массового удаления: ${e}`)
+    } finally {
+      setBulkLoading(false)
+    }
   }
 
   // ── Voice recording ────────────────────────────────
@@ -280,6 +381,13 @@ export default function TasksPage() {
     )
   }
 
+  // Task counts by status for bulk action badges
+  const countByStatus = (status: string) => tasks?.filter(t => t.status === status).length || 0
+  const doneCount = countByStatus('done')
+  const failedCount = countByStatus('failed')
+  const cancelledCount = countByStatus('cancelled')
+  const hasBulkTargets = doneCount > 0 || failedCount > 0 || cancelledCount > 0
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -294,70 +402,215 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* ── Stage A: Voice/Text Intake ── */}
-      <Card>
-        <CardContent className="pt-5">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Опишите задачу голосом или текстом..."
-              rows={3}
-              className="w-full resize-none rounded-lg border border-border-subtle bg-bg-deep px-3 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  handleSubmit(e)
-                }
-              }}
-            />
-            <div className="flex items-center gap-2">
-              <Button type="submit" disabled={!inputText.trim() || submitting} loading={submitting} className="flex-1 sm:flex-none">
-                <Send className="h-4 w-4" />
-                Анализировать
-              </Button>
+      {/* ── Confirmation dialogs ── */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setConfirmDelete(null)}>
+          <div className="w-full max-w-sm rounded-xl border border-border-subtle bg-bg-deep p-5 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold">Переместить в корзину?</h3>
+            <p className="text-sm text-muted-foreground break-words">{confirmDelete.title}</p>
+            <div className="flex gap-2">
               <Button
-                type="button"
-                variant={recording ? 'destructive' : 'outline'}
-                size="sm"
-                onClick={handleVoiceToggle}
-                disabled={submitting}
-                title={recording ? 'Остановить запись' : 'Голосовой ввод'}
+                variant="destructive"
+                className="flex-1"
+                onClick={() => handleSoftDelete(confirmDelete.taskId)}
+                loading={actionLoading === `${confirmDelete.taskId}-delete`}
               >
-                <Mic className={`h-4 w-4 ${recording ? 'animate-pulse' : ''}`} />
-                {recording ? 'Стоп' : 'Голос'}
+                <Trash2 className="h-4 w-4" /> В корзину
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setConfirmDelete(null)}>
+                Отмена
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Ctrl+Enter для отправки. Можно добавить голос для контекста.
-            </p>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Task list */}
-      {!tasks || tasks.length === 0 ? (
-        <EmptyState
-          icon={ListTodo}
-          title="Нет задач"
-          description="Опишите задачу выше — система предложит варианты решения"
-        />
-      ) : (
-        <div className="space-y-4">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              isExpanded={activeTaskId === task.id}
-              onToggle={() => handleToggle(task.id)}
-              actionLoading={actionLoading}
-              onAction={handleAction}
-              revisionText={activeTaskId === task.id ? revisionText : ''}
-              onRevisionTextChange={setRevisionText}
-              onRevise={handleRevise}
-              events={taskEvents[task.id]}
-            />
-          ))}
+          </div>
         </div>
+      )}
+
+      {confirmPermanent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setConfirmPermanent(null)}>
+          <div className="w-full max-w-sm rounded-xl border border-destructive/30 bg-bg-deep p-5 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-destructive">Удалить навсегда?</h3>
+            <p className="text-sm text-muted-foreground break-words">{confirmPermanent.title}</p>
+            <p className="text-xs text-destructive/70">Это действие необратимо. Задача и её история будут удалены.</p>
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => handlePermanentDelete(confirmPermanent.taskId)}
+                loading={actionLoading === `${confirmPermanent.taskId}-permanent`}
+              >
+                Удалить навсегда
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setConfirmPermanent(null)}>
+                Отмена
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab: Tasks / Trash ── */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShowTrash(false)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!showTrash ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          Задачи
+        </button>
+        <button
+          onClick={() => setShowTrash(true)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${showTrash ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Корзина
+          {trashCount > 0 && (
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${showTrash ? 'bg-primary-foreground/20' : 'bg-muted-foreground/20'}`}>
+              {trashCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Trash View ── */}
+      {showTrash ? (
+        <div className="space-y-4">
+          {trashLoading ? (
+            <div className="flex justify-center py-8"><Loading size="lg" /></div>
+          ) : trashTasks.length === 0 ? (
+            <EmptyState icon={Trash2} title="Корзина пуста" description="Удалённые задачи появятся здесь" />
+          ) : (
+            <>
+              {trashTasks.map((task) => {
+                const interp = parseJsonField<TaskInterpretation>(task.interpretation)
+                const config = statusConfig[task.status] || { label: task.status, variant: 'secondary' as const }
+                return (
+                  <Card key={task.id} className="opacity-70">
+                    <div className="flex items-center gap-3 p-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium break-words line-through decoration-muted-foreground/30">
+                          {interp?.understood || truncate(task.raw_input, 100)}
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <Badge variant={config.variant}>{config.label}</Badge>
+                          <span className="text-xs text-muted-foreground">удалена {timeAgo(task.deleted_at!)}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestore(task.id)}
+                          loading={actionLoading === `${task.id}-restore`}
+                          className="min-h-[36px]"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" /> Восстановить
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmPermanent({ taskId: task.id, title: interp?.understood || task.raw_input.slice(0, 100) })}
+                          className="min-h-[36px] text-destructive hover:text-destructive"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              })}
+            </>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* ── Stage A: Voice/Text Intake ── */}
+          <Card>
+            <CardContent className="pt-5">
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Опишите задачу голосом или текстом..."
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-border-subtle bg-bg-deep px-3 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      handleSubmit(e)
+                    }
+                  }}
+                />
+                <div className="flex items-center gap-2">
+                  <Button type="submit" disabled={!inputText.trim() || submitting} loading={submitting} className="flex-1 sm:flex-none">
+                    <Send className="h-4 w-4" />
+                    Анализировать
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={recording ? 'destructive' : 'outline'}
+                    size="sm"
+                    onClick={handleVoiceToggle}
+                    disabled={submitting}
+                    title={recording ? 'Остановить запись' : 'Голосовой ввод'}
+                  >
+                    <Mic className={`h-4 w-4 ${recording ? 'animate-pulse' : ''}`} />
+                    {recording ? 'Стоп' : 'Голос'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ctrl+Enter для отправки. Можно добавить голос для контекста.
+                </p>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* ── Bulk actions bar ── */}
+          {hasBulkTargets && (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              <span className="text-xs text-muted-foreground">Очистить:</span>
+              {doneCount > 0 && (
+                <Button variant="outline" size="sm" onClick={() => handleBulkDelete('done')} loading={bulkLoading} className="text-xs h-7">
+                  <Trash2 className="h-3 w-3" /> Выполненные ({doneCount})
+                </Button>
+              )}
+              {failedCount > 0 && (
+                <Button variant="outline" size="sm" onClick={() => handleBulkDelete('failed')} loading={bulkLoading} className="text-xs h-7">
+                  <Trash2 className="h-3 w-3" /> Ошибочные ({failedCount})
+                </Button>
+              )}
+              {cancelledCount > 0 && (
+                <Button variant="outline" size="sm" onClick={() => handleBulkDelete('cancelled')} loading={bulkLoading} className="text-xs h-7">
+                  <Trash2 className="h-3 w-3" /> Отменённые ({cancelledCount})
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Task list */}
+          {!tasks || tasks.length === 0 ? (
+            <EmptyState
+              icon={ListTodo}
+              title="Нет задач"
+              description="Опишите задачу выше — система предложит варианты решения"
+            />
+          ) : (
+            <div className="space-y-4">
+              {tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  isExpanded={activeTaskId === task.id}
+                  onToggle={() => handleToggle(task.id)}
+                  actionLoading={actionLoading}
+                  onAction={handleAction}
+                  revisionText={activeTaskId === task.id ? revisionText : ''}
+                  onRevisionTextChange={setRevisionText}
+                  onRevise={handleRevise}
+                  events={taskEvents[task.id]}
+                  onDelete={(id, title) => setConfirmDelete({ taskId: id, title })}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -375,6 +628,7 @@ interface TaskCardProps {
   onRevisionTextChange: (text: string) => void
   onRevise: (taskId: number) => void
   events?: TaskEvent[]
+  onDelete: (taskId: number, title: string) => void
 }
 
 function TaskCard({
@@ -387,6 +641,7 @@ function TaskCard({
   onRevisionTextChange,
   onRevise,
   events,
+  onDelete,
 }: TaskCardProps) {
   const interpretation = parseJsonField<TaskInterpretation>(task.interpretation)
   const engPacket = parseJsonField<TaskEngineeringPacket>(task.engineering_packet)
@@ -436,7 +691,22 @@ function TaskCard({
             )}
           </div>
         </div>
-        {isExpanded ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Delete button — only for non-running tasks */}
+          {task.status !== 'running' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(task.id, interpretation?.understood || task.raw_input.slice(0, 100))
+              }}
+              className="p-1.5 rounded-md text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="В корзину"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </div>
       </button>
 
       {/* Expanded content */}

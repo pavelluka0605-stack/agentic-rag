@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTask, getTaskEvents } from '@/lib/db'
-import { controlPost } from '@/lib/control-api'
+import { controlPost, controlDelete } from '@/lib/control-api'
 
 // GET /api/tasks/:id — read task from SQLite (with optional ?events=1)
 export async function GET(
@@ -37,12 +37,29 @@ export async function POST(
       return NextResponse.json({ error: 'action is required' }, { status: 400 })
     }
 
-    const validActions = ['interpret', 'revise', 'choose-option', 'confirm', 'cancel', 'start', 'progress', 'complete', 'fail', 'review', 'request-review', 'retry']
+    const validActions = ['interpret', 'revise', 'choose-option', 'confirm', 'cancel', 'start', 'progress', 'complete', 'fail', 'review', 'request-review', 'retry', 'delete', 'restore']
     if (!validActions.includes(action)) {
       return NextResponse.json({ error: `Invalid action: ${action}` }, { status: 400 })
     }
 
     const result = await controlPost(`/api/tasks/${id}/${action}`, data)
+    if (!result) {
+      return NextResponse.json({ error: 'Control API unavailable' }, { status: 503 })
+    }
+    return NextResponse.json(result)
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}
+
+// DELETE /api/tasks/:id — permanent delete (proxy to Control API)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  try {
+    const result = await controlDelete(`/api/tasks/${id}`)
     if (!result) {
       return NextResponse.json({ error: 'Control API unavailable' }, { status: 503 })
     }

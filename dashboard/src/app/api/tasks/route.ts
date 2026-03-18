@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getTasks, getTaskStats } from '@/lib/db'
+import { getTasks, getTaskStats, getDeletedTaskCount } from '@/lib/db'
 import { controlPost } from '@/lib/control-api'
 
 // GET /api/tasks — list tasks (reads from local SQLite)
@@ -9,13 +9,18 @@ export async function GET(request: NextRequest) {
   const project = searchParams.get('project') || undefined
   const limit = parseInt(searchParams.get('limit') || '20')
   const offset = parseInt(searchParams.get('offset') || '0')
+  const deleted = searchParams.get('deleted') === '1'
 
   try {
     if (searchParams.get('stats') === 'true') {
       return NextResponse.json(getTaskStats())
     }
-    const tasks = getTasks({ status, project, limit, offset })
-    return NextResponse.json(tasks)
+    const tasks = getTasks({ status, project, limit, offset, deleted })
+    const res = NextResponse.json(tasks)
+    if (!deleted) {
+      res.headers.set('X-Trash-Count', String(getDeletedTaskCount()))
+    }
+    return res
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
