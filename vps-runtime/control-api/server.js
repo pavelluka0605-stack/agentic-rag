@@ -789,25 +789,40 @@ async function handleTaskStartExec(req, res, id) {
     const updated = taskDb.startTaskExecution(id, body.execution_run_id || `task-${id}`);
     taskDb.addTaskEvent(id, "dispatched", `Задача отправлена на выполнение${taskFile ? ` → ${path.basename(taskFile)}` : ""}`);
 
-    // Try to send to tmux — record dispatch outcome explicitly
+    // Spawn executor process in background
     let dispatchConfirmed = false;
     if (taskFile) {
-      try {
-        const session = process.env.CLAUDE_TMUX_SESSION || "claude-code";
-        const tmuxUp = run(`tmux has-session -t "${session}" 2>/dev/null && echo yes`) === "yes";
-        if (tmuxUp) {
-          run(`tmux send-keys -t "${session}:workspace" "cat ${taskFile}" Enter`);
+      const execScript = path.join(BIN_DIR, "exec-task.sh");
+      if (fs.existsSync(execScript)) {
+        try {
+          const child = exec(
+            `bash "${execScript}" ${id} "${taskFile}" >> "${path.join(LOG_DIR, `exec-task-${id}.log`)}" 2>&1`,
+            { timeout: 0 }  // no timeout — executor manages its own lifecycle
+          );
+          child.unref();  // detach from parent — don't block control-api
           dispatchConfirmed = true;
-          taskDb.addTaskEvent(id, "executor_ack", "Команда отправлена в tmux-сессию. Ожидаем первый прогресс.");
-        } else {
-          taskDb.addTaskEvent(id, "executor_no_ack", "tmux недоступен — исполнитель не подтвердил получение задачи");
+          taskDb.addTaskEvent(id, "executor_started", `Исполнитель запущен (PID: ${child.pid}). Файл: ${path.basename(taskFile)}`);
+        } catch (execErr) {
+          console.error("[task-exec] Failed to spawn executor:", execErr.message);
+          taskDb.addTaskEvent(id, "executor_spawn_failed", `Не удалось запустить исполнитель: ${execErr.message}`);
         }
-      } catch (tmuxErr) {
-        console.warn("[task-exec] tmux dispatch failed:", tmuxErr.message);
-        taskDb.addTaskEvent(id, "executor_no_ack", `tmux ошибка: ${tmuxErr.message}. Исполнитель не подтвердил получение.`);
+      } else {
+        // Fallback: exec-task.sh not deployed yet — try tmux send-keys
+        try {
+          const session = process.env.CLAUDE_TMUX_SESSION || "claude-code";
+          const tmuxUp = run(`tmux has-session -t "${session}" 2>/dev/null && echo yes`) === "yes";
+          if (tmuxUp) {
+            run(`tmux send-keys -t "${session}:workspace" "cat ${taskFile}" Enter`);
+            taskDb.addTaskEvent(id, "executor_fallback_tmux", "exec-task.sh не найден — файл задачи отправлен в tmux (cat). Автоматический прогресс невозможен.");
+          } else {
+            taskDb.addTaskEvent(id, "executor_no_ack", "exec-task.sh не найден, tmux недоступен — исполнитель не запущен");
+          }
+        } catch (tmuxErr) {
+          taskDb.addTaskEvent(id, "executor_no_ack", `exec-task.sh не найден, tmux ошибка: ${tmuxErr.message}`);
+        }
       }
     } else {
-      taskDb.addTaskEvent(id, "executor_no_ack", "Нет engineering packet — файл задачи не создан");
+      taskDb.addTaskEvent(id, "executor_no_ack", "Нет engineering packet — файл задачи не создан, исполнитель не запущен");
     }
 
     json(res, 200, { ...updated, dispatch_confirmed: dispatchConfirmed });
@@ -945,15 +960,34 @@ async function checkStalledTasks() {
   try {
     const stalled = taskDb.getStalledTasks(STALL_THRESHOLD_SECONDS);
     for (const task of stalled) {
-      const stallReason = `Задача зависла: нет прогресса более ${STALL_THRESHOLD_SECONDS} секунд после запуска. Исполнитель не отвечает.`;
+      // Diagnose WHY it stalled by reading the event trail
+      const events = taskDb.getTaskEvents(task.id);
+      const lastEvent = events.length > 0 ? events[events.length - 1] : null;
+      const lastType = lastEvent?.event_type || "none";
+
+      let diagnosis;
+      if (lastType === "executor_spawn_failed") {
+        diagnosis = "Исполнитель не запустился (exec-task.sh не удалось выполнить).";
+      } else if (lastType === "executor_no_ack") {
+        diagnosis = "Исполнитель не запущен: " + (lastEvent?.detail || "нет подробностей.");
+      } else if (lastType === "executor_fallback_tmux") {
+        diagnosis = "Файл задачи отправлен в tmux (cat), но автоматический исполнитель отсутствует.";
+      } else if (lastType === "executor_started") {
+        diagnosis = "Исполнитель был запущен, но не прислал первый прогресс. Возможно: claude CLI зависла, ошибка авторизации Anthropic API, или процесс завершился аварийно.";
+      } else if (lastType === "dispatched") {
+        diagnosis = "Задача была отправлена, но исполнитель не запустился (событие executor_started отсутствует).";
+      } else {
+        diagnosis = `Последнее событие: ${lastType}. Исполнитель не отвечает.`;
+      }
+
+      const stallReason = `Задача зависла (${STALL_THRESHOLD_SECONDS}с без прогресса). ${diagnosis}`;
       taskDb.requestManualReview(task.id, stallReason);
       taskDb.addTaskEvent(task.id, "stall_detected", stallReason);
-      console.warn(`[stall-watchdog] Task #${task.id} stalled — escalated to needs_manual_review`);
+      console.warn(`[stall-watchdog] Task #${task.id} stalled — ${diagnosis}`);
 
       // Telegram: stall is critical
       await sendTelegram(
-        `<b>⚠️ Задача #${task.id} зависла</b>\n\n` +
-        `Нет прогресса более ${STALL_THRESHOLD_SECONDS}с после запуска.\n` +
+        `<b>⚠️ Задача #${task.id} зависла</b>\n\n${stallReason}\n` +
         `Статус изменён на «нужна ручная проверка».`
       );
     }
