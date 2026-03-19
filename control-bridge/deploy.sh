@@ -47,8 +47,8 @@ else
     TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
     echo "BRIDGE_API_TOKEN=${TOKEN}" > "${BRIDGE_DIR}/.env"
     chmod 600 "${BRIDGE_DIR}/.env"
-    echo "Generated new API token: ${TOKEN}"
-    echo "IMPORTANT: Save this token — you'll need it for your custom GPT."
+    echo "New API token generated and saved to ${BRIDGE_DIR}/.env (chmod 600)."
+    echo "To view: cat ${BRIDGE_DIR}/.env"
 fi
 
 # --- 5. systemd service ---
@@ -209,7 +209,7 @@ echo "  Service:          systemctl status ${SERVICE_NAME}"
 echo "  nginx config:     ${NGINX_CONF}"
 echo "  Token file:       ${BRIDGE_DIR}/.env"
 echo "  Public URL:       https://${DOMAIN}"
-echo "  Token value:      ${TOKEN}"
+echo "  Token:            (see ${BRIDGE_DIR}/.env)"
 echo ""
 echo "To rotate the token later:"
 echo "  1. Edit ${BRIDGE_DIR}/.env"
