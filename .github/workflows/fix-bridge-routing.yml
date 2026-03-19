@@ -1,0 +1,158 @@
+name: "Fix Bridge Routing (Traefik)"
+
+on:
+  push:
+    branches: ["claude/*"]
+    paths: [".github/workflows/fix-bridge-routing.yml", "control-bridge/traefik-api-bridge.yml"]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  fix:
+    name: "Fix and Retest"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy Traefik config and retest
+        run: |
+          SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
+          SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+
+          # Copy Traefik dynamic config to VPS
+          $SCP control-bridge/traefik-api-bridge.yml \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/traefik-api-bridge.yml
+
+          $SSH << 'FIX' | tee /tmp/fix-output.txt
+          set -e
+
+          echo "=== 1. DEPLOY TRAEFIK CONFIG ==="
+          # Find the Traefik dynamic config directory
+          TRAEFIK_DYN=""
+          for d in /opt/n8n-traefik/dynamic /opt/traefik/dynamic /etc/traefik/dynamic; do
+            if [ -d "$d" ]; then
+              TRAEFIK_DYN="$d"
+              break
+            fi
+          done
+
+          if [ -z "$TRAEFIK_DYN" ]; then
+            echo "ERROR: No Traefik dynamic dir found. Searching..."
+            find / -name "dashboard.yml" -path "*/dynamic/*" 2>/dev/null | head -5
+            find / -name "traefik.yml" -o -name "traefik.toml" 2>/dev/null | head -5
+            # Try docker inspect
+            docker inspect $(docker ps -q --filter "name=traefik") 2>/dev/null | grep -i "mount\|volume\|bind" | head -10 || true
+            exit 1
+          fi
+
+          echo "Traefik dynamic dir: $TRAEFIK_DYN"
+          ls -la "$TRAEFIK_DYN/"
+          cp /tmp/traefik-api-bridge.yml "$TRAEFIK_DYN/api-bridge.yml"
+          echo "Config deployed. Traefik should auto-reload."
+          echo ""
+
+          echo "=== 2. VERIFY TRAEFIK PICKED IT UP ==="
+          sleep 5
+          echo ""
+
+          echo "=== 3. DISABLE CONFLICTING NGINX CONFIG ==="
+          # Remove api-marbomebel nginx config that can't bind anyway
+          rm -f /etc/nginx/sites-enabled/api-marbomebel 2>/dev/null || true
+          echo "Removed /etc/nginx/sites-enabled/api-marbomebel (if existed)"
+          echo ""
+
+          echo "=== 4. TEST HTTPS HEALTH ==="
+          curl -si --connect-timeout 10 https://api.marbomebel.ru/health 2>&1 || echo "HTTPS_HEALTH_FAILED"
+          echo ""
+
+          echo "=== 5. TEST HTTPS createJob ==="
+          TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
+          CREATE=$(curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Тестовая задача","raw_user_request":"Проверка моста GPT -> API","normalized_brief":"Тестовый запуск createJob"}' 2>&1)
+          echo "${CREATE}"
+          JOB_ID=$(echo "${CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+          echo "job_id: ${JOB_ID}"
+          echo ""
+
+          if [ -z "${JOB_ID}" ]; then
+            echo "ERROR: createJob failed. Stopping."
+            exit 1
+          fi
+
+          echo "=== 6. TEST confirmJob ==="
+          curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 7. TEST getJobStatus ==="
+          curl -si --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 8. TEST getJobResult ==="
+          curl -si --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 9. TEST cancelJob ==="
+          CANCEL_CREATE=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Cancel test","raw_user_request":"Cancel","normalized_brief":"Cancel"}')
+          CID=$(echo "${CANCEL_CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+          curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 10. TOKEN INFO ==="
+          echo "token_prefix: $(echo ${TOKEN} | cut -c1-6)..."
+          echo "token_length: ${#TOKEN}"
+          echo ""
+
+          echo "=== 11. AUTH REJECTION ==="
+          curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+            -H "Content-Type: application/json" \
+            -d '{"title":"no auth","raw_user_request":"x","normalized_brief":""}' 2>&1
+          echo ""
+
+          echo "=== DONE ==="
+          FIX
+
+      - name: Post results to issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, urllib.request, traceback
+          try:
+              with open("/tmp/fix-output.txt") as f:
+                  content = f.read()
+              body = "## Fix Bridge Routing\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Bridge Fix ${{ github.run_id }}", "body": body}).encode()
+              req = urllib.request.Request(
+                  "https://api.github.com/repos/${{ github.repository }}/issues",
+                  data=payload,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+                  method="POST")
+              resp = urllib.request.urlopen(req)
+              data = json.loads(resp.read())
+              print(f"Issue #{data['number']} created: {data['html_url']}")
+          except Exception as e:
+              traceback.print_exc()
+              with open("/tmp/fix-output.txt") as f:
+                  print(f.read())
+          PYEOF
