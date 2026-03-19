@@ -1,15 +1,15 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Thu Mar 19 12:56:26 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Thu Mar 19 12:59:40 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
 ● dashboard.service - Claude Code Task Dashboard (Next.js)
      Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
-     Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 24h ago
+     Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 1 day 1h ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 122.3M (max: 256.0M available: 133.6M peak: 124.5M)
-        CPU: 8.161s
+     Memory: 122.8M (max: 256.0M available: 133.1M peak: 124.5M)
+        CPU: 8.199s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -23,11 +23,11 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 24h ago
+     Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 1 day 1h ago
    Main PID: 1364558 (node)
       Tasks: 11 (limit: 32)
-     Memory: 29.5M (max: 128.0M available: 98.4M peak: 128.0M swap: 14.0M swap peak: 81.0M)
-        CPU: 6.678s
+     Memory: 29.6M (max: 128.0M available: 98.3M peak: 128.0M swap: 14.0M swap peak: 81.0M)
+        CPU: 6.685s
      CGroup: /system.slice/control-api.service
              └─1364558 /usr/bin/node server.js
 
@@ -132,7 +132,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Thu, 19 Mar 2026 12:56:26 GMT
+Date: Thu, 19 Mar 2026 12:59:40 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,7 +142,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-19T12:56:26.189Z"
+  "timestamp": "2026-03-19T12:59:40.544Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -185,9 +185,9 @@ nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
 nginx: configuration file /etc/nginx/nginx.conf test is successful
 --- sites-enabled ---
 total 12
-drwxr-xr-x 2 root root 4096 Mar 19 12:52 .
-drwxr-xr-x 8 root root 4096 Mar 13 13:57 ..
-lrwxrwxrwx 1 root root   41 Mar 19 12:52 api-marbomebel -> /etc/nginx/sites-available/api-marbomebel
+drwxr-xr-x 2 root root 4096 Mar 19 12:56 .
+drwxr-xr-x 8 root root 4096 Mar 19 12:56 ..
+lrwxrwxrwx 1 root root   41 Mar 19 12:56 api-marbomebel -> /etc/nginx/sites-available/api-marbomebel
 -rw-r--r-- 1 root root  528 Mar 13 16:11 chat-marbomebel
 
 === 15. Docker containers ===
@@ -209,7 +209,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Thu, 19 Mar 2026 12:56:26 GMT
+date: Thu, 19 Mar 2026 12:59:40 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
