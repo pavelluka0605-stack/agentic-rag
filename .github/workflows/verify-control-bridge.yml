@@ -8,6 +8,10 @@ on:
       - ".github/workflows/verify-control-bridge.yml"
   workflow_dispatch:
 
+permissions:
+  issues: write
+  contents: read
+
 jobs:
   verify:
     name: "Verify Bridge"
@@ -22,10 +26,10 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Run verification on VPS and save output
+      - name: Run verification on VPS
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'VERIFY' > /tmp/verify-output.txt 2>&1
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'VERIFY' | tee /tmp/verify-output.txt
           TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
           MASKED="$(echo ${TOKEN} | cut -c1-4)****"
 
@@ -118,42 +122,42 @@ jobs:
 
           echo "=== DONE ==="
           VERIFY
-          cat /tmp/verify-output.txt
 
-      - name: Post results to GitHub issue
+      - name: Post results to issue
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Read the output file and escape for JSON
-          python3 << 'PYEOF'
-          import json, os, urllib.request
-
-          with open("/tmp/verify-output.txt", "r") as f:
-              content = f.read()
-
-          body = "## Control Bridge API Verification\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
-          payload = json.dumps({
-              "title": "Control Bridge Verification — Run ${{ github.run_id }}",
-              "body": body,
-              "labels": ["automated"]
-          }).encode()
-
-          req = urllib.request.Request(
-              "https://api.github.com/repos/${{ github.repository }}/issues",
-              data=payload,
-              headers={
-                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
-                  "Accept": "application/vnd.github+json",
-                  "Content-Type": "application/json"
-              },
-              method="POST"
-          )
+          python3 -c "
+          import json, os, urllib.request, traceback
           try:
+              with open('/tmp/verify-output.txt') as f:
+                  content = f.read()
+              body = '## Control Bridge API Verification\n\nRun: ${{ github.run_id }}\n\n\`\`\`\n' + content[:60000] + '\n\`\`\`'
+              payload = json.dumps({'title': 'Bridge Verification ${{ github.run_id }}', 'body': body, 'labels': ['automated']}).encode()
+              req = urllib.request.Request(
+                  'https://api.github.com/repos/${{ github.repository }}/issues',
+                  data=payload,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'},
+                  method='POST')
               resp = urllib.request.urlopen(req)
               data = json.loads(resp.read())
-              print(f"Issue #{data['number']} created: {data['html_url']}")
+              print(f'Issue #{data[\"number\"]} created: {data[\"html_url\"]}')
           except Exception as e:
-              print(f"Issue creation failed: {e}")
-              # Print output directly as fallback
-              print(content)
-          PYEOF
+              traceback.print_exc()
+              print('Fallback: printing output directly')
+              with open('/tmp/verify-output.txt') as f:
+                  print(f.read())
+          "
+
+      - name: Send to Telegram
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          # Send first 4000 chars to Telegram
+          MSG=$(head -c 4000 /tmp/verify-output.txt)
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
