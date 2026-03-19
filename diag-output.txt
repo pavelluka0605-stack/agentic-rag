@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Thu Mar 19 18:33:30 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Thu Mar 19 18:37:13 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 1 day 6h ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 122.9M (max: 256.0M available: 133.0M peak: 124.7M)
-        CPU: 9.340s
+     Memory: 122.5M (max: 256.0M available: 133.4M peak: 124.7M)
+        CPU: 9.367s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -27,7 +27,7 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
    Main PID: 1364558 (node)
       Tasks: 11 (limit: 32)
      Memory: 29.6M (max: 128.0M available: 98.3M peak: 128.0M swap: 14.0M swap peak: 81.0M)
-        CPU: 7.255s
+        CPU: 7.266s
      CGroup: /system.slice/control-api.service
              └─1364558 /usr/bin/node server.js
 
@@ -132,7 +132,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Thu, 19 Mar 2026 18:33:31 GMT
+Date: Thu, 19 Mar 2026 18:37:13 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,7 +142,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-19T18:33:31.106Z"
+  "timestamp": "2026-03-19T18:37:13.941Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -209,7 +209,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Thu, 19 Mar 2026 18:33:31 GMT
+date: Thu, 19 Mar 2026 18:37:14 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
