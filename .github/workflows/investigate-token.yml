@@ -1,0 +1,116 @@
+name: "Investigate Token History"
+
+on:
+  push:
+    branches: ["claude/*"]
+    paths: [".github/workflows/investigate-token.yml"]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  investigate:
+    name: "Token Investigation"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Investigate token history on VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'INVESTIGATE' | tee /tmp/investigate-output.txt
+          echo "=== CURRENT TOKEN ==="
+          TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
+          echo "prefix: $(echo ${TOKEN} | cut -c1-8)..."
+          echo "length: ${#TOKEN}"
+          echo ""
+
+          echo "=== BASH HISTORY (token-related) ==="
+          grep -i "BRIDGE_API_TOKEN\|token\|\.env\|control-bridge" ~/.bash_history 2>/dev/null | tail -30 || echo "no bash history"
+          echo ""
+
+          echo "=== JOURNALCTL TOKEN GENERATION EVENTS ==="
+          journalctl -u control-bridge --no-pager 2>/dev/null | grep -i "token\|start\|env" | tail -20 || echo "none"
+          echo ""
+
+          echo "=== SYSTEMD SERVICE RESTARTS ==="
+          journalctl -u control-bridge --no-pager 2>/dev/null | grep -i "Started\|Stopped" | tail -20
+          echo ""
+
+          echo "=== .ENV FILE MODIFICATION HISTORY ==="
+          stat /opt/control-bridge/.env 2>/dev/null
+          echo ""
+
+          echo "=== BACKUP .ENV FILES ==="
+          find /opt/control-bridge -name ".env*" -o -name "*.env" -o -name "*.bak" 2>/dev/null
+          find /tmp -name "*.env" -o -name "*bridge*" 2>/dev/null | head -10
+          echo ""
+
+          echo "=== DEPLOY SCRIPT HISTORY (sed traces in .env) ==="
+          # If sed -i was used, there might be a backup
+          ls -la /opt/control-bridge/.env* 2>/dev/null
+          echo ""
+
+          echo "=== GITHUB ACTIONS DEPLOY TRACES ==="
+          # Check /tmp for any leftover deploy artifacts
+          ls -la /tmp/control-bridge-deploy/ 2>/dev/null || echo "no deploy dir"
+          echo ""
+
+          echo "=== RECENT SYSLOG FOR TOKEN CHANGES ==="
+          grep -i "bridge\|token\|control" /var/log/syslog 2>/dev/null | tail -20 || echo "no syslog entries"
+          echo ""
+
+          echo "=== DOCKER LOGS (traefik - check for api.marbomebel requests) ==="
+          TRAEFIK=$(docker ps --filter "name=traefik" -q | head -1)
+          docker logs --tail 30 "${TRAEFIK}" 2>&1 | grep -i "api.marbomebel" | tail -10 || echo "no api requests in traefik logs"
+          echo ""
+
+          echo "=== N8N LOGS (may have stored token in env) ==="
+          grep -ri "BRIDGE_API_TOKEN" /opt/n8n-traefik/ 2>/dev/null | head -5 || echo "not in n8n dir"
+          echo ""
+
+          echo "=== ALL TOKEN PREFIXES FROM JOURNALCTL ==="
+          # Look for any token values that were echoed (before security fix)
+          journalctl --no-pager 2>/dev/null | grep -o "NEW_TOKEN=[^ ]*\|TOKEN=[^ ]*" | grep -v "TOKEN_EXISTS\|TOKEN_GENERATED\|TOKEN=\*\*\*" | while read line; do
+            VAL=$(echo "$line" | cut -d= -f2-)
+            if [ ${#VAL} -gt 10 ]; then
+              echo "found: $(echo $VAL | cut -c1-8)... (length: ${#VAL})"
+            fi
+          done
+          echo ""
+
+          echo "=== DONE ==="
+          INVESTIGATE
+
+      - name: Post results to issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, urllib.request, traceback
+          try:
+              with open("/tmp/investigate-output.txt") as f:
+                  content = f.read()
+              body = "## Token Investigation\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Token Investigation ${{ github.run_id }}", "body": body}).encode()
+              req = urllib.request.Request(
+                  "https://api.github.com/repos/${{ github.repository }}/issues",
+                  data=payload,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+                  method="POST")
+              resp = urllib.request.urlopen(req)
+              data = json.loads(resp.read())
+              print(f"Issue #{data['number']} created: {data['html_url']}")
+          except Exception as e:
+              traceback.print_exc()
+              with open("/tmp/investigate-output.txt") as f:
+                  print(f.read())
+          PYEOF
