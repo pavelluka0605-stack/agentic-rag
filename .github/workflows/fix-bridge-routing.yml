@@ -25,41 +25,54 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy Traefik config
+      - name: Deploy fix (bind 0.0.0.0, Traefik config, restart)
         run: |
-          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
-            control-bridge/traefik-api-bridge.yml \
+          SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
+          SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+
+          # Copy updated service file and Traefik config
+          $SCP control-bridge/control-bridge.service \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge.service
+          $SCP control-bridge/traefik-api-bridge.yml \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/traefik-api-bridge.yml
 
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY'
-          # Find Traefik dynamic dir
-          TRAEFIK_DYN=""
-          for d in /opt/n8n-traefik/dynamic /opt/traefik/dynamic /etc/traefik/dynamic; do
+          $SSH << 'FIX'
+          echo "=== 1. UPDATE SYSTEMD SERVICE (bind 0.0.0.0) ==="
+          cp /tmp/control-bridge.service /etc/systemd/system/control-bridge.service
+          systemctl daemon-reload
+          systemctl restart control-bridge
+          sleep 3
+          systemctl is-active control-bridge && echo "SERVICE_OK" || echo "SERVICE_FAIL"
+          echo ""
+
+          echo "=== 2. DEPLOY TRAEFIK CONFIG ==="
+          for d in /opt/n8n-traefik/dynamic /opt/traefik/dynamic; do
             [ -d "$d" ] && TRAEFIK_DYN="$d" && break
           done
-          echo "Traefik dir: $TRAEFIK_DYN"
           cp /tmp/traefik-api-bridge.yml "$TRAEFIK_DYN/api-bridge.yml"
-          echo "Config deployed"
-          ls -la "$TRAEFIK_DYN/"
-
-          # Remove conflicting nginx config
+          echo "Config: $TRAEFIK_DYN/api-bridge.yml"
           rm -f /etc/nginx/sites-enabled/api-marbomebel 2>/dev/null || true
+          echo ""
 
-          # Check Traefik logs for cert provisioning
-          echo "Waiting 30s for Traefik to provision TLS cert..."
+          echo "=== 3. VERIFY UVICORN BINDS 0.0.0.0 ==="
+          ss -tlnp | grep 3000
+          echo ""
+
+          echo "=== 4. TEST DOCKER BRIDGE ACCESS ==="
+          curl -si --connect-timeout 5 http://172.17.0.1:3000/health 2>&1
+          echo ""
+
+          echo "=== 5. WAIT FOR TRAEFIK TLS ==="
+          echo "Waiting 30s for Traefik to reload and provision cert..."
           sleep 30
-
-          # Check Traefik container logs
           TRAEFIK_CONTAINER=$(docker ps --filter "name=traefik" -q | head -1)
-          echo "Traefik container: ${TRAEFIK_CONTAINER}"
-          docker logs --tail 30 "${TRAEFIK_CONTAINER}" 2>&1 | grep -i "api.marbomebel\|acme\|cert\|error\|tls" || echo "no relevant traefik logs"
-          DEPLOY
+          docker logs --tail 20 "${TRAEFIK_CONTAINER}" 2>&1 | grep -i "api.marbomebel\|cert\|tls\|acme\|error" || echo "no relevant logs"
+          FIX
 
-      - name: Wait for TLS cert provisioning
+      - name: Wait for TLS
         run: sleep 30
 
-      - name: Run full retest via HTTPS
+      - name: Run full HTTPS retest
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'TEST' | tee /tmp/fix-output.txt
@@ -105,16 +118,16 @@ jobs:
               -H "Authorization: Bearer ${TOKEN}" 2>&1
             echo ""
           else
-            echo "createJob FAILED — no job_id extracted"
-            echo "Checking Traefik logs..."
+            echo "createJob FAILED — no job_id"
+            echo "Traefik logs:"
             TRAEFIK_CONTAINER=$(docker ps --filter "name=traefik" -q | head -1)
-            docker logs --tail 50 "${TRAEFIK_CONTAINER}" 2>&1 | tail -30
+            docker logs --tail 30 "${TRAEFIK_CONTAINER}" 2>&1 | tail -20
             echo ""
-            echo "Checking if Traefik can reach uvicorn..."
+            echo "Docker bridge test:"
             curl -si --connect-timeout 5 http://172.17.0.1:3000/health 2>&1
-            echo ""
           fi
 
+          echo ""
           echo "=== AUTH REJECTION ==="
           curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
             -H "Content-Type: application/json" \
@@ -124,8 +137,8 @@ jobs:
           echo "=== TOKEN INFO ==="
           echo "prefix: $(echo ${TOKEN} | cut -c1-6)..."
           echo "length: ${#TOKEN}"
-          echo ""
 
+          echo ""
           echo "=== DONE ==="
           TEST
 
