@@ -65,7 +65,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "if [ -f /opt/control-bridge/.env ] && grep -q BRIDGE_API_TOKEN /opt/control-bridge/.env; then echo TOKEN_EXISTS; else TOKEN=\$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))') && echo \"BRIDGE_API_TOKEN=\${TOKEN}\" > /opt/control-bridge/.env && chmod 600 /opt/control-bridge/.env && echo NEW_TOKEN=\${TOKEN}; fi"
+            "if [ -f /opt/control-bridge/.env ] && grep -q BRIDGE_API_TOKEN /opt/control-bridge/.env; then echo TOKEN_EXISTS; else TOKEN=\$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))') && echo \"BRIDGE_API_TOKEN=\${TOKEN}\" > /opt/control-bridge/.env && chmod 600 /opt/control-bridge/.env && echo TOKEN_GENERATED; fi"
 
       - name: Setup systemd service
         run: |
@@ -146,7 +146,7 @@ jobs:
           echo ""
 
           echo "=== REPORT ==="
-          echo "TOKEN=${TOKEN}"
+          echo "TOKEN=*****(masked)"
           echo "URL=https://api.marbomebel.ru"
           TEST_SCRIPT
 

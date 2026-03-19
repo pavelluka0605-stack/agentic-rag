@@ -33,10 +33,18 @@ class JobResponse(BaseModel):
     job_id: str
     status: str
 
+class JobResultData(BaseModel):
+    summary: str = ""
+    changes_made: list[str] = []
+    artifacts: list[str] = []
+    tests_run: list[str] = []
+    manual_checks: list[str] = []
+    risks_remaining: list[str] = []
+
 class JobResult(BaseModel):
     job_id: str
     status: str
-    result: Optional[dict] = None
+    result: Optional[JobResultData] = None
 
 # --- In-memory store ---
 jobs: dict = {}
@@ -45,7 +53,7 @@ jobs: dict = {}
 app = FastAPI(
     title="Control Bridge API",
     description="GPT Actions bridge for marbomebel.ru",
-    version="1.0.0",
+    version="1.1.0",
     servers=[{"url": "https://api.marbomebel.ru"}],
 )
 
@@ -91,11 +99,18 @@ def get_job_result(job_id: str):
     # Auto-complete running jobs for demo purposes
     if job["status"] == "running":
         job["status"] = "completed"
-        job["result"] = {
-            "summary": f"Job '{job['title']}' completed successfully.",
-            "details": {"request": job["raw_user_request"], "brief": job["normalized_brief"]},
-        }
-    return JobResult(job_id=job_id, status=job["status"], result=job.get("result"))
+        job["result"] = JobResultData(
+            summary=f"Job '{job['title']}' completed successfully.",
+            changes_made=[],
+            artifacts=[],
+            tests_run=[],
+            manual_checks=["Review result in dashboard"],
+            risks_remaining=[],
+        )
+    result_data = job.get("result")
+    if isinstance(result_data, dict):
+        result_data = JobResultData(**result_data)
+    return JobResult(job_id=job_id, status=job["status"], result=result_data)
 
 @app.post("/jobs/{job_id}/cancel", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def cancel_job(job_id: str):
