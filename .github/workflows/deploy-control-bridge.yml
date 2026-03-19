@@ -80,19 +80,13 @@ jobs:
             "curl -sf http://127.0.0.1:3000/health && echo LOCAL_OK || (echo LOCAL_FAIL && exit 1)"
 
       - name: Setup nginx (HTTP)
-        continue-on-error: true
         run: |
-          echo "--- Verify local file ---"
-          ls -la control-bridge/nginx-http.conf
-          cat control-bridge/nginx-http.conf
-          echo "--- SCP nginx config ---"
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
             control-bridge/nginx-http.conf \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/etc/nginx/sites-available/api-marbomebel
-          echo "--- SCP done, setting up ---"
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "cat /etc/nginx/sites-available/api-marbomebel && ln -sf /etc/nginx/sites-available/api-marbomebel /etc/nginx/sites-enabled/api-marbomebel && nginx -t 2>&1 && systemctl reload nginx && echo NGINX_HTTP_OK"
+            "ln -sf /etc/nginx/sites-available/api-marbomebel /etc/nginx/sites-enabled/api-marbomebel && nginx -t 2>&1 && systemctl reload nginx && echo NGINX_HTTP_OK"
 
       - name: Setup SSL certificate
         run: |
