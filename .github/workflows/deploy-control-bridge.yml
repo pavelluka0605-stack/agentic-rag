@@ -81,9 +81,27 @@ jobs:
 
       - name: Setup nginx (HTTP)
         run: |
+          cat > /tmp/nginx-http.conf << 'NGEOF'
+          server {
+            listen 80;
+            server_name api.marbomebel.ru;
+            location /.well-known/acme-challenge/ { root /var/www/html; }
+            location / {
+              proxy_pass http://127.0.0.1:3000;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+            }
+          }
+          NGEOF
+          sed -i 's/^          //' /tmp/nginx-http.conf
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            /tmp/nginx-http.conf \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/etc/nginx/sites-available/api-marbomebel
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'printf "server {\n  listen 80;\n  server_name api.marbomebel.ru;\n  location /.well-known/acme-challenge/ { root /var/www/html; }\n  location / {\n    proxy_pass http://127.0.0.1:3000;\n    proxy_set_header Host \$host;\n    proxy_set_header X-Real-IP \$remote_addr;\n    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;\n    proxy_set_header X-Forwarded-Proto \$scheme;\n  }\n}\n" > /etc/nginx/sites-available/api-marbomebel && ln -sf /etc/nginx/sites-available/api-marbomebel /etc/nginx/sites-enabled/api-marbomebel && nginx -t && systemctl reload nginx && echo NGINX_HTTP_OK'
+            "ln -sf /etc/nginx/sites-available/api-marbomebel /etc/nginx/sites-enabled/api-marbomebel && nginx -t && systemctl reload nginx && echo NGINX_HTTP_OK"
 
       - name: Setup SSL certificate
         run: |
