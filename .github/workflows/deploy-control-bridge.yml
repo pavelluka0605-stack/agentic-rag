@@ -1,0 +1,217 @@
+name: "Deploy Control Bridge API"
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/*"
+    paths:
+      - "control-bridge/**"
+      - ".github/workflows/deploy-control-bridge.yml"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        required: true
+        default: "deploy"
+        type: choice
+        options:
+          - deploy       # Full deploy
+          - healthcheck  # Just check status
+
+jobs:
+  deploy:
+    name: "Deploy Control Bridge"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Copy files to VPS
+        run: |
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
+            control-bridge/ \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge-deploy/
+
+      - name: Deploy on VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE_SCRIPT'
+
+          set -euo pipefail
+          BRIDGE_DIR="/opt/control-bridge"
+          SRC="/tmp/control-bridge-deploy"
+          DOMAIN="api.marbomebel.ru"
+          SERVICE_NAME="control-bridge"
+
+          echo "=== Control Bridge API Deployment ==="
+
+          # 1. System packages
+          echo "--- Installing packages ---"
+          apt-get update -qq
+          apt-get install -y -qq python3 python3-venv python3-pip nginx certbot python3-certbot-nginx curl dnsutils
+
+          # 2. App directory
+          echo "--- Setting up app ---"
+          mkdir -p "${BRIDGE_DIR}"
+          cp "${SRC}/app.py" "${BRIDGE_DIR}/app.py"
+          cp "${SRC}/requirements.txt" "${BRIDGE_DIR}/requirements.txt"
+
+          # 3. Python venv
+          echo "--- Python venv ---"
+          if [ ! -d "${BRIDGE_DIR}/venv" ]; then
+              python3 -m venv "${BRIDGE_DIR}/venv"
+          fi
+          "${BRIDGE_DIR}/venv/bin/pip" install --upgrade pip -q
+          "${BRIDGE_DIR}/venv/bin/pip" install -r "${BRIDGE_DIR}/requirements.txt" -q
+
+          # 4. API token
+          echo "--- API token ---"
+          if [ -f "${BRIDGE_DIR}/.env" ] && grep -q "BRIDGE_API_TOKEN=" "${BRIDGE_DIR}/.env"; then
+              echo "Token already exists, keeping."
+          else
+              TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+              echo "BRIDGE_API_TOKEN=${TOKEN}" > "${BRIDGE_DIR}/.env"
+              chmod 600 "${BRIDGE_DIR}/.env"
+              echo "NEW_TOKEN=${TOKEN}"
+          fi
+
+          # 5. systemd
+          echo "--- systemd service ---"
+          cp "${SRC}/control-bridge.service" "/etc/systemd/system/${SERVICE_NAME}.service"
+          systemctl daemon-reload
+          systemctl enable "${SERVICE_NAME}"
+          systemctl restart "${SERVICE_NAME}"
+          sleep 2
+          systemctl is-active "${SERVICE_NAME}" || { journalctl -u "${SERVICE_NAME}" --no-pager -n 20; exit 1; }
+          echo "Service is running."
+
+          # 6. Local test
+          echo "--- Local health check ---"
+          curl -sf http://127.0.0.1:3000/health && echo " OK" || { echo " FAILED"; exit 1; }
+
+          # 7. nginx (HTTP first)
+          echo "--- nginx ---"
+          NGINX_CONF="/etc/nginx/sites-available/api-marbomebel"
+          cat > "${NGINX_CONF}" << 'NGINX_HTTP'
+          server {
+              listen 80;
+              server_name api.marbomebel.ru;
+              location /.well-known/acme-challenge/ { root /var/www/html; }
+              location / {
+                  proxy_pass http://127.0.0.1:3000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+          NGINX_HTTP
+          ln -sf "${NGINX_CONF}" /etc/nginx/sites-enabled/api-marbomebel
+          nginx -t && systemctl reload nginx
+          echo "nginx HTTP configured."
+
+          # 8. DNS check
+          echo "--- DNS ---"
+          dig +short "${DOMAIN}" || echo "(dig unavailable)"
+          curl -s -4 ifconfig.me || echo "(ip check unavailable)"
+
+          # 9. SSL
+          echo "--- SSL ---"
+          if [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
+              echo "SSL cert already exists."
+          else
+              certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --email admin@marbomebel.ru --redirect || {
+                  echo "WARNING: certbot --nginx failed, trying standalone..."
+                  systemctl stop nginx
+                  certbot certonly --standalone -d "${DOMAIN}" --non-interactive --agree-tos --email admin@marbomebel.ru || echo "SSL FAILED"
+                  systemctl start nginx
+              }
+          fi
+
+          # Install full HTTPS config if cert exists
+          if [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
+              cp "${SRC}/nginx-api.conf" "${NGINX_CONF}"
+              nginx -t && systemctl reload nginx
+              echo "HTTPS configured."
+          fi
+
+          # 10. Final verification
+          echo ""
+          echo "=== FINAL TESTS ==="
+          TOKEN=$(grep BRIDGE_API_TOKEN "${BRIDGE_DIR}/.env" | cut -d= -f2-)
+
+          echo "health:"
+          curl -s http://127.0.0.1:3000/health
+          echo ""
+
+          echo "createJob:"
+          CREATE=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Deploy test","raw_user_request":"Automated deploy test","normalized_brief":"Test"}')
+          echo "${CREATE}"
+          JOB_ID=$(echo "${CREATE}" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null || echo "")
+
+          if [ -n "${JOB_ID}" ]; then
+              echo "confirmJob:"
+              curl -s -X POST "http://127.0.0.1:3000/jobs/${JOB_ID}/confirm" -H "Authorization: Bearer ${TOKEN}"
+              echo ""
+              echo "getJobStatus:"
+              curl -s "http://127.0.0.1:3000/jobs/${JOB_ID}/status" -H "Authorization: Bearer ${TOKEN}"
+              echo ""
+              echo "getJobResult:"
+              curl -s "http://127.0.0.1:3000/jobs/${JOB_ID}/result" -H "Authorization: Bearer ${TOKEN}"
+              echo ""
+
+              # Cancel test
+              CANCEL=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{"title":"Cancel test","raw_user_request":"Test cancel","normalized_brief":"Cancel"}')
+              CID=$(echo "${CANCEL}" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null || echo "")
+              if [ -n "${CID}" ]; then
+                  echo "cancelJob:"
+                  curl -s -X POST "http://127.0.0.1:3000/jobs/${CID}/cancel" -H "Authorization: Bearer ${TOKEN}"
+                  echo ""
+              fi
+          fi
+
+          # HTTPS test
+          echo "httpsHealth:"
+          curl -sk "https://${DOMAIN}/health" 2>/dev/null || curl -s "http://${DOMAIN}/health" 2>/dev/null || echo "HTTPS not available yet"
+          echo ""
+
+          echo ""
+          echo "=== DEPLOYMENT REPORT ==="
+          echo "TOKEN=${TOKEN}"
+          echo "URL=https://${DOMAIN}"
+          echo "SERVICE=${SERVICE_NAME}"
+          echo "DIR=${BRIDGE_DIR}"
+
+          # Cleanup
+          rm -rf "${SRC}"
+          REMOTE_SCRIPT
+
+      - name: Send Telegram notification
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          STATUS="${{ job.status }}"
+          MSG="Control Bridge Deploy: ${STATUS}
+          URL: https://api.marbomebel.ru
+          Run: ${{ github.run_id }}"
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
