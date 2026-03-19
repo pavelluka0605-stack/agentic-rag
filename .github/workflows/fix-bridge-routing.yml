@@ -3,7 +3,7 @@ name: "Fix Bridge Routing (Traefik)"
 on:
   push:
     branches: ["claude/*"]
-    paths: [".github/workflows/fix-bridge-routing.yml"]
+    paths: [".github/workflows/fix-bridge-routing.yml", "control-bridge/app.py"]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ jobs:
   fix:
     name: "Fix and Retest"
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,120 +25,139 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy fix (bind 0.0.0.0, Traefik config, restart)
+      - name: Deploy dual-token app.py, set legacy token, restart
         run: |
           SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
           SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
 
-          # Copy updated service file and Traefik config
-          $SCP control-bridge/control-bridge.service \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge.service
-          $SCP control-bridge/traefik-api-bridge.yml \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/traefik-api-bridge.yml
+          $SCP control-bridge/app.py \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/control-bridge/app.py
 
           $SSH << 'FIX'
-          echo "=== 1. UPDATE SYSTEMD SERVICE (bind 0.0.0.0) ==="
-          cp /tmp/control-bridge.service /etc/systemd/system/control-bridge.service
-          systemctl daemon-reload
+          echo "=== 1. ADD LEGACY TOKEN TO .ENV ==="
+          # Add legacy token (the token that was active when the GPT was first configured)
+          if grep -q BRIDGE_API_TOKEN_LEGACY /opt/control-bridge/.env; then
+            echo "LEGACY_TOKEN_ALREADY_SET"
+          else
+            echo 'BRIDGE_API_TOKEN_LEGACY=0ORbpHTjaswJvP2J4wO9gUhSvrfl0mbK3h5BVDKSV60' >> /opt/control-bridge/.env
+            chmod 600 /opt/control-bridge/.env
+            echo "LEGACY_TOKEN_ADDED"
+          fi
+          echo "env lines: $(wc -l < /opt/control-bridge/.env)"
+          echo ""
+
+          echo "=== 2. RESTART SERVICE ==="
           systemctl restart control-bridge
           sleep 3
           systemctl is-active control-bridge && echo "SERVICE_OK" || echo "SERVICE_FAIL"
           echo ""
 
-          echo "=== 2. DEPLOY TRAEFIK CONFIG ==="
-          for d in /opt/n8n-traefik/dynamic /opt/traefik/dynamic; do
-            [ -d "$d" ] && TRAEFIK_DYN="$d" && break
-          done
-          cp /tmp/traefik-api-bridge.yml "$TRAEFIK_DYN/api-bridge.yml"
-          echo "Config: $TRAEFIK_DYN/api-bridge.yml"
-          rm -f /etc/nginx/sites-enabled/api-marbomebel 2>/dev/null || true
+          echo "=== 3. VERIFY BOTH TOKENS WORK ==="
+          CURRENT=$(grep '^BRIDGE_API_TOKEN=' /opt/control-bridge/.env | cut -d= -f2-)
+          LEGACY=$(grep '^BRIDGE_API_TOKEN_LEGACY=' /opt/control-bridge/.env | cut -d= -f2-)
+          echo "current prefix: $(echo ${CURRENT} | cut -c1-6)..."
+          echo "legacy prefix: $(echo ${LEGACY} | cut -c1-6)..."
+
+          echo ""
+          echo "--- Test with CURRENT token ---"
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${CURRENT}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Current token test","raw_user_request":"x","normalized_brief":"x"}' 2>&1
           echo ""
 
-          echo "=== 3. VERIFY UVICORN BINDS 0.0.0.0 ==="
-          ss -tlnp | grep 3000
+          echo ""
+          echo "--- Test with LEGACY token ---"
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${LEGACY}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Legacy token test","raw_user_request":"x","normalized_brief":"x"}' 2>&1
           echo ""
 
-          echo "=== 4. TEST DOCKER BRIDGE ACCESS ==="
-          curl -si --connect-timeout 5 http://172.17.0.1:3000/health 2>&1
           echo ""
-
-          echo "=== 5. WAIT FOR TRAEFIK TLS ==="
-          echo "Waiting 30s for Traefik to reload and provision cert..."
-          sleep 30
-          TRAEFIK_CONTAINER=$(docker ps --filter "name=traefik" -q | head -1)
-          docker logs --tail 20 "${TRAEFIK_CONTAINER}" 2>&1 | grep -i "api.marbomebel\|cert\|tls\|acme\|error" || echo "no relevant logs"
+          echo "--- Test with BAD token ---"
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer WRONG_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Bad token test","raw_user_request":"x","normalized_brief":"x"}' 2>&1
+          echo ""
           FIX
 
-      - name: Wait for TLS
-        run: sleep 30
-
-      - name: Run full HTTPS retest
+      - name: Run full HTTPS retest with legacy token
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'TEST' | tee /tmp/fix-output.txt
-          TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
+          LEGACY=$(grep '^BRIDGE_API_TOKEN_LEGACY=' /opt/control-bridge/.env | cut -d= -f2-)
+          CURRENT=$(grep '^BRIDGE_API_TOKEN=' /opt/control-bridge/.env | cut -d= -f2-)
 
-          echo "=== HTTPS HEALTH ==="
+          echo "=== HTTPS TESTS WITH LEGACY TOKEN (GPT-configured) ==="
+          echo "legacy prefix: $(echo ${LEGACY} | cut -c1-6)..."
+          echo ""
+
+          echo "=== health ==="
           curl -si --connect-timeout 15 https://api.marbomebel.ru/health 2>&1
           echo ""
 
-          echo "=== HTTPS createJob ==="
-          CREATE_RESP=$(curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
-            -H "Authorization: Bearer ${TOKEN}" \
+          echo "=== createJob ==="
+          CREATE=$(curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ${LEGACY}" \
             -H "Content-Type: application/json" \
             -d '{"title":"Тестовая задача","raw_user_request":"Проверка моста GPT -> API","normalized_brief":"Тестовый запуск createJob"}' 2>&1)
-          echo "${CREATE_RESP}"
-          JOB_ID=$(echo "${CREATE_RESP}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+          echo "${CREATE}"
+          JOB_ID=$(echo "${CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
           echo "job_id: ${JOB_ID}"
           echo ""
 
           if [ -n "${JOB_ID}" ]; then
-            echo "=== HTTPS confirmJob ==="
+            echo "=== confirmJob ==="
             curl -si --connect-timeout 15 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" \
-              -H "Authorization: Bearer ${TOKEN}" 2>&1
+              -H "Authorization: Bearer ${LEGACY}" 2>&1
             echo ""
 
-            echo "=== HTTPS getJobStatus ==="
+            echo "=== getJobStatus ==="
             curl -si --connect-timeout 15 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" \
-              -H "Authorization: Bearer ${TOKEN}" 2>&1
+              -H "Authorization: Bearer ${LEGACY}" 2>&1
             echo ""
 
-            echo "=== HTTPS getJobResult ==="
+            echo "=== getJobResult ==="
             curl -si --connect-timeout 15 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" \
-              -H "Authorization: Bearer ${TOKEN}" 2>&1
+              -H "Authorization: Bearer ${LEGACY}" 2>&1
             echo ""
 
-            echo "=== HTTPS cancelJob (new job) ==="
+            echo "=== cancelJob ==="
             C2=$(curl -s --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
-              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Authorization: Bearer ${LEGACY}" \
               -H "Content-Type: application/json" \
               -d '{"title":"Cancel test","raw_user_request":"x","normalized_brief":"x"}')
             CID=$(echo "${C2}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
             curl -si --connect-timeout 15 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" \
-              -H "Authorization: Bearer ${TOKEN}" 2>&1
+              -H "Authorization: Bearer ${LEGACY}" 2>&1
             echo ""
           else
-            echo "createJob FAILED — no job_id"
-            echo "Traefik logs:"
-            TRAEFIK_CONTAINER=$(docker ps --filter "name=traefik" -q | head -1)
-            docker logs --tail 30 "${TRAEFIK_CONTAINER}" 2>&1 | tail -20
-            echo ""
-            echo "Docker bridge test:"
-            curl -si --connect-timeout 5 http://172.17.0.1:3000/health 2>&1
+            echo "createJob FAILED with legacy token"
           fi
 
           echo ""
-          echo "=== AUTH REJECTION ==="
+          echo "=== CURRENT TOKEN ALSO WORKS ==="
           curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ${CURRENT}" \
             -H "Content-Type: application/json" \
-            -d '{"title":"no auth","raw_user_request":"x","normalized_brief":""}' 2>&1
+            -d '{"title":"Current token verify","raw_user_request":"x","normalized_brief":"x"}' 2>&1
+          echo ""
+
+          echo "=== AUTH REJECTION (bad token) ==="
+          curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer INVALID" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}' 2>&1
           echo ""
 
           echo "=== TOKEN INFO ==="
-          echo "prefix: $(echo ${TOKEN} | cut -c1-6)..."
-          echo "length: ${#TOKEN}"
-
+          echo "current: $(echo ${CURRENT} | cut -c1-6)... (len ${#CURRENT})"
+          echo "legacy:  $(echo ${LEGACY} | cut -c1-6)... (len ${#LEGACY})"
+          echo "mode: dual-token"
           echo ""
+
           echo "=== DONE ==="
           TEST
 
@@ -152,8 +171,8 @@ jobs:
           try:
               with open("/tmp/fix-output.txt") as f:
                   content = f.read()
-              body = "## Bridge Fix Retest\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
-              payload = json.dumps({"title": "Bridge Retest ${{ github.run_id }}", "body": body}).encode()
+              body = "## Dual-Token Retest\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Dual-Token Retest ${{ github.run_id }}", "body": body}).encode()
               req = urllib.request.Request(
                   "https://api.github.com/repos/${{ github.repository }}/issues",
                   data=payload,

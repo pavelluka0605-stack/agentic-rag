@@ -12,7 +12,11 @@ from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 
 # --- Auth ---
+# Primary token from .env (current)
 API_TOKEN = os.environ.get("BRIDGE_API_TOKEN", "")
+# Legacy token for transition period (optional, set in .env as BRIDGE_API_TOKEN_LEGACY)
+# Remove BRIDGE_API_TOKEN_LEGACY from .env once the GPT is updated to use the current token.
+API_TOKEN_LEGACY = os.environ.get("BRIDGE_API_TOKEN_LEGACY", "")
 
 def verify_token(authorization: Optional[str] = Header(None)):
     if not API_TOKEN:
@@ -20,8 +24,13 @@ def verify_token(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
     scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or token != API_TOKEN:
+    if scheme.lower() != "bearer":
         raise HTTPException(status_code=403, detail="Invalid token")
+    if token == API_TOKEN:
+        return
+    if API_TOKEN_LEGACY and token == API_TOKEN_LEGACY:
+        return
+    raise HTTPException(status_code=403, detail="Invalid token")
 
 # --- Models ---
 class JobCreate(BaseModel):
