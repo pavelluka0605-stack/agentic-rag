@@ -16,8 +16,8 @@ on:
         default: "deploy"
         type: choice
         options:
-          - deploy       # Full deploy
-          - healthcheck  # Just check status
+          - deploy
+          - healthcheck
 
 jobs:
   deploy:
@@ -38,10 +38,10 @@ jobs:
 
       - name: Copy files to VPS
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "rm -rf /tmp/control-bridge-deploy && mkdir -p /tmp/control-bridge-deploy"
-          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          SCP_CMD="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
+          $SSH_CMD "rm -rf /tmp/control-bridge-deploy && mkdir -p /tmp/control-bridge-deploy"
+          $SCP_CMD \
             control-bridge/app.py \
             control-bridge/requirements.txt \
             control-bridge/nginx-api.conf \
@@ -49,11 +49,110 @@ jobs:
             control-bridge/deploy.sh \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge-deploy/
 
-      - name: Deploy on VPS
+      - name: Install packages on VPS
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "chmod +x /tmp/control-bridge-deploy/deploy.sh && bash /tmp/control-bridge-deploy/deploy.sh"
+            "apt-get update -qq && apt-get install -y -qq python3 python3-venv python3-pip nginx certbot python3-certbot-nginx curl dnsutils 2>&1 | tail -5"
+
+      - name: Setup app and venv
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "mkdir -p /opt/control-bridge && cp /tmp/control-bridge-deploy/app.py /tmp/control-bridge-deploy/requirements.txt /opt/control-bridge/ && (test -d /opt/control-bridge/venv || python3 -m venv /opt/control-bridge/venv) && /opt/control-bridge/venv/bin/pip install --upgrade pip -q && /opt/control-bridge/venv/bin/pip install -r /opt/control-bridge/requirements.txt -q && echo VENV_OK"
+
+      - name: Generate API token
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "if [ -f /opt/control-bridge/.env ] && grep -q BRIDGE_API_TOKEN /opt/control-bridge/.env; then echo TOKEN_EXISTS; else TOKEN=\$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))') && echo \"BRIDGE_API_TOKEN=\${TOKEN}\" > /opt/control-bridge/.env && chmod 600 /opt/control-bridge/.env && echo NEW_TOKEN=\${TOKEN}; fi"
+
+      - name: Setup systemd service
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "cp /tmp/control-bridge-deploy/control-bridge.service /etc/systemd/system/control-bridge.service && systemctl daemon-reload && systemctl enable control-bridge && systemctl restart control-bridge && sleep 3 && systemctl is-active control-bridge && echo SERVICE_OK || (journalctl -u control-bridge --no-pager -n 30 && exit 1)"
+
+      - name: Test local health
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "curl -sf http://127.0.0.1:3000/health && echo LOCAL_OK || (echo LOCAL_FAIL && exit 1)"
+
+      - name: Setup nginx (HTTP)
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'printf "server {\n  listen 80;\n  server_name api.marbomebel.ru;\n  location /.well-known/acme-challenge/ { root /var/www/html; }\n  location / {\n    proxy_pass http://127.0.0.1:3000;\n    proxy_set_header Host \$host;\n    proxy_set_header X-Real-IP \$remote_addr;\n    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;\n    proxy_set_header X-Forwarded-Proto \$scheme;\n  }\n}\n" > /etc/nginx/sites-available/api-marbomebel && ln -sf /etc/nginx/sites-available/api-marbomebel /etc/nginx/sites-enabled/api-marbomebel && nginx -t && systemctl reload nginx && echo NGINX_HTTP_OK'
+
+      - name: Setup SSL certificate
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "if [ -f /etc/letsencrypt/live/api.marbomebel.ru/fullchain.pem ]; then echo SSL_EXISTS; else certbot --nginx -d api.marbomebel.ru --non-interactive --agree-tos --email admin@marbomebel.ru --redirect 2>&1 && echo SSL_OK || echo SSL_FAILED; fi"
+
+      - name: Install HTTPS nginx config
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "if [ -f /etc/letsencrypt/live/api.marbomebel.ru/fullchain.pem ]; then cp /tmp/control-bridge-deploy/nginx-api.conf /etc/nginx/sites-available/api-marbomebel && nginx -t && systemctl reload nginx && echo HTTPS_NGINX_OK; else echo NO_CERT_SKIP; fi"
+
+      - name: Run endpoint tests
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'TEST_SCRIPT'
+          TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
+          echo "=== ENDPOINT TESTS ==="
+
+          echo "health:"
+          curl -s http://127.0.0.1:3000/health
+          echo ""
+
+          echo "createJob:"
+          CREATE=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Deploy test","raw_user_request":"Automated deploy test","normalized_brief":"Test"}')
+          echo "${CREATE}"
+          JOB_ID=$(echo "${CREATE}" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null)
+
+          echo "confirmJob:"
+          curl -s -X POST "http://127.0.0.1:3000/jobs/${JOB_ID}/confirm" -H "Authorization: Bearer ${TOKEN}"
+          echo ""
+
+          echo "getJobStatus:"
+          curl -s "http://127.0.0.1:3000/jobs/${JOB_ID}/status" -H "Authorization: Bearer ${TOKEN}"
+          echo ""
+
+          echo "getJobResult:"
+          curl -s "http://127.0.0.1:3000/jobs/${JOB_ID}/result" -H "Authorization: Bearer ${TOKEN}"
+          echo ""
+
+          CANCEL=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Cancel test","raw_user_request":"Test cancel","normalized_brief":"Cancel"}')
+          CID=$(echo "${CANCEL}" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null)
+
+          echo "cancelJob:"
+          curl -s -X POST "http://127.0.0.1:3000/jobs/${CID}/cancel" -H "Authorization: Bearer ${TOKEN}"
+          echo ""
+
+          echo "httpsHealth:"
+          curl -sk https://api.marbomebel.ru/health 2>/dev/null || curl -s http://api.marbomebel.ru/health 2>/dev/null || echo "not available"
+          echo ""
+
+          echo "=== REPORT ==="
+          echo "TOKEN=${TOKEN}"
+          echo "URL=https://api.marbomebel.ru"
+          TEST_SCRIPT
+
+      - name: Cleanup
+        if: always()
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "rm -rf /tmp/control-bridge-deploy" 2>/dev/null || true
 
       - name: Send Telegram notification
         if: always()
