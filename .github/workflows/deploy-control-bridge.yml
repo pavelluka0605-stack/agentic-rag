@@ -38,8 +38,15 @@ jobs:
 
       - name: Copy files to VPS
         run: |
-          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} -r \
-            control-bridge/ \
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "rm -rf /tmp/control-bridge-deploy && mkdir -p /tmp/control-bridge-deploy"
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            control-bridge/app.py \
+            control-bridge/requirements.txt \
+            control-bridge/nginx-api.conf \
+            control-bridge/control-bridge.service \
+            control-bridge/deploy.sh \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge-deploy/
 
       - name: Deploy on VPS
@@ -99,23 +106,10 @@ jobs:
           echo "--- Local health check ---"
           curl -sf http://127.0.0.1:3000/health && echo " OK" || { echo " FAILED"; exit 1; }
 
-          # 7. nginx (HTTP first)
+          # 7. nginx (HTTP first for certbot)
           echo "--- nginx ---"
           NGINX_CONF="/etc/nginx/sites-available/api-marbomebel"
-          cat > "${NGINX_CONF}" << 'NGINX_HTTP'
-          server {
-              listen 80;
-              server_name api.marbomebel.ru;
-              location /.well-known/acme-challenge/ { root /var/www/html; }
-              location / {
-                  proxy_pass http://127.0.0.1:3000;
-                  proxy_set_header Host $host;
-                  proxy_set_header X-Real-IP $remote_addr;
-                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  proxy_set_header X-Forwarded-Proto $scheme;
-              }
-          }
-          NGINX_HTTP
+          printf 'server {\n  listen 80;\n  server_name api.marbomebel.ru;\n  location /.well-known/acme-challenge/ { root /var/www/html; }\n  location / {\n    proxy_pass http://127.0.0.1:3000;\n    proxy_set_header Host $host;\n    proxy_set_header X-Real-IP $remote_addr;\n    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n    proxy_set_header X-Forwarded-Proto $scheme;\n  }\n}\n' > "${NGINX_CONF}"
           ln -sf "${NGINX_CONF}" /etc/nginx/sites-enabled/api-marbomebel
           nginx -t && systemctl reload nginx
           echo "nginx HTTP configured."
