@@ -1,0 +1,17 @@
+[Unit]
+Description=Control Bridge API (GPT Actions bridge)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/control-bridge
+EnvironmentFile=/opt/control-bridge/.env
+ExecStart=/opt/control-bridge/venv/bin/uvicorn app:app --host 127.0.0.1 --port 3000 --workers 1 --log-level info
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
