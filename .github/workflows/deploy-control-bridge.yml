@@ -45,8 +45,10 @@ jobs:
             control-bridge/app.py \
             control-bridge/requirements.txt \
             control-bridge/nginx-api.conf \
+            control-bridge/nginx-http.conf \
             control-bridge/control-bridge.service \
             control-bridge/deploy.sh \
+            control-bridge/rotate-token.sh \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge-deploy/
 
       - name: Install packages on VPS
@@ -59,15 +61,26 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "mkdir -p /opt/control-bridge && cp /tmp/control-bridge-deploy/app.py /tmp/control-bridge-deploy/requirements.txt /opt/control-bridge/ && (test -d /opt/control-bridge/venv || python3 -m venv /opt/control-bridge/venv) && /opt/control-bridge/venv/bin/pip install --upgrade pip -q && /opt/control-bridge/venv/bin/pip install -r /opt/control-bridge/requirements.txt -q && echo VENV_OK"
+            "mkdir -p /opt/control-bridge && cp /tmp/control-bridge-deploy/app.py /tmp/control-bridge-deploy/requirements.txt /tmp/control-bridge-deploy/rotate-token.sh /opt/control-bridge/ && chmod +x /opt/control-bridge/rotate-token.sh && (test -d /opt/control-bridge/venv || python3 -m venv /opt/control-bridge/venv) && /opt/control-bridge/venv/bin/pip install --upgrade pip -q && /opt/control-bridge/venv/bin/pip install -r /opt/control-bridge/requirements.txt -q && echo VENV_OK"
 
-      - name: Generate API token
+      - name: Generate API token (if missing)
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "if [ -f /opt/control-bridge/.env ] && grep -q BRIDGE_API_TOKEN /opt/control-bridge/.env; then echo TOKEN_EXISTS; else TOKEN=\$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))') && echo \"BRIDGE_API_TOKEN=\${TOKEN}\" > /opt/control-bridge/.env && chmod 600 /opt/control-bridge/.env && echo TOKEN_GENERATED; fi"
 
-      - name: Setup systemd service
+      - name: Rotate API token
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ROTATE'
+          set -e
+          NEW_TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+          sed -i "s|^BRIDGE_API_TOKEN=.*|BRIDGE_API_TOKEN=${NEW_TOKEN}|" /opt/control-bridge/.env
+          chmod 600 /opt/control-bridge/.env
+          echo "TOKEN_ROTATED"
+          ROTATE
+
+      - name: Setup systemd service and restart
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
@@ -77,78 +90,116 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "curl -sf http://127.0.0.1:3000/health && echo LOCAL_OK || (echo LOCAL_FAIL && exit 1)"
+            "curl -sf http://127.0.0.1:3000/health && echo ' LOCAL_OK' || (echo LOCAL_FAIL && exit 1)"
 
-      - name: Setup nginx (HTTP)
-        run: |
-          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
-            control-bridge/nginx-http.conf \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/etc/nginx/sites-available/api-marbomebel
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "ln -sf /etc/nginx/sites-available/api-marbomebel /etc/nginx/sites-enabled/api-marbomebel && nginx -t 2>&1 && systemctl reload nginx && echo NGINX_HTTP_OK"
-
-      - name: Setup SSL certificate
+      - name: Setup nginx
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "if [ -f /etc/letsencrypt/live/api.marbomebel.ru/fullchain.pem ]; then echo SSL_EXISTS; else certbot --nginx -d api.marbomebel.ru --non-interactive --agree-tos --email admin@marbomebel.ru --redirect 2>&1 && echo SSL_OK || echo SSL_FAILED; fi"
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'NGINX'
+          set -e
+          # If HTTPS cert already exists, install HTTPS config directly
+          if [ -f /etc/letsencrypt/live/api.marbomebel.ru/fullchain.pem ]; then
+            echo "SSL cert exists, installing HTTPS config"
+            cp /tmp/control-bridge-deploy/nginx-api.conf /etc/nginx/sites-available/api-marbomebel
+            ln -sf /etc/nginx/sites-available/api-marbomebel /etc/nginx/sites-enabled/api-marbomebel
+            nginx -t 2>&1 && systemctl reload nginx && echo "HTTPS_NGINX_OK"
+          else
+            echo "No SSL cert, installing HTTP config first"
+            cp /tmp/control-bridge-deploy/nginx-http.conf /etc/nginx/sites-available/api-marbomebel
+            ln -sf /etc/nginx/sites-available/api-marbomebel /etc/nginx/sites-enabled/api-marbomebel
+            nginx -t 2>&1 && systemctl reload nginx && echo "HTTP_NGINX_OK"
+            # Try to get SSL cert
+            certbot --nginx -d api.marbomebel.ru --non-interactive --agree-tos --email admin@marbomebel.ru --redirect 2>&1 || echo "CERTBOT_SKIPPED"
+            # If cert now exists, install HTTPS config
+            if [ -f /etc/letsencrypt/live/api.marbomebel.ru/fullchain.pem ]; then
+              cp /tmp/control-bridge-deploy/nginx-api.conf /etc/nginx/sites-available/api-marbomebel
+              nginx -t && systemctl reload nginx && echo "HTTPS_NGINX_OK"
+            fi
+          fi
+          NGINX
 
-      - name: Install HTTPS nginx config
+      - name: Service and nginx diagnostics
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "if [ -f /etc/letsencrypt/live/api.marbomebel.ru/fullchain.pem ]; then cp /tmp/control-bridge-deploy/nginx-api.conf /etc/nginx/sites-available/api-marbomebel && nginx -t && systemctl reload nginx && echo HTTPS_NGINX_OK; else echo NO_CERT_SKIP; fi"
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DIAG'
+          echo "=== systemctl status control-bridge ==="
+          systemctl status control-bridge --no-pager 2>&1 || true
+          echo ""
+          echo "=== nginx -t ==="
+          nginx -t 2>&1
+          echo ""
+          echo "=== /opt/control-bridge/.env exists ==="
+          test -f /opt/control-bridge/.env && echo "YES ($(stat -c '%a' /opt/control-bridge/.env) permissions)" || echo "NO"
+          DIAG
 
-      - name: Run endpoint tests
+      - name: Run full endpoint verification
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'TEST_SCRIPT'
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'VERIFY'
           TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
-          echo "=== ENDPOINT TESTS ==="
+          echo "=== LIVE ENDPOINT VERIFICATION ==="
 
-          echo "health:"
-          curl -s http://127.0.0.1:3000/health
+          echo ""
+          echo "--- health (local) ---"
+          curl -si http://127.0.0.1:3000/health 2>&1
           echo ""
 
-          echo "createJob:"
-          CREATE=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+          echo ""
+          echo "--- health (public HTTPS) ---"
+          curl -si https://api.marbomebel.ru/health 2>&1 || echo "HTTPS_UNREACHABLE"
+          echo ""
+
+          echo ""
+          echo "--- createJob ---"
+          CREATE=$(curl -si -X POST http://127.0.0.1:3000/jobs \
             -H "Authorization: Bearer ${TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{"title":"Deploy test","raw_user_request":"Automated deploy test","normalized_brief":"Test"}')
+            -d '{"title":"Verification test","raw_user_request":"Automated verification","normalized_brief":"Verify all endpoints"}')
           echo "${CREATE}"
-          JOB_ID=$(echo "${CREATE}" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null)
-
-          echo "confirmJob:"
-          curl -s -X POST "http://127.0.0.1:3000/jobs/${JOB_ID}/confirm" -H "Authorization: Bearer ${TOKEN}"
+          JOB_ID=$(echo "${CREATE}" | tail -1 | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null)
           echo ""
 
-          echo "getJobStatus:"
-          curl -s "http://127.0.0.1:3000/jobs/${JOB_ID}/status" -H "Authorization: Bearer ${TOKEN}"
+          echo ""
+          echo "--- confirmJob ---"
+          curl -si -X POST "http://127.0.0.1:3000/jobs/${JOB_ID}/confirm" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
           echo ""
 
-          echo "getJobResult:"
-          curl -s "http://127.0.0.1:3000/jobs/${JOB_ID}/result" -H "Authorization: Bearer ${TOKEN}"
+          echo ""
+          echo "--- getJobStatus ---"
+          curl -si "http://127.0.0.1:3000/jobs/${JOB_ID}/status" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
           echo ""
 
-          CANCEL=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+          echo ""
+          echo "--- getJobResult ---"
+          curl -si "http://127.0.0.1:3000/jobs/${JOB_ID}/result" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo ""
+          echo "--- cancelJob (new job) ---"
+          CANCEL_CREATE=$(curl -s -X POST http://127.0.0.1:3000/jobs \
             -H "Authorization: Bearer ${TOKEN}" \
             -H "Content-Type: application/json" \
             -d '{"title":"Cancel test","raw_user_request":"Test cancel","normalized_brief":"Cancel"}')
-          CID=$(echo "${CANCEL}" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null)
-
-          echo "cancelJob:"
-          curl -s -X POST "http://127.0.0.1:3000/jobs/${CID}/cancel" -H "Authorization: Bearer ${TOKEN}"
+          CID=$(echo "${CANCEL_CREATE}" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null)
+          curl -si -X POST "http://127.0.0.1:3000/jobs/${CID}/cancel" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
           echo ""
 
-          echo "httpsHealth:"
-          curl -sk https://api.marbomebel.ru/health 2>/dev/null || curl -s http://api.marbomebel.ru/health 2>/dev/null || echo "not available"
+          echo ""
+          echo "--- auth rejection test (no token) ---"
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Should fail","raw_user_request":"No token","normalized_brief":""}' 2>&1
           echo ""
 
-          echo "=== REPORT ==="
-          echo "TOKEN=*****(masked)"
+          echo ""
+          echo "=== VERIFICATION COMPLETE ==="
+          echo "TOKEN=*****(rotated, masked)"
           echo "URL=https://api.marbomebel.ru"
-          TEST_SCRIPT
+          VERIFY
 
       - name: Cleanup
         if: always()
@@ -165,6 +216,7 @@ jobs:
         run: |
           STATUS="${{ job.status }}"
           MSG="Control Bridge Deploy: ${STATUS}
+          Token: rotated
           URL: https://api.marbomebel.ru
           Run: ${{ github.run_id }}"
           curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
