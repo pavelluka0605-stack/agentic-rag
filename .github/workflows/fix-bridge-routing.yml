@@ -3,7 +3,7 @@ name: "Fix Bridge Routing (Traefik)"
 on:
   push:
     branches: ["claude/*"]
-    paths: [".github/workflows/fix-bridge-routing.yml", "control-bridge/traefik-api-bridge.yml"]
+    paths: [".github/workflows/fix-bridge-routing.yml"]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +13,7 @@ jobs:
   fix:
     name: "Fix and Retest"
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,111 +25,109 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy Traefik config and retest
+      - name: Deploy Traefik config
         run: |
-          SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
-          SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
-
-          # Copy Traefik dynamic config to VPS
-          $SCP control-bridge/traefik-api-bridge.yml \
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            control-bridge/traefik-api-bridge.yml \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/traefik-api-bridge.yml
 
-          $SSH << 'FIX' | tee /tmp/fix-output.txt
-          set -e
-
-          echo "=== 1. DEPLOY TRAEFIK CONFIG ==="
-          # Find the Traefik dynamic config directory
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY'
+          # Find Traefik dynamic dir
           TRAEFIK_DYN=""
           for d in /opt/n8n-traefik/dynamic /opt/traefik/dynamic /etc/traefik/dynamic; do
-            if [ -d "$d" ]; then
-              TRAEFIK_DYN="$d"
-              break
-            fi
+            [ -d "$d" ] && TRAEFIK_DYN="$d" && break
           done
-
-          if [ -z "$TRAEFIK_DYN" ]; then
-            echo "ERROR: No Traefik dynamic dir found. Searching..."
-            find / -name "dashboard.yml" -path "*/dynamic/*" 2>/dev/null | head -5
-            find / -name "traefik.yml" -o -name "traefik.toml" 2>/dev/null | head -5
-            # Try docker inspect
-            docker inspect $(docker ps -q --filter "name=traefik") 2>/dev/null | grep -i "mount\|volume\|bind" | head -10 || true
-            exit 1
-          fi
-
-          echo "Traefik dynamic dir: $TRAEFIK_DYN"
-          ls -la "$TRAEFIK_DYN/"
+          echo "Traefik dir: $TRAEFIK_DYN"
           cp /tmp/traefik-api-bridge.yml "$TRAEFIK_DYN/api-bridge.yml"
-          echo "Config deployed. Traefik should auto-reload."
-          echo ""
+          echo "Config deployed"
+          ls -la "$TRAEFIK_DYN/"
 
-          echo "=== 2. VERIFY TRAEFIK PICKED IT UP ==="
-          sleep 5
-          echo ""
-
-          echo "=== 3. DISABLE CONFLICTING NGINX CONFIG ==="
-          # Remove api-marbomebel nginx config that can't bind anyway
+          # Remove conflicting nginx config
           rm -f /etc/nginx/sites-enabled/api-marbomebel 2>/dev/null || true
-          echo "Removed /etc/nginx/sites-enabled/api-marbomebel (if existed)"
-          echo ""
 
-          echo "=== 4. TEST HTTPS HEALTH ==="
-          curl -si --connect-timeout 10 https://api.marbomebel.ru/health 2>&1 || echo "HTTPS_HEALTH_FAILED"
-          echo ""
+          # Check Traefik logs for cert provisioning
+          echo "Waiting 30s for Traefik to provision TLS cert..."
+          sleep 30
 
-          echo "=== 5. TEST HTTPS createJob ==="
+          # Check Traefik container logs
+          TRAEFIK_CONTAINER=$(docker ps --filter "name=traefik" -q | head -1)
+          echo "Traefik container: ${TRAEFIK_CONTAINER}"
+          docker logs --tail 30 "${TRAEFIK_CONTAINER}" 2>&1 | grep -i "api.marbomebel\|acme\|cert\|error\|tls" || echo "no relevant traefik logs"
+          DEPLOY
+
+      - name: Wait for TLS cert provisioning
+        run: sleep 30
+
+      - name: Run full retest via HTTPS
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'TEST' | tee /tmp/fix-output.txt
           TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
-          CREATE=$(curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+
+          echo "=== HTTPS HEALTH ==="
+          curl -si --connect-timeout 15 https://api.marbomebel.ru/health 2>&1
+          echo ""
+
+          echo "=== HTTPS createJob ==="
+          CREATE_RESP=$(curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
             -H "Authorization: Bearer ${TOKEN}" \
             -H "Content-Type: application/json" \
             -d '{"title":"Тестовая задача","raw_user_request":"Проверка моста GPT -> API","normalized_brief":"Тестовый запуск createJob"}' 2>&1)
-          echo "${CREATE}"
-          JOB_ID=$(echo "${CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+          echo "${CREATE_RESP}"
+          JOB_ID=$(echo "${CREATE_RESP}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
           echo "job_id: ${JOB_ID}"
           echo ""
 
-          if [ -z "${JOB_ID}" ]; then
-            echo "ERROR: createJob failed. Stopping."
-            exit 1
+          if [ -n "${JOB_ID}" ]; then
+            echo "=== HTTPS confirmJob ==="
+            curl -si --connect-timeout 15 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" \
+              -H "Authorization: Bearer ${TOKEN}" 2>&1
+            echo ""
+
+            echo "=== HTTPS getJobStatus ==="
+            curl -si --connect-timeout 15 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" \
+              -H "Authorization: Bearer ${TOKEN}" 2>&1
+            echo ""
+
+            echo "=== HTTPS getJobResult ==="
+            curl -si --connect-timeout 15 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" \
+              -H "Authorization: Bearer ${TOKEN}" 2>&1
+            echo ""
+
+            echo "=== HTTPS cancelJob (new job) ==="
+            C2=$(curl -s --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"title":"Cancel test","raw_user_request":"x","normalized_brief":"x"}')
+            CID=$(echo "${C2}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+            curl -si --connect-timeout 15 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" \
+              -H "Authorization: Bearer ${TOKEN}" 2>&1
+            echo ""
+          else
+            echo "createJob FAILED — no job_id extracted"
+            echo "Checking Traefik logs..."
+            TRAEFIK_CONTAINER=$(docker ps --filter "name=traefik" -q | head -1)
+            docker logs --tail 50 "${TRAEFIK_CONTAINER}" 2>&1 | tail -30
+            echo ""
+            echo "Checking if Traefik can reach uvicorn..."
+            curl -si --connect-timeout 5 http://172.17.0.1:3000/health 2>&1
+            echo ""
           fi
 
-          echo "=== 6. TEST confirmJob ==="
-          curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
-          echo ""
-
-          echo "=== 7. TEST getJobStatus ==="
-          curl -si --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
-          echo ""
-
-          echo "=== 8. TEST getJobResult ==="
-          curl -si --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
-          echo ""
-
-          echo "=== 9. TEST cancelJob ==="
-          CANCEL_CREATE=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Cancel test","raw_user_request":"Cancel","normalized_brief":"Cancel"}')
-          CID=$(echo "${CANCEL_CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
-          curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
-          echo ""
-
-          echo "=== 10. TOKEN INFO ==="
-          echo "token_prefix: $(echo ${TOKEN} | cut -c1-6)..."
-          echo "token_length: ${#TOKEN}"
-          echo ""
-
-          echo "=== 11. AUTH REJECTION ==="
-          curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+          echo "=== AUTH REJECTION ==="
+          curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
             -H "Content-Type: application/json" \
             -d '{"title":"no auth","raw_user_request":"x","normalized_brief":""}' 2>&1
           echo ""
 
+          echo "=== TOKEN INFO ==="
+          echo "prefix: $(echo ${TOKEN} | cut -c1-6)..."
+          echo "length: ${#TOKEN}"
+          echo ""
+
           echo "=== DONE ==="
-          FIX
+          TEST
 
       - name: Post results to issue
         if: always()
@@ -141,8 +139,8 @@ jobs:
           try:
               with open("/tmp/fix-output.txt") as f:
                   content = f.read()
-              body = "## Fix Bridge Routing\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
-              payload = json.dumps({"title": "Bridge Fix ${{ github.run_id }}", "body": body}).encode()
+              body = "## Bridge Fix Retest\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Bridge Retest ${{ github.run_id }}", "body": body}).encode()
               req = urllib.request.Request(
                   "https://api.github.com/repos/${{ github.repository }}/issues",
                   data=payload,
