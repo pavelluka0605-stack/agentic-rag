@@ -22,11 +22,10 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Run verification on VPS
-        id: verify
+      - name: Run verification on VPS and save output
         run: |
-          OUTPUT=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'VERIFY'
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'VERIFY' > /tmp/verify-output.txt 2>&1
           TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
           MASKED="$(echo ${TOKEN} | cut -c1-4)****"
 
@@ -119,34 +118,42 @@ jobs:
 
           echo "=== DONE ==="
           VERIFY
-          )
-          echo "${OUTPUT}"
-          echo "OUTPUT<<HEREDOC_EOF" >> $GITHUB_OUTPUT
-          echo "${OUTPUT}" >> $GITHUB_OUTPUT
-          echo "HEREDOC_EOF" >> $GITHUB_OUTPUT
+          cat /tmp/verify-output.txt
 
-      - name: Create issue with results
+      - name: Post results to GitHub issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          BODY="${{ steps.verify.outputs.OUTPUT }}"
-          # Truncate to 60000 chars for API limit
-          BODY=$(echo "${BODY}" | head -300)
-          curl -s -X POST \
-            "https://api.github.com/repos/${{ github.repository }}/issues" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -d "$(python3 -c "
-          import json, sys
-          body = open('/dev/stdin').read()
-          print(json.dumps({
-            'title': 'Control Bridge API Verification Results',
-            'body': '## Verification Output\n\n\`\`\`\n' + body + '\n\`\`\`',
-            'labels': ['automated']
-          }))
-          " <<< "${BODY}")" 2>&1 | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          print(f'Issue #{data.get(\"number\",\"?\")} created: {data.get(\"html_url\",\"?\")}')
-          " 2>&1 || echo "Issue creation failed"
+          # Read the output file and escape for JSON
+          python3 << 'PYEOF'
+          import json, os, urllib.request
+
+          with open("/tmp/verify-output.txt", "r") as f:
+              content = f.read()
+
+          body = "## Control Bridge API Verification\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
+          payload = json.dumps({
+              "title": "Control Bridge Verification — Run ${{ github.run_id }}",
+              "body": body,
+              "labels": ["automated"]
+          }).encode()
+
+          req = urllib.request.Request(
+              "https://api.github.com/repos/${{ github.repository }}/issues",
+              data=payload,
+              headers={
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "Content-Type": "application/json"
+              },
+              method="POST"
+          )
+          try:
+              resp = urllib.request.urlopen(req)
+              data = json.loads(resp.read())
+              print(f"Issue #{data['number']} created: {data['html_url']}")
+          except Exception as e:
+              print(f"Issue creation failed: {e}")
+              # Print output directly as fallback
+              print(content)
+          PYEOF
