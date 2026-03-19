@@ -1,0 +1,128 @@
+name: "Verify Control Bridge API"
+
+on:
+  push:
+    branches:
+      - "claude/*"
+    paths:
+      - ".github/workflows/verify-control-bridge.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: "Verify Bridge"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run verification on VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'VERIFY' > /tmp/verification-output.txt 2>&1
+          TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
+          MASKED="$(echo ${TOKEN} | cut -c1-4)****"
+
+          echo "=== VERIFICATION REPORT ==="
+          echo "date: $(date -u)"
+          echo "token: ${MASKED}"
+          echo ""
+
+          echo "=== systemctl status control-bridge ==="
+          systemctl status control-bridge --no-pager 2>&1 || true
+          echo ""
+
+          echo "=== nginx -t ==="
+          nginx -t 2>&1
+          echo ""
+
+          echo "=== .env file ==="
+          test -f /opt/control-bridge/.env && echo "EXISTS (permissions: $(stat -c '%a' /opt/control-bridge/.env))" || echo "MISSING"
+          echo ""
+
+          echo "=== 1. health (local) ==="
+          curl -si http://127.0.0.1:3000/health 2>&1
+          echo ""
+
+          echo "=== 2. health (HTTPS) ==="
+          curl -si https://api.marbomebel.ru/health 2>&1 || echo "UNREACHABLE"
+          echo ""
+
+          echo "=== 3. createJob ==="
+          CREATE=$(curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Verification test","raw_user_request":"Full contract verification","normalized_brief":"Verify all endpoints"}' 2>&1)
+          echo "${CREATE}"
+          JOB_ID=$(echo "${CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+          echo "extracted job_id: ${JOB_ID}"
+          echo ""
+
+          echo "=== 4. confirmJob ==="
+          curl -si -X POST "http://127.0.0.1:3000/jobs/${JOB_ID}/confirm" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 5. getJobStatus ==="
+          curl -si "http://127.0.0.1:3000/jobs/${JOB_ID}/status" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 6. getJobResult ==="
+          curl -si "http://127.0.0.1:3000/jobs/${JOB_ID}/result" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 7. cancelJob (new job) ==="
+          CANCEL_CREATE=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Cancel test","raw_user_request":"Test cancel","normalized_brief":"Cancel"}')
+          CID=$(echo "${CANCEL_CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+          curl -si -X POST "http://127.0.0.1:3000/jobs/${CID}/cancel" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 8. auth rejection (no token) ==="
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Should fail","raw_user_request":"No token","normalized_brief":""}' 2>&1
+          echo ""
+
+          echo "=== 9. auth rejection (bad token) ==="
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer INVALID_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Should fail","raw_user_request":"Bad token","normalized_brief":""}' 2>&1
+          echo ""
+
+          echo "=== 10. OpenAPI auto-generated schema check ==="
+          curl -s http://127.0.0.1:3000/openapi.json 2>&1 | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print(f'title: {data[\"info\"][\"title\"]}')
+          print(f'version: {data[\"info\"][\"version\"]}')
+          print(f'paths: {list(data[\"paths\"].keys())}')
+          schemas = data.get('components',{}).get('schemas',{})
+          print(f'schemas: {list(schemas.keys())}')
+          jr = schemas.get('JobResultData',{}).get('properties',{})
+          print(f'JobResultData fields: {list(jr.keys())}')
+          " 2>&1
+          echo ""
+
+          echo "=== DONE ==="
+          VERIFY
+          cat /tmp/verification-output.txt
+
+      - name: Upload verification results
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-output
+          path: /tmp/verification-output.txt
+          retention-days: 1
