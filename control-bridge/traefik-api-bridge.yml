@@ -1,0 +1,33 @@
+## Traefik dynamic config — Control Bridge API
+## Deployed to /opt/n8n-traefik/dynamic/api-bridge.yml
+## Traefik auto-reloads (file.watch=true)
+
+http:
+  routers:
+    api-bridge:
+      rule: "Host(`api.marbomebel.ru`)"
+      entryPoints:
+        - websecure
+      service: api-bridge
+      tls:
+        certResolver: mytlschallenge
+
+    api-bridge-http:
+      rule: "Host(`api.marbomebel.ru`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+      service: api-bridge
+
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  services:
+    api-bridge:
+      loadBalancer:
+        servers:
+          - url: "http://172.17.0.1:3000"
