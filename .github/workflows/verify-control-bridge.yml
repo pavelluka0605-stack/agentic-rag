@@ -95,25 +95,57 @@ jobs:
           curl -s http://127.0.0.1:3901/health 2>&1
           echo ""
 
-          echo "=== 8. Test /jobs/active ==="
-          curl -si http://127.0.0.1:3000/jobs/active \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo "=== 8. Bridge /jobs/active ==="
+          curl -s http://127.0.0.1:3000/jobs/active \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1 | python3 -c "
+          import sys, json
+          jobs = json.load(sys.stdin)
+          if not jobs: print('  (no active jobs)')
+          for j in jobs:
+              print(f'  job={j[\"job_id\"][:8]}... status={j[\"status\"]} title={j[\"title\"]}')
+          " 2>&1
           echo ""
 
-          echo "=== 9. Test concurrency rejection ==="
-          # Create a job first
-          J1=$(curl -s -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Concurrency test 1","raw_user_request":"Test","normalized_brief":"Test"}')
-          echo "Job 1: ${J1}"
-          sleep 2
-          # Try to create a second while first is running
-          J2=$(curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Concurrency test 2","raw_user_request":"Should get 429","normalized_brief":"Test"}')
-          echo "Job 2 (should be 429): ${J2}"
+          echo "=== 9. All bridge jobs (last 10) ==="
+          python3 -c "
+          import sqlite3, json, time
+          conn = sqlite3.connect('/opt/control-bridge/jobs.db')
+          conn.row_factory = sqlite3.Row
+          rows = conn.execute('SELECT job_id, title, status, raw_user_request, created_at, result_json FROM jobs ORDER BY created_at DESC LIMIT 10').fetchall()
+          for r in rows:
+              d = dict(r)
+              age = int(time.time() - d['created_at'])
+              rj = ''
+              if d.get('result_json'):
+                  try:
+                      rj = json.loads(d['result_json']).get('summary','')[:100]
+                  except: pass
+              print(f'  {d[\"job_id\"][:8]}... status={d[\"status\"]:12s} age={age}s title={d[\"title\"]}')
+              print(f'    request: {d[\"raw_user_request\"][:80]}')
+              if rj: print(f'    result: {rj}')
+          conn.close()
+          " 2>&1
+          echo ""
+
+          echo "=== 10. Control API tasks (last 10) ==="
+          curl -s http://127.0.0.1:3901/api/tasks 2>&1 | python3 -c "
+          import sys, json
+          tasks = json.load(sys.stdin)
+          for t in tasks[:10]:
+              print(f'  #{t[\"id\"]} status={t[\"status\"]} mode={t.get(\"mode\",\"?\")} created={t[\"created_at\"]}')
+              raw = t.get('raw_input','')[:100]
+              print(f'    input: {raw}')
+              if t.get('error'): print(f'    ERROR: {t[\"error\"][:150]}')
+              if t.get('output'): print(f'    OUTPUT: {str(t[\"output\"])[:150]}')
+          " 2>&1
+          echo ""
+
+          echo "=== 11. Bridge logs (last 30) ==="
+          journalctl -u control-bridge -n 30 --no-pager 2>&1 || true
+          echo ""
+
+          echo "=== 12. Running processes (claude/timeout) ==="
+          ps aux | grep -E 'claude|timeout' | grep -v grep 2>&1 || echo "(none)"
           echo ""
 
           echo "=== DONE ==="
