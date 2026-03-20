@@ -3,7 +3,7 @@ name: "Capture GPT Token and Secure"
 on:
   push:
     branches: ["claude/*"]
-    paths: [".github/workflows/capture-gpt-token.yml"]
+    paths: [".github/workflows/capture-gpt-token.yml", "control-bridge/traefik-api-bridge.yml"]
   workflow_dispatch:
 
 permissions:
