@@ -58,66 +58,41 @@ jobs:
           curl -si https://api.marbomebel.ru/health 2>&1 || echo "UNREACHABLE"
           echo ""
 
-          echo "=== 3. createJob ==="
-          CREATE=$(curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Verification test","raw_user_request":"Full contract verification","normalized_brief":"Verify all endpoints"}' 2>&1)
-          echo "${CREATE}"
-          JOB_ID=$(echo "${CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
-          echo "extracted job_id: ${JOB_ID}"
-          echo ""
-
-          echo "=== 4. confirmJob ==="
-          curl -si -X POST "http://127.0.0.1:3000/jobs/${JOB_ID}/confirm" \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
-          echo ""
-
-          echo "=== 5. getJobStatus ==="
-          curl -si "http://127.0.0.1:3000/jobs/${JOB_ID}/status" \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
-          echo ""
-
-          echo "=== 6. getJobResult ==="
-          curl -si "http://127.0.0.1:3000/jobs/${JOB_ID}/result" \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
-          echo ""
-
-          echo "=== 7. cancelJob (new job) ==="
-          CANCEL_CREATE=$(curl -s -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Cancel test","raw_user_request":"Test cancel","normalized_brief":"Cancel"}')
-          CID=$(echo "${CANCEL_CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
-          curl -si -X POST "http://127.0.0.1:3000/jobs/${CID}/cancel" \
-            -H "Authorization: Bearer ${TOKEN}" 2>&1
-          echo ""
-
-          echo "=== 8. auth rejection (no token) ==="
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Should fail","raw_user_request":"No token","normalized_brief":""}' 2>&1
-          echo ""
-
-          echo "=== 9. auth rejection (bad token) ==="
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer INVALID_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Should fail","raw_user_request":"Bad token","normalized_brief":""}' 2>&1
-          echo ""
-
-          echo "=== 10. OpenAPI auto-generated schema check ==="
-          curl -s http://127.0.0.1:3000/openapi.json 2>&1 | python3 -c "
+          echo "=== 3. Control API tasks (last 5) ==="
+          curl -s http://127.0.0.1:3901/api/tasks 2>&1 | python3 -c "
           import sys, json
-          data = json.load(sys.stdin)
-          print(f'title: {data[\"info\"][\"title\"]}')
-          print(f'version: {data[\"info\"][\"version\"]}')
-          print(f'paths: {list(data[\"paths\"].keys())}')
-          schemas = data.get('components',{}).get('schemas',{})
-          print(f'schemas: {list(schemas.keys())}')
-          jr = schemas.get('JobResultData',{}).get('properties',{})
-          print(f'JobResultData fields: {list(jr.keys())}')
+          tasks = json.load(sys.stdin)
+          for t in tasks[:5]:
+              print(f'  #{t[\"id\"]} status={t[\"status\"]} mode={t.get(\"mode\",\"?\")} created={t[\"created_at\"]}')
+              raw = t.get('raw_input','')[:80]
+              print(f'    input: {raw}')
+              if t.get('error'): print(f'    ERROR: {t[\"error\"]}')
           " 2>&1
+          echo ""
+
+          echo "=== 4. Bridge DB jobs (last 5) ==="
+          python3 -c "
+          import sqlite3, json
+          conn = sqlite3.connect('/opt/control-bridge/bridge_jobs.db')
+          conn.row_factory = sqlite3.Row
+          rows = conn.execute('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 5').fetchall()
+          for r in rows:
+              d = dict(r)
+              print(json.dumps(d, ensure_ascii=False, indent=2))
+          conn.close()
+          " 2>&1
+          echo ""
+
+          echo "=== 5. Bridge logs (last 50 lines) ==="
+          journalctl -u control-bridge -n 50 --no-pager 2>&1 || true
+          echo ""
+
+          echo "=== 6. Control API logs (last 30 lines) ==="
+          journalctl -u control-api -n 30 --no-pager 2>&1 || true
+          echo ""
+
+          echo "=== 7. Control API health ==="
+          curl -s http://127.0.0.1:3901/health 2>&1
           echo ""
 
           echo "=== DONE ==="
