@@ -3,7 +3,7 @@ name: "Fix Bridge Routing (Traefik)"
 on:
   push:
     branches: ["claude/*"]
-    paths: [".github/workflows/fix-bridge-routing.yml", "control-bridge/app.py"]
+    paths: [".github/workflows/fix-bridge-routing.yml"]
   workflow_dispatch:
 
 permissions:
@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   fix:
-    name: "Fix and Retest"
+    name: "Enable Debug Auth"
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy debug app.py and enable BRIDGE_DEBUG_ACCEPT_ANY
+      - name: Enable debug mode and deploy latest app.py
         run: |
           SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
           SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
@@ -33,87 +33,46 @@ jobs:
           $SCP control-bridge/app.py \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/control-bridge/app.py
 
-          $SSH << 'FIX'
-          # Add debug flag to .env (temporary)
+          $SSH << 'ENABLE'
+          # Enable debug mode
           if grep -q BRIDGE_DEBUG_ACCEPT_ANY /opt/control-bridge/.env; then
             sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=1/' /opt/control-bridge/.env
           else
             echo 'BRIDGE_DEBUG_ACCEPT_ANY=1' >> /opt/control-bridge/.env
           fi
-          echo ".env contents (redacted tokens):"
-          grep -v "TOKEN" /opt/control-bridge/.env; grep "TOKEN" /opt/control-bridge/.env | sed 's/=.*/=***/'
-          echo ""
 
           systemctl restart control-bridge
           sleep 3
-          systemctl is-active control-bridge && echo "SERVICE_OK" || echo "SERVICE_FAIL"
+          systemctl is-active control-bridge && echo "SERVICE_OK — DEBUG MODE ON" || echo "SERVICE_FAIL"
 
           echo ""
-          echo "Quick sanity with a random bearer:"
+          echo "Verify debug accepts any token:"
           curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer TOTALLY_RANDOM_TEST" \
+            -H "Authorization: Bearer ANY_TOKEN_WORKS_NOW" \
             -H "Content-Type: application/json" \
-            -d '{"title":"debug test","raw_user_request":"x","normalized_brief":"x"}' 2>&1
+            -d '{"title":"debug verify","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -5
           echo ""
 
-          echo "Check log for debug prefix:"
-          sleep 1
-          journalctl -u control-bridge -n 10 --no-pager 2>&1 | grep -i "AUTH_DEBUG" || echo "no debug lines yet"
-          FIX
-
-      - name: Wait 90s for user to test from GPT
-        run: |
-          echo "DEBUG MODE IS LIVE. Any Bearer token will be accepted on all endpoints."
-          echo "Waiting 90 seconds to allow the GPT to make a request..."
-          echo "The token prefix will be captured in journalctl."
-          sleep 90
-
-      - name: Capture GPT token prefix from logs, then disable debug
-        run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'CAPTURE' | tee /tmp/fix-output.txt
-          echo "=== CAPTURED AUTH_DEBUG ENTRIES ==="
-          journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG" | tail -20
-          echo ""
-
-          echo "=== ALL RECENT REQUESTS ==="
-          journalctl -u control-bridge -n 40 --no-pager 2>&1 | grep -E "POST|GET|AUTH" | tail -20
-          echo ""
-
-          echo "=== DISABLE DEBUG MODE ==="
-          sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/' /opt/control-bridge/.env
-          systemctl restart control-bridge
-          sleep 3
-          systemctl is-active control-bridge && echo "SERVICE_OK (debug disabled)" || echo "SERVICE_FAIL"
-          echo ""
-
-          echo "=== VERIFY DEBUG IS OFF (random token should now fail) ==="
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer SHOULD_NOW_FAIL" \
+          echo "Verify via HTTPS too:"
+          curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ANY_TOKEN_WORKS_NOW" \
             -H "Content-Type: application/json" \
-            -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}' 2>&1
+            -d '{"title":"HTTPS debug verify","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -5
           echo ""
 
-          echo "=== CURRENT .ENV FLAGS ==="
-          grep -v "TOKEN=" /opt/control-bridge/.env
-          grep "TOKEN" /opt/control-bridge/.env | sed 's/=.*/=***/'
-          echo ""
+          echo "DEBUG MODE IS NOW LIVE. Test from GPT, then run the capture workflow."
+          ENABLE
 
-          echo "=== DONE ==="
-          CAPTURE
-
-      - name: Post results to issue
+      - name: Post confirmation
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 << 'PYEOF'
-          import json, os, urllib.request, traceback
+          import json, os, urllib.request
           try:
-              with open("/tmp/fix-output.txt") as f:
-                  content = f.read()
-              body = "## Debug Auth Capture\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
-              payload = json.dumps({"title": "Auth Debug Capture ${{ github.run_id }}", "body": body}).encode()
+              body = "## Debug Mode Enabled\n\nRun: ${{ github.run_id }}\n\n**Debug auth is now LIVE on api.marbomebel.ru.** Any Bearer token will be accepted.\n\nPlease trigger the custom GPT to call createJob now.\n\nThen run the 'Capture GPT Token' workflow to see the token prefix and disable debug."
+              payload = json.dumps({"title": "DEBUG MODE ON — test GPT now", "body": body}).encode()
               req = urllib.request.Request(
                   "https://api.github.com/repos/${{ github.repository }}/issues",
                   data=payload,
@@ -121,9 +80,7 @@ jobs:
                   method="POST")
               resp = urllib.request.urlopen(req)
               data = json.loads(resp.read())
-              print(f"Issue #{data['number']} created: {data['html_url']}")
+              print(f"Issue #{data['number']}: {data['html_url']}")
           except Exception as e:
-              traceback.print_exc()
-              with open("/tmp/fix-output.txt") as f:
-                  print(f.read())
+              print(f"Issue creation failed: {e}")
           PYEOF
