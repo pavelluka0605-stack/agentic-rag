@@ -2,16 +2,31 @@ openapi: 3.0.0
 info:
   title: Control Bridge API
   description: |
-    GPT Actions bridge for marbomebel.ru.
+    GPT Actions bridge + shared project memory for marbomebel.ru.
+
+    ## Jobs
     Jobs are auto-dispatched on creation — NO confirmation needed.
     Flow: createJob → poll getJobStatus → getJobResult when completed.
     Only ONE job can run at a time. Call getActiveJobs first to check.
-  version: "1.4.1"
+
+    ## Memory
+    Shared memory between GPT and Claude Code. 6 layers:
+    - **policies** — project rules, constraints, conventions
+    - **incidents** — errors, stack traces, verified fixes (auto-dedup)
+    - **solutions** — proven patterns, playbooks, snippets
+    - **decisions** — architectural decisions, tradeoffs
+    - **episodes** — session summaries, open loops
+    - **contexts** — code, infra, deployment knowledge
+
+    ALWAYS call memoryBootstrap at the START of a new task to load project context.
+    Use memorySearch to find relevant experience before starting work.
+  version: "2.0.0"
 servers:
   - url: https://api.marbomebel.ru
     description: Production
 
 paths:
+  # ─── Health ─────────────────────────────────────────────────────────────────
   /health:
     get:
       operationId: healthCheck
@@ -26,9 +41,12 @@ paths:
                 properties:
                   ok:
                     type: boolean
+                  version:
+                    type: string
                 required:
                   - ok
 
+  # ─── Jobs ───────────────────────────────────────────────────────────────────
   /jobs/active:
     get:
       operationId: getActiveJobs
@@ -57,7 +75,7 @@ paths:
   /jobs:
     post:
       operationId: createJob
-      summary: "Create and auto-start a new job. No confirmation needed — it starts immediately. Returns 429 if another job is running."
+      summary: "Create and auto-start a new job. Returns 429 if another job is running."
       description: |
         Creates a job and automatically dispatches it to Claude Code.
         DO NOT call confirmJob after this — it is not needed.
@@ -92,12 +110,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/JobResponse"
         "429":
-          description: "Another job is already running. Tell the user to wait and try later."
+          description: "Another job is already running. Tell the user to wait."
 
   /jobs/{job_id}/status:
     get:
       operationId: getJobStatus
-      summary: "Poll job status. Returns queued/dispatched/running/completed/failed/cancelled."
+      summary: "Poll job status."
       security:
         - BearerAuth: []
       parameters:
@@ -159,8 +177,420 @@ paths:
                 $ref: "#/components/schemas/JobResponse"
         "404":
           description: "Job not found"
-        "409":
-          description: "Job cannot be cancelled in current state"
+
+  # ─── Memory: Read ───────────────────────────────────────────────────────────
+  /memory/bootstrap:
+    get:
+      operationId: memoryBootstrap
+      summary: "Load full project context. CALL THIS at the start of every new task."
+      description: |
+        Returns: active policies, recent sessions, open incidents,
+        top verified solutions, recent decisions, and memory stats.
+        This gives you the full picture before starting work.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Bootstrap context"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BootstrapResponse"
+
+  /memory/search:
+    get:
+      operationId: memorySearch
+      summary: "Full-text search across all memory layers. Use before starting a task to find relevant experience."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: "Search query (natural language)"
+          schema:
+            type: string
+        - name: tables
+          in: query
+          required: false
+          description: "Comma-separated layers to search: incidents,solutions,decisions,contexts,policies,episodes"
+          schema:
+            type: string
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: "Ranked search results from matching memory layers"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _type:
+                      type: string
+                      description: "Memory layer: incidents, solutions, etc."
+                    id:
+                      type: integer
+                    title:
+                      type: string
+                    rank:
+                      type: number
+
+  /memory/stats:
+    get:
+      operationId: memoryStats
+      summary: "Get counts for all memory layers"
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: "Memory statistics"
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /memory/incidents:
+    get:
+      operationId: memoryIncidents
+      summary: "List errors and their fixes. Filter by status to see open or fixed."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: "Filter: open, investigating, fixed, wontfix, duplicate"
+          schema:
+            type: string
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "List of incidents"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incident"
+    post:
+      operationId: memoryAddIncident
+      summary: "Record a new error/incident. Auto-deduplicates."
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                error_message:
+                  type: string
+                context:
+                  type: string
+                probable_cause:
+                  type: string
+                project:
+                  type: string
+                service:
+                  type: string
+              required:
+                - error_message
+      responses:
+        "200":
+          description: "Created or deduplicated incident"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /memory/solutions:
+    get:
+      operationId: memorySolutions
+      summary: "List proven solutions. Use verified=true for battle-tested ones."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: verified
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "List of solutions"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Solution"
+    post:
+      operationId: memoryAddSolution
+      summary: "Record a working solution or pattern"
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                code:
+                  type: string
+                tags:
+                  type: string
+                project:
+                  type: string
+                verified:
+                  type: boolean
+              required:
+                - title
+                - description
+      responses:
+        "200":
+          description: "Created solution"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Solution"
+
+  /memory/decisions:
+    get:
+      operationId: memoryDecisions
+      summary: "List architectural decisions and tradeoffs"
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "List of decisions"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    title:
+                      type: string
+                    chosen:
+                      type: string
+                    alternatives:
+                      type: string
+                    tradeoffs:
+                      type: string
+                    not_doing:
+                      type: string
+
+  /memory/policies:
+    get:
+      operationId: memoryPolicies
+      summary: "List active project rules and constraints"
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: query
+          required: false
+          description: "rule, constraint, convention, limitation"
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "List of policies"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    title:
+                      type: string
+                    content:
+                      type: string
+                    category:
+                      type: string
+
+  /memory/episodes:
+    get:
+      operationId: memoryEpisodes
+      summary: "List recent work sessions"
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: "List of episodes"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    summary:
+                      type: string
+                    what_done:
+                      type: string
+                    where_stopped:
+                      type: string
+                    what_remains:
+                      type: string
+    post:
+      operationId: memoryAddEpisode
+      summary: "Record a session summary"
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                summary:
+                  type: string
+                what_done:
+                  type: string
+                where_stopped:
+                  type: string
+                what_remains:
+                  type: string
+                project:
+                  type: string
+              required:
+                - summary
+      responses:
+        "200":
+          description: "Created episode"
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /memory/contexts:
+    get:
+      operationId: memoryContexts
+      summary: "List saved code/infra/deployment contexts"
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          required: false
+          description: "code, infra, docs, deployment, summary, config, api"
+          schema:
+            type: string
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "List of contexts"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    title:
+                      type: string
+                    content:
+                      type: string
+                    category:
+                      type: string
+                    file_path:
+                      type: string
 
 components:
   securitySchemes:
@@ -176,23 +606,14 @@ components:
           type: string
         status:
           type: string
-          enum:
-            - queued
-            - dispatched
-            - running
-            - completed
-            - failed
-            - cancelled
-      required:
-        - job_id
-        - status
+          enum: [queued, dispatched, running, completed, failed, cancelled]
+      required: [job_id, status]
 
     JobResultData:
       type: object
       properties:
         summary:
           type: string
-          description: "Human-readable summary of what was done"
         changes_made:
           type: array
           items:
@@ -201,20 +622,7 @@ components:
           type: array
           items:
             type: string
-        tests_run:
-          type: array
-          items:
-            type: string
-        manual_checks:
-          type: array
-          items:
-            type: string
-        risks_remaining:
-          type: array
-          items:
-            type: string
-      required:
-        - summary
+      required: [summary]
 
     JobResultResponse:
       type: object
@@ -225,6 +633,64 @@ components:
           type: string
         result:
           $ref: "#/components/schemas/JobResultData"
-      required:
-        - job_id
-        - status
+      required: [job_id, status]
+
+    BootstrapResponse:
+      type: object
+      properties:
+        policies:
+          type: array
+          items:
+            type: object
+        recent_sessions:
+          type: array
+          items:
+            type: object
+        open_incidents:
+          type: array
+          items:
+            type: object
+        top_solutions:
+          type: array
+          items:
+            type: object
+        recent_decisions:
+          type: array
+          items:
+            type: object
+        stats:
+          type: object
+
+    Incident:
+      type: object
+      properties:
+        id:
+          type: integer
+        error_message:
+          type: string
+        status:
+          type: string
+        verified_fix:
+          type: string
+        occurrence_count:
+          type: integer
+        probable_cause:
+          type: string
+
+    Solution:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        code:
+          type: string
+        verified:
+          type: integer
+        use_count:
+          type: integer
+        usefulness_score:
+          type: integer
