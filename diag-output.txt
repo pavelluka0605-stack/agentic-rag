@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Fri Mar 20 07:02:26 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Fri Mar 20 07:23:19 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 1 day 19h ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 122.5M (max: 256.0M available: 133.4M peak: 124.7M)
-        CPU: 10.676s
+     Memory: 122.4M (max: 256.0M available: 133.5M peak: 124.7M)
+        CPU: 10.733s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -25,17 +25,11 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
      Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 1 day 19h ago
    Main PID: 1364558 (node)
-      Tasks: 27 (limit: 32)
-     Memory: 110.1M (max: 128.0M available: 17.8M peak: 128.0M swap: 88.1M swap peak: 97.6M)
-        CPU: 11.586s
+      Tasks: 11 (limit: 32)
+     Memory: 20.4M (max: 128.0M available: 107.5M peak: 128.0M swap: 29.5M swap peak: 97.6M)
+        CPU: 13.056s
      CGroup: /system.slice/control-api.service
-             ├─1364558 /usr/bin/node server.js
-             ├─1701888 /bin/sh -c "bash \"/opt/claude-code/bin/exec-task.sh\" 102 \"/opt/claude-code/workspace/task-102.md\" >> \"/opt/claude-code/logs/exec-task-102.log\" 2>&1"
-             ├─1701889 bash /opt/claude-code/bin/exec-task.sh 102 /opt/claude-code/workspace/task-102.md
-             ├─1701915 bash /opt/claude-code/bin/exec-task.sh 102 /opt/claude-code/workspace/task-102.md
-             ├─1701916 timeout 600 claude -p "You are executing a task from the dashboard task pipeline.\n\nTASK FILE CONTENTS:\n# Task #102: Тестирование пайплайна GPT -> Claude Code\n\n## Objective\nПроверить работоспособность пайплайна, взаимодействующего между моделями GPT и Claude Code.\n\n## Scope\n- Модели GPT\n- Модели Claude Code\n- Интерфейс пайплайна\n\n## Steps\n1. Выбрать подходящий вариант тестирования\n2. Подготовить тестовые запросы\n3. Запустить тестирование пайплайна\n4. Собрать и проанализировать результаты\n\n## Constraints\n- Необходимо обеспечить корректное взаимодействие между моделями\n- Тестирование должно быть завершено в рамках установленного времени\n\n## Acceptance Criteria\n- Получение корректных результатов от пайплайна\n- Подтверждение работоспособности системы\n\n## Mode: safe\n\n---\nReport progress via: POST /api/tasks/102/progress { \"message_ru\": \"...\", \"pct\": N }\nComplete via: POST /api/tasks/102/complete { \"result_summary_ru\": \"...\", \"result_detail\": \"...\" }\nFail via: POST /api/tasks/102/fail { \"error\": \"...\" }\n\nIMPORTANT INSTRUCTIONS:\n1. Execute the task described above\n2. Work in the /opt/claude-code/workspace directory\n3. Be thorough but concise\n4. When done, output a clear summary of what was accomplished\n\nDo NOT call any API endpoints — just do the work and output results."
-             ├─1701918 claude
-             └─1702380 sleep 30
+             └─1364558 /usr/bin/node server.js
 
 Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
@@ -45,6 +39,7 @@ Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB: ready
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] LLM: configured
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Telegram: configured
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Stall watchdog: every 30s, threshold 90s
+Mar 20 07:05:04 fra-1-vm-ckr7 node[1364558]: [stall-watchdog] Task #105 stalled — Исполнитель был запущен, но не прислал первый прогресс. Возможно: claude CLI зависла, ошибка авторизации Anthropic API, или процесс завершился аварийно.
 
 === 3. Ports listening (3200, 3901, 3847, 3900, 80, 443) ===
 LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=1364558,fd=21))                                                                                                                                
@@ -87,7 +82,6 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Starting...
 Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 
 === 5. Control API logs (last 20 lines) ===
-Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [db] Added column tasks.deleted_at
 Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
 Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Listening on 127.0.0.1:3901
 Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
@@ -107,6 +101,7 @@ Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB: ready
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] LLM: configured
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Telegram: configured
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Stall watchdog: every 30s, threshold 90s
+Mar 20 07:05:04 fra-1-vm-ckr7 node[1364558]: [stall-watchdog] Task #105 stalled — Исполнитель был запущен, но не прислал первый прогресс. Возможно: claude CLI зависла, ошибка авторизации Anthropic API, или процесс завершился аварийно.
 
 === 6. Dashboard .next/ build exists? ===
 total 180
@@ -138,7 +133,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Fri, 20 Mar 2026 07:02:26 GMT
+Date: Fri, 20 Mar 2026 07:23:19 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -148,7 +143,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-20T07:02:26.957Z"
+  "timestamp": "2026-03-20T07:23:19.381Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -159,7 +154,7 @@ Keep-Alive: timeout=5
 total 16
 drwxr-xr-x 2 root root 4096 Mar 19 17:46 .
 drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root  716 Mar 20 06:40 api-bridge.yml
+-rw-r--r-- 1 root root  716 Mar 20 07:02 api-bridge.yml
 -rw-r--r-- 1 root root  671 Mar 18 11:57 dashboard.yml
 --- dashboard.yml ---
 ## Traefik dynamic config — Task Dashboard
@@ -203,7 +198,7 @@ mebelit-wp-db-1          Up 5 days              0.0.0.0:3306->3306/tcp, [::]:330
 n8n-traefik-traefik-1    Up 6 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
 n8n-postgres-1           Up 10 days             5432/tcp
 n8n-voice-app-1          Up 11 days             80/tcp
-n8n-n8n-1                Up 9 days              5678/tcp
+n8n-n8n-1                Up 10 days             5678/tcp
 openclaw                 Up 2 weeks (healthy)   
 
 === 16. PM2 processes ===
@@ -215,7 +210,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Fri, 20 Mar 2026 07:02:27 GMT
+date: Fri, 20 Mar 2026 07:23:19 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
