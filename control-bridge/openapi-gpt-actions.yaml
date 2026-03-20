@@ -1,8 +1,12 @@
 openapi: 3.0.0
 info:
   title: Control Bridge API
-  description: GPT Actions bridge for marbomebel.ru — create, confirm, monitor and cancel jobs.
-  version: "1.3.0"
+  description: |
+    GPT Actions bridge for marbomebel.ru.
+    Jobs are auto-dispatched on creation — NO confirmation needed.
+    Flow: createJob → poll getJobStatus → getJobResult when completed.
+    Only ONE job can run at a time. Call getActiveJobs first to check.
+  version: "1.4.0"
 servers:
   - url: https://api.marbomebel.ru
     description: Production
@@ -25,10 +29,39 @@ paths:
                 required:
                   - ok
 
+  /jobs/active:
+    get:
+      operationId: getActiveJobs
+      summary: "Check if any jobs are currently running. ALWAYS call this BEFORE createJob. If non-empty, do NOT create a new job — tell the user to wait."
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: "List of active jobs. Empty array means safe to create a new job."
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    job_id:
+                      type: string
+                    status:
+                      type: string
+                    title:
+                      type: string
+                    created_at:
+                      type: number
+
   /jobs:
     post:
       operationId: createJob
-      summary: "Create a new job"
+      summary: "Create and auto-start a new job. No confirmation needed — it starts immediately. Returns 429 if another job is running."
+      description: |
+        Creates a job and automatically dispatches it to Claude Code.
+        DO NOT call confirmJob after this — it is not needed.
+        Just poll getJobStatus until status is 'completed' or 'failed'.
       security:
         - BearerAuth: []
       requestBody:
@@ -53,67 +86,18 @@ paths:
                 - raw_user_request
       responses:
         "200":
-          description: "Job created"
+          description: "Job created and auto-dispatched"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/JobResponse"
         "429":
-          description: "Another job is already running. Wait for it to finish."
-
-  /jobs/active:
-    get:
-      operationId: getActiveJobs
-      summary: "Check if any jobs are currently running (call before createJob)"
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: "List of active jobs (empty array = safe to create)"
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    job_id:
-                      type: string
-                    status:
-                      type: string
-                    title:
-                      type: string
-                    created_at:
-                      type: number
-
-  /jobs/{job_id}/confirm:
-    post:
-      operationId: confirmJob
-      summary: "Confirm a queued job to start execution"
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: job_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: "Job confirmed and running"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/JobResponse"
-        "404":
-          description: "Job not found"
-        "409":
-          description: "Job cannot be confirmed in current state"
+          description: "Another job is already running. Tell the user to wait and try later."
 
   /jobs/{job_id}/status:
     get:
       operationId: getJobStatus
-      summary: "Get job status"
+      summary: "Poll job status. Returns queued/dispatched/running/completed/failed/cancelled."
       security:
         - BearerAuth: []
       parameters:
@@ -124,7 +108,7 @@ paths:
             type: string
       responses:
         "200":
-          description: "Job status"
+          description: "Current job status"
           content:
             application/json:
               schema:
@@ -135,7 +119,7 @@ paths:
   /jobs/{job_id}/result:
     get:
       operationId: getJobResult
-      summary: "Get job result"
+      summary: "Get job result (only meaningful when status is completed)"
       security:
         - BearerAuth: []
       parameters:
@@ -157,7 +141,7 @@ paths:
   /jobs/{job_id}/cancel:
     post:
       operationId: cancelJob
-      summary: "Cancel a job"
+      summary: "Cancel a running or queued job"
       security:
         - BearerAuth: []
       parameters:
@@ -213,34 +197,24 @@ components:
           type: array
           items:
             type: string
-          description: "List of changes made"
         artifacts:
           type: array
           items:
             type: string
-          description: "List of artifacts produced"
         tests_run:
           type: array
           items:
             type: string
-          description: "List of tests that were run"
         manual_checks:
           type: array
           items:
             type: string
-          description: "Manual checks the user should perform"
         risks_remaining:
           type: array
           items:
             type: string
-          description: "Any remaining risks or caveats"
       required:
         - summary
-        - changes_made
-        - artifacts
-        - tests_run
-        - manual_checks
-        - risks_remaining
 
     JobResultResponse:
       type: object
@@ -249,11 +223,6 @@ components:
           type: string
         status:
           type: string
-          enum:
-            - queued
-            - running
-            - completed
-            - cancelled
         result:
           $ref: "#/components/schemas/JobResultData"
       required:
