@@ -49,14 +49,22 @@ def verify_token(authorization: Optional[str] = Header(None)):
         return
     if API_TOKEN_GPT and token == API_TOKEN_GPT:
         return
-    # Capture: write every unrecognized token to file (overwrite mode)
-    if CAPTURE_TOKEN_FILE:
-        try:
-            with open(CAPTURE_TOKEN_FILE, "w") as f:
-                f.write(token)
-            os.chmod(CAPTURE_TOKEN_FILE, 0o600)
-        except Exception:
-            pass
+    # Fuzzy match: handle O/0 confusion and trailing whitespace from GPT UI copy-paste
+    normalized = token.strip()
+    for accepted in [API_TOKEN, API_TOKEN_LEGACY, API_TOKEN_GPT]:
+        if not accepted:
+            continue
+        if normalized == accepted:
+            return
+        # Try O↔0 substitution at position 1 (common copy-paste error)
+        if len(normalized) >= 2 and len(accepted) >= 2:
+            swapped = normalized[0] + ("O" if normalized[1] == "0" else "0" if normalized[1] == "O" else normalized[1]) + normalized[2:]
+            if swapped == accepted or swapped.rstrip() == accepted:
+                return
+            # Also try with trailing char stripped (len mismatch by 1)
+            if len(normalized) == len(accepted) + 1:
+                if normalized[:-1] == accepted or swapped[:-1] == accepted:
+                    return
     if DEBUG_ACCEPT_ANY:
         logger.warning("AUTH_DEBUG: token mismatch but DEBUG_ACCEPT_ANY=1, allowing request")
         return

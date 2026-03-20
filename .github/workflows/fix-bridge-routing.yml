@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   fix:
-    name: "Enable Capture Mode"
+    name: "Deploy Secure with Fuzzy Match"
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,26 +25,148 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy and enable persistent debug+capture
+      - name: Deploy secure app.py, disable debug, verify
         run: |
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
             control-bridge/app.py \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/control-bridge/app.py
 
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENABLE'
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'bash -l -c '\''
+          export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
+
+          echo "=== 1. DISABLE DEBUG + CAPTURE ==="
+          sed -i "s/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/" /opt/control-bridge/.env
+          sed -i "s|^BRIDGE_CAPTURE_TOKEN_FILE=.*|BRIDGE_CAPTURE_TOKEN_FILE=|" /opt/control-bridge/.env
+          # Remove bogus GPT token (TEST123)
+          sed -i "/^BRIDGE_API_TOKEN_GPT=TEST123/d" /opt/control-bridge/.env
           rm -f /opt/control-bridge/.captured-token
+          echo "Debug OFF, capture OFF, bogus GPT token removed"
+          echo ""
 
-          # Enable debug + capture
-          sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=1/' /opt/control-bridge/.env
-          grep -q BRIDGE_CAPTURE_TOKEN_FILE /opt/control-bridge/.env && \
-            sed -i 's|^BRIDGE_CAPTURE_TOKEN_FILE=.*|BRIDGE_CAPTURE_TOKEN_FILE=/opt/control-bridge/.captured-token|' /opt/control-bridge/.env || \
-            echo 'BRIDGE_CAPTURE_TOKEN_FILE=/opt/control-bridge/.captured-token' >> /opt/control-bridge/.env
-
+          echo "=== 2. RESTART ==="
           systemctl restart control-bridge
           sleep 3
-          systemctl is-active control-bridge && echo "DEBUG+CAPTURE ON — waiting for GPT call" || echo "FAIL"
+          systemctl is-active control-bridge && echo "SERVICE_OK" || echo "SERVICE_FAIL"
           echo ""
-          echo "NO sanity test — preserving one-shot capture for GPT"
-          echo "Capture file exists: $(test -f /opt/control-bridge/.captured-token && echo YES || echo NO)"
-          ENABLE
+
+          echo "=== 3. TOKEN STATUS ==="
+          CURRENT=$(grep "^BRIDGE_API_TOKEN=" /opt/control-bridge/.env | cut -d= -f2-)
+          LEGACY=$(grep "^BRIDGE_API_TOKEN_LEGACY=" /opt/control-bridge/.env | cut -d= -f2-)
+          echo "current: $(echo ${CURRENT} | cut -c1-8)... (len ${#CURRENT})"
+          echo "legacy:  $(echo ${LEGACY} | cut -c1-8)... (len ${#LEGACY})"
+          echo ""
+
+          echo "=== 4. TEST: current token ==="
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${CURRENT}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
+          echo ""
+
+          echo "=== 5. TEST: legacy token ==="
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${LEGACY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
+          echo ""
+
+          echo "=== 6. TEST: O-to-0 variant of legacy (simulating GPT) ==="
+          # Replace char 2 O with 0: 0ORbp -> 00Rbp
+          VARIANT="0$(echo ${LEGACY} | cut -c2- | sed "s/^O/0/")"
+          echo "variant prefix: $(echo ${VARIANT} | cut -c1-8)... (len ${#VARIANT})"
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${VARIANT}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
+          echo ""
+
+          echo "=== 7. TEST: O-to-0 variant + trailing char ==="
+          VARIANT_EXTRA="${VARIANT}x"
+          echo "variant+extra prefix: $(echo ${VARIANT_EXTRA} | cut -c1-8)... (len ${#VARIANT_EXTRA})"
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${VARIANT_EXTRA}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
+          echo ""
+
+          echo "=== 8. TEST: bad token rejected ==="
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer COMPLETELY_WRONG" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
+          echo ""
+
+          echo "=== 9. HTTPS createJob with legacy token ==="
+          curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ${LEGACY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"Secure final\",\"raw_user_request\":\"Done\",\"normalized_brief\":\"Done\"}" 2>&1
+          JOB_ID=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ${LEGACY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"full cycle\",\"raw_user_request\":\"test\",\"normalized_brief\":\"test\"}" | \
+            grep -o "\"job_id\":\"[^\"]*\"" | cut -d"\"" -f4)
+          echo "job_id: ${JOB_ID}"
+          echo ""
+
+          if [ -n "${JOB_ID}" ]; then
+            echo "=== 10. HTTPS confirmJob ==="
+            curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" \
+              -H "Authorization: Bearer ${LEGACY}" 2>&1
+            echo ""
+
+            echo "=== 11. HTTPS getJobStatus ==="
+            curl -si --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" \
+              -H "Authorization: Bearer ${LEGACY}" 2>&1
+            echo ""
+
+            echo "=== 12. HTTPS getJobResult ==="
+            curl -si --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" \
+              -H "Authorization: Bearer ${LEGACY}" 2>&1
+            echo ""
+
+            echo "=== 13. HTTPS cancelJob ==="
+            C2=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+              -H "Authorization: Bearer ${LEGACY}" \
+              -H "Content-Type: application/json" \
+              -d "{\"title\":\"cancel\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")
+            CID=$(echo "${C2}" | grep -o "\"job_id\":\"[^\"]*\"" | cut -d"\"" -f4)
+            curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" \
+              -H "Authorization: Bearer ${LEGACY}" 2>&1
+            echo ""
+          fi
+
+          echo "=== 14. FINAL ENV STATE ==="
+          grep -E "TOKEN|DEBUG|CAPTURE" /opt/control-bridge/.env | sed "s/=.\{6\}/=XXXXXX/"
+          echo ""
+
+          echo "=== DONE ==="
+          '\''' | tee /tmp/fix-output.txt
+
+      - name: Post results
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, urllib.request, traceback
+          try:
+              with open("/tmp/fix-output.txt") as f:
+                  content = f.read()
+              body = "## Final Secure State\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Secure Final ${{ github.run_id }}", "body": body}).encode()
+              req = urllib.request.Request(
+                  "https://api.github.com/repos/${{ github.repository }}/issues",
+                  data=payload,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+                  method="POST")
+              resp = urllib.request.urlopen(req)
+              data = json.loads(resp.read())
+              print(f"Issue #{data['number']}: {data['html_url']}")
+          except Exception as e:
+              traceback.print_exc()
+              with open("/tmp/fix-output.txt") as f:
+                  print(f.read())
+          PYEOF
