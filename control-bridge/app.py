@@ -14,15 +14,8 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 
-import logging
-
-logger = logging.getLogger("bridge")
-
 # --- Auth ---
 API_TOKEN = os.environ.get("BRIDGE_API_TOKEN", "")
-API_TOKEN_LEGACY = os.environ.get("BRIDGE_API_TOKEN_LEGACY", "")
-API_TOKEN_GPT = os.environ.get("BRIDGE_API_TOKEN_GPT", "")
-DEBUG_ACCEPT_ANY = os.environ.get("BRIDGE_DEBUG_ACCEPT_ANY", "") == "1"
 
 def verify_token(authorization: Optional[str] = Header(None)):
     if not API_TOKEN:
@@ -30,26 +23,8 @@ def verify_token(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
     scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer":
+    if scheme.lower() != "bearer" or token != API_TOKEN:
         raise HTTPException(status_code=403, detail="Invalid token")
-    if token == API_TOKEN:
-        return
-    if API_TOKEN_LEGACY and token == API_TOKEN_LEGACY:
-        return
-    if API_TOKEN_GPT and token == API_TOKEN_GPT:
-        return
-    if DEBUG_ACCEPT_ANY:
-        prefix = token[:8] if len(token) > 8 else token
-        logger.warning("AUTH_DEBUG: rejected token prefix=%s... len=%d", prefix, len(token))
-        capture_path = "/opt/control-bridge/.captured-token"
-        try:
-            with open(capture_path, "w") as f:
-                f.write(token)
-            os.chmod(capture_path, 0o600)
-        except Exception:
-            pass
-        return
-    raise HTTPException(status_code=403, detail="Invalid token")
 
 # --- SQLite storage ---
 DB_PATH = os.environ.get("BRIDGE_DB_PATH", "/opt/control-bridge/jobs.db")
