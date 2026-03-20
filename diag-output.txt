@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Fri Mar 20 08:05:40 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Fri Mar 20 08:41:03 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 1 day 20h ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 122.9M (max: 256.0M available: 133.0M peak: 124.7M)
-        CPU: 10.862s
+     Memory: 122.6M (max: 256.0M available: 133.3M peak: 124.7M)
+        CPU: 10.917s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -25,17 +25,11 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
      Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 1 day 20h ago
    Main PID: 1364558 (node)
-      Tasks: 27 (limit: 32)
-     Memory: 115.9M (max: 128.0M available: 12.0M peak: 128.0M swap: 80.5M swap peak: 97.6M)
-        CPU: 20.639s
+      Tasks: 11 (limit: 32)
+     Memory: 15.4M (max: 128.0M available: 112.5M peak: 128.0M swap: 32.0M swap peak: 97.6M)
+        CPU: 21.353s
      CGroup: /system.slice/control-api.service
-             ├─1364558 /usr/bin/node server.js
-             ├─1712496 /bin/sh -c "bash \"/opt/claude-code/bin/exec-task.sh\" 110 \"/opt/claude-code/workspace/task-110.md\" >> \"/opt/claude-code/logs/exec-task-110.log\" 2>&1"
-             ├─1712497 bash /opt/claude-code/bin/exec-task.sh 110 /opt/claude-code/workspace/task-110.md
-             ├─1712523 bash /opt/claude-code/bin/exec-task.sh 110 /opt/claude-code/workspace/task-110.md
-             ├─1712525 timeout 600 claude -p "You are executing a task from the dashboard task pipeline.\n\nTASK FILE CONTENTS:\n# Task #110: Проверка интеграции моста GPT-Cloud с векторной памятью\n\n## Objective\nПроверить, как соединяется мост GPT-Cloud вместе с векторной памятью и всеми ранее построенными компонентами системы.\n\n## Scope\n- Мост GPT-Cloud\n- Векторная память\n- Компоненты системы\n\n## Steps\n1. Провести тестирование интеграции всех компонентов\n2. Анализировать результаты тестирования\n3. Внести необходимые изменения в компоненты при выявлении ошибок\n\n## Constraints\n- Необходимо учитывать совместимость всех версий компонентов\n- Тестирование должно быть проведено в безопасной среде\n\n## Acceptance Criteria\n- Все компоненты корректно взаимодействуют друг с другом\n- Не выявлено критических ошибок при тестировании\n\n## Mode: safe\n\n---\nReport progress via: POST /api/tasks/110/progress { \"message_ru\": \"...\", \"pct\": N }\nComplete via: POST /api/tasks/110/complete { \"result_summary_ru\": \"...\", \"result_detail\": \"...\" }\nFail via: POST /api/tasks/110/fail { \"error\": \"...\" }\n\nIMPORTANT INSTRUCTIONS:\n1. Execute the task described above\n2. Work in the /opt/claude-code/workspace directory\n3. Be thorough but concise\n4. When done, output a clear summary of what was accomplished\n\nDo NOT call any API endpoints — just do the work and output results."
-             ├─1712526 claude
-             └─1713805 sleep 30
+             └─1364558 /usr/bin/node server.js
 
 Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
@@ -46,6 +40,7 @@ Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] LLM: configured
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Telegram: configured
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Stall watchdog: every 30s, threshold 90s
 Mar 20 07:05:04 fra-1-vm-ckr7 node[1364558]: [stall-watchdog] Task #105 stalled — Исполнитель был запущен, но не прислал первый прогресс. Возможно: claude CLI зависла, ошибка авторизации Anthropic API, или процесс завершился аварийно.
+Mar 20 08:08:06 fra-1-vm-ckr7 node[1364558]: [stall-watchdog] Task #112 stalled — Исполнитель был запущен, но не прислал первый прогресс. Возможно: claude CLI зависла, ошибка авторизации Anthropic API, или процесс завершился аварийно.
 
 === 3. Ports listening (3200, 3901, 3847, 3900, 80, 443) ===
 LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=1364558,fd=21))                                                                                                                                
@@ -88,7 +83,6 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Starting...
 Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 
 === 5. Control API logs (last 20 lines) ===
-Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
 Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Listening on 127.0.0.1:3901
 Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
 Mar 18 11:37:20 fra-1-vm-ckr7 node[1358973]: [control-api] Task DB: ready
@@ -108,6 +102,7 @@ Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] LLM: configured
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Telegram: configured
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Stall watchdog: every 30s, threshold 90s
 Mar 20 07:05:04 fra-1-vm-ckr7 node[1364558]: [stall-watchdog] Task #105 stalled — Исполнитель был запущен, но не прислал первый прогресс. Возможно: claude CLI зависла, ошибка авторизации Anthropic API, или процесс завершился аварийно.
+Mar 20 08:08:06 fra-1-vm-ckr7 node[1364558]: [stall-watchdog] Task #112 stalled — Исполнитель был запущен, но не прислал первый прогресс. Возможно: claude CLI зависла, ошибка авторизации Anthropic API, или процесс завершился аварийно.
 
 === 6. Dashboard .next/ build exists? ===
 total 180
@@ -139,7 +134,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Fri, 20 Mar 2026 08:05:41 GMT
+Date: Fri, 20 Mar 2026 08:41:03 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -149,7 +144,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-20T08:05:41.205Z"
+  "timestamp": "2026-03-20T08:41:03.527Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -160,7 +155,7 @@ Keep-Alive: timeout=5
 total 16
 drwxr-xr-x 2 root root 4096 Mar 19 17:46 .
 drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root  716 Mar 20 07:36 api-bridge.yml
+-rw-r--r-- 1 root root  716 Mar 20 08:06 api-bridge.yml
 -rw-r--r-- 1 root root  671 Mar 18 11:57 dashboard.yml
 --- dashboard.yml ---
 ## Traefik dynamic config — Task Dashboard
@@ -202,7 +197,7 @@ NAMES                    STATUS                 PORTS
 mebelit-wp-wordpress-1   Up 5 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
 mebelit-wp-db-1          Up 5 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
 n8n-traefik-traefik-1    Up 6 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
-n8n-postgres-1           Up 10 days             5432/tcp
+n8n-postgres-1           Up 11 days             5432/tcp
 n8n-voice-app-1          Up 11 days             80/tcp
 n8n-n8n-1                Up 10 days             5678/tcp
 openclaw                 Up 2 weeks (healthy)   
@@ -216,7 +211,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Fri, 20 Mar 2026 08:05:41 GMT
+date: Fri, 20 Mar 2026 08:41:04 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
