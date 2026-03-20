@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   fix:
-    name: "Deploy SQLite + Capture Token + Secure"
+    name: "Clean Token Reset + Deploy"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy app.py, capture GPT token, disable debug, verify
+      - name: Deploy clean app.py, reset token, verify
         run: |
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
             control-bridge/app.py \
@@ -36,37 +36,20 @@ jobs:
             'bash -l -c '\''
           export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
 
-          echo "=== 1. FIX GPT TOKEN QUOTING IN .ENV ==="
-          if [ -f /opt/control-bridge/.captured-token ]; then
-            GPT_TOKEN=$(cat /opt/control-bridge/.captured-token)
-            echo "captured prefix: $(echo ${GPT_TOKEN} | cut -c1-8)... len=${#GPT_TOKEN}"
-            echo "hex dump:"
-            echo -n "${GPT_TOKEN}" | xxd | head -4
-            echo ""
-            # Remove old GPT token line (may be unquoted/broken)
-            sed -i "/^BRIDGE_API_TOKEN_GPT=/d" /opt/control-bridge/.env
-            # Add with proper quoting (token contains space — systemd needs quotes)
-            printf 'BRIDGE_API_TOKEN_GPT="%s"\n' "${GPT_TOKEN}" >> /opt/control-bridge/.env
-            echo "GPT token added to .env (quoted for systemd)"
-            rm -f /opt/control-bridge/.captured-token
-          elif grep -q "^BRIDGE_API_TOKEN_GPT=" /opt/control-bridge/.env; then
-            # Re-quote existing value if unquoted
-            OLD_VAL=$(grep "^BRIDGE_API_TOKEN_GPT=" /opt/control-bridge/.env | cut -d= -f2-)
-            if [[ "${OLD_VAL}" != \"* ]]; then
-              sed -i "/^BRIDGE_API_TOKEN_GPT=/d" /opt/control-bridge/.env
-              printf 'BRIDGE_API_TOKEN_GPT="%s"\n' "${OLD_VAL}" >> /opt/control-bridge/.env
-              echo "Re-quoted existing GPT token"
-            else
-              echo "GPT token already quoted"
-            fi
-          else
-            echo "No GPT token to fix"
-          fi
+          echo "=== 1. REPLACE .ENV WITH CLEAN TOKEN ONLY ==="
+          cat > /opt/control-bridge/.env << ENVEOF
+          BRIDGE_API_TOKEN=46924d4253c3dc5dc6474779fdbb595e3f83c29a
+          ENVEOF
+          # Remove leading whitespace from heredoc
+          sed -i "s/^[[:space:]]*//" /opt/control-bridge/.env
+          chmod 600 /opt/control-bridge/.env
+          echo ".env reset to single clean token"
+          wc -l /opt/control-bridge/.env
           echo ""
 
-          echo "=== 2. DISABLE DEBUG ==="
-          sed -i "s/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/" /opt/control-bridge/.env
-          echo "Debug OFF"
+          echo "=== 2. CLEANUP ==="
+          rm -f /opt/control-bridge/.captured-token
+          echo "Removed capture artifacts"
           echo ""
 
           echo "=== 3. RESTART ==="
@@ -75,41 +58,35 @@ jobs:
           systemctl is-active control-bridge && echo "SERVICE_OK" || (echo "SERVICE_FAIL" && journalctl -u control-bridge -n 20 --no-pager && exit 1)
           echo ""
 
-          echo "=== 4. TOKEN CHECKS ==="
-          CURRENT=$(grep "^BRIDGE_API_TOKEN=" /opt/control-bridge/.env | head -1 | cut -d= -f2- | tr -d "\"")
-          LEGACY=$(grep "^BRIDGE_API_TOKEN_LEGACY=" /opt/control-bridge/.env | head -1 | cut -d= -f2- | tr -d "\"")
-          GPT_TOK=$(grep "^BRIDGE_API_TOKEN_GPT=" /opt/control-bridge/.env | head -1 | cut -d= -f2- | tr -d "\"")
-          echo "current: $(echo ${CURRENT} | cut -c1-8)... => $(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${CURRENT}" -H "Content-Type: application/json" -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")"
-          echo "legacy:  $(echo ${LEGACY} | cut -c1-8)... => $(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${LEGACY}" -H "Content-Type: application/json" -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")"
-          if [ -n "${GPT_TOK}" ]; then
-            echo "gpt:     $(echo ${GPT_TOK} | cut -c1-8)... => $(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${GPT_TOK}" -H "Content-Type: application/json" -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")"
-          fi
-          echo "random:  GARBAGE... => $(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer GARBAGE" -H "Content-Type: application/json" -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")"
+          echo "=== 4. VERIFY: clean token accepted ==="
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer 46924d4253c3dc5dc6474779fdbb595e3f83c29a" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"clean token test\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
           echo ""
 
-          echo "=== 5. SQLITE PERSISTENCE CHECK ==="
-          ls -la /opt/control-bridge/jobs.db 2>&1 || echo "No DB file yet"
-          echo "Jobs in DB: $(sqlite3 /opt/control-bridge/jobs.db "SELECT COUNT(*) FROM jobs" 2>/dev/null || echo "N/A")"
+          echo "=== 5. VERIFY: invalid token rejected ==="
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer INVALID_GARBAGE" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
           echo ""
 
-          echo "=== 6. VERIFY SYSTEMD READS QUOTED TOKEN ==="
-          echo "Python env check:"
-          curl -s http://127.0.0.1:3000/health
-          echo ""
-          echo "GPT token env (from Python perspective):"
-          # Test with the exact GPT token including space
-          echo "len of GPT_TOK shell var: ${#GPT_TOK}"
+          echo "=== 6. VERIFY: old tokens rejected ==="
+          curl -s -o /dev/null -w "old_legacy: HTTP %{http_code}\n" -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer 0ORbpHTjaswJvP2J4wO9gUhSvrfl0mbK3h5BVDKSV60" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}"
           echo ""
 
           echo "=== 7. HTTPS FULL CYCLE ==="
-          TOKEN="${GPT_TOK:-${CURRENT}}"
-          echo "Using token prefix: $(echo ${TOKEN} | cut -c1-8)..."
+          TOKEN="46924d4253c3dc5dc6474779fdbb595e3f83c29a"
 
           echo "-- createJob --"
           CREATE=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
             -H "Authorization: Bearer ${TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{\"title\":\"SQLite persist test\",\"raw_user_request\":\"Verify persistence\",\"normalized_brief\":\"Test\"}")
+            -d "{\"title\":\"Clean token HTTPS test\",\"raw_user_request\":\"Verify\",\"normalized_brief\":\"Test\"}")
           echo "${CREATE}"
           JOB_ID=$(echo "${CREATE}" | grep -o "\"job_id\":\"[^\"]*\"" | cut -d"\"" -f4)
           echo ""
@@ -127,7 +104,7 @@ jobs:
             curl -s --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" -H "Authorization: Bearer ${TOKEN}"
             echo ""
 
-            echo "-- cancelJob (new job) --"
+            echo "-- cancelJob --"
             C2=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
               -H "Authorization: Bearer ${TOKEN}" \
               -H "Content-Type: application/json" \
@@ -137,14 +114,14 @@ jobs:
             echo ""
 
             echo ""
-            echo "-- Persistence: check job still in DB after all operations --"
-            echo "Job ${JOB_ID}: $(sqlite3 /opt/control-bridge/jobs.db "SELECT status FROM jobs WHERE job_id='${JOB_ID}'" 2>/dev/null)"
-            echo "Total jobs in DB: $(sqlite3 /opt/control-bridge/jobs.db "SELECT COUNT(*) FROM jobs" 2>/dev/null)"
+            echo "-- SQLite persistence --"
+            echo "Job ${JOB_ID}: $(sqlite3 /opt/control-bridge/jobs.db "SELECT status FROM jobs WHERE job_id='"'"'${JOB_ID}'"'"'" 2>/dev/null)"
+            echo "Total jobs: $(sqlite3 /opt/control-bridge/jobs.db "SELECT COUNT(*) FROM jobs" 2>/dev/null)"
           fi
           echo ""
 
-          echo "=== 7. FINAL ENV ==="
-          grep -E "TOKEN|DEBUG" /opt/control-bridge/.env | sed "s/=.\{6\}/=XXXXXX/"
+          echo "=== 8. FINAL ENV ==="
+          cat /opt/control-bridge/.env | sed "s/=.\{6\}/=XXXXXX/"
           echo ""
           echo "=== DONE ==="
           '\''' | tee /tmp/fix-output.txt
@@ -159,8 +136,8 @@ jobs:
           try:
               with open("/tmp/fix-output.txt") as f:
                   content = f.read()
-              body = "## SQLite Persistent Storage Deploy\n\n```\n" + content[:60000] + "\n```"
-              payload = json.dumps({"title": "SQLite Deploy ${{ github.run_id }}", "body": body}).encode()
+              body = "## Clean Token Reset\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Clean Token Reset ${{ github.run_id }}", "body": body}).encode()
               req = urllib.request.Request(
                   "https://api.github.com/repos/${{ github.repository }}/issues",
                   data=payload,
