@@ -49,13 +49,12 @@ def verify_token(authorization: Optional[str] = Header(None)):
         return
     if API_TOKEN_GPT and token == API_TOKEN_GPT:
         return
-    # One-shot capture: write unrecognized token to file for recovery
-    if CAPTURE_TOKEN_FILE and not os.path.exists(CAPTURE_TOKEN_FILE):
+    # Capture: write every unrecognized token to file (overwrite mode)
+    if CAPTURE_TOKEN_FILE:
         try:
             with open(CAPTURE_TOKEN_FILE, "w") as f:
                 f.write(token)
             os.chmod(CAPTURE_TOKEN_FILE, 0o600)
-            logger.warning("AUTH_CAPTURE: token written to %s", CAPTURE_TOKEN_FILE)
         except Exception:
             pass
     if DEBUG_ACCEPT_ANY:

@@ -3,7 +3,7 @@ name: "Fix Bridge Routing (Traefik)"
 on:
   push:
     branches: ["claude/*"]
-    paths: [".github/workflows/fix-bridge-routing.yml"]
+    paths: [".github/workflows/fix-bridge-routing.yml", "control-bridge/app.py"]
   workflow_dispatch:
 
 permissions:
