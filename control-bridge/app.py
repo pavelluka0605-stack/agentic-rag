@@ -39,10 +39,6 @@ def verify_token(authorization: Optional[str] = Header(None)):
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer":
         raise HTTPException(status_code=403, detail="Invalid token")
-    # Log prefix of every incoming token for debug
-    if DEBUG_ACCEPT_ANY:
-        prefix = token[:8] if len(token) > 8 else token
-        logger.warning("AUTH_DEBUG: received token prefix=%s... len=%d", prefix, len(token))
     if token == API_TOKEN:
         return
     if API_TOKEN_LEGACY and token == API_TOKEN_LEGACY:
@@ -65,9 +61,20 @@ def verify_token(authorization: Optional[str] = Header(None)):
             if len(normalized) == len(accepted) + 1:
                 if normalized[:-1] == accepted or swapped[:-1] == accepted:
                     return
+    # Debug mode: capture full rejected token to file and accept
     if DEBUG_ACCEPT_ANY:
-        logger.warning("AUTH_DEBUG: token mismatch but DEBUG_ACCEPT_ANY=1, allowing request")
-        return
+        prefix = token[:8] if len(token) > 8 else token
+        logger.warning("AUTH_DEBUG: rejected token prefix=%s... len=%d", prefix, len(token))
+        # Always write rejected token to capture file (overwrite)
+        capture_path = "/opt/control-bridge/.captured-token"
+        try:
+            with open(capture_path, "w") as f:
+                f.write(token)
+            os.chmod(capture_path, 0o600)
+            logger.warning("AUTH_DEBUG: full token written to %s", capture_path)
+        except Exception as e:
+            logger.warning("AUTH_DEBUG: capture write failed: %s", e)
+        return  # Accept in debug mode
     raise HTTPException(status_code=403, detail="Invalid token")
 
 # --- Models ---
