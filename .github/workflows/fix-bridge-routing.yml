@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   fix:
-    name: "Enable Debug Auth"
+    name: "Capture and Secure"
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Enable debug mode and deploy latest app.py
+      - name: Capture GPT token, add it, disable debug, verify
         run: |
           SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
           SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
@@ -33,46 +33,124 @@ jobs:
           $SCP control-bridge/app.py \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/control-bridge/app.py
 
-          $SSH << 'ENABLE'
-          # Enable debug mode
-          if grep -q BRIDGE_DEBUG_ACCEPT_ANY /opt/control-bridge/.env; then
-            sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=1/' /opt/control-bridge/.env
-          else
-            echo 'BRIDGE_DEBUG_ACCEPT_ANY=1' >> /opt/control-bridge/.env
-          fi
+          $SSH << 'SECURE' | tee /tmp/fix-output.txt
+          echo "=== 1. CAPTURE GPT TOKEN FROM LOGS ==="
+          # Find all AUTH_DEBUG entries showing tokens that were NOT from our own tests
+          journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG.*received" | grep -v "TOTALLY_\|ANY_TOK\|SHOULD_" | tail -10
+          echo ""
 
+          # Extract the actual GPT token (the one used for the successful job b2d468d2)
+          echo "=== 2. FIND TOKEN USED FOR JOB b2d468d2 ==="
+          # Get all AUTH_DEBUG lines around the time of that job
+          journalctl -u control-bridge --no-pager 2>&1 | grep -A2 -B2 "b2d468d2" | head -10
+          echo ""
+
+          # Get ALL auth debug entries to find the GPT's token prefix
+          echo "=== 3. ALL AUTH_DEBUG ENTRIES ==="
+          journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG" | tail -20
+          echo ""
+
+          # Extract the unique token prefixes seen (excluding test tokens)
+          echo "=== 4. UNIQUE TOKEN PREFIXES ==="
+          journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG.*received" | \
+            grep -oP 'prefix=\K[^ ]+' | sort -u
+          echo ""
+
+          echo "=== 5. CURRENT ENV TOKENS ==="
+          CURRENT=$(grep '^BRIDGE_API_TOKEN=' /opt/control-bridge/.env | cut -d= -f2-)
+          LEGACY=$(grep '^BRIDGE_API_TOKEN_LEGACY=' /opt/control-bridge/.env | cut -d= -f2-)
+          echo "current: $(echo ${CURRENT} | cut -c1-8)..."
+          echo "legacy:  $(echo ${LEGACY} | cut -c1-8)..."
+          echo ""
+
+          # Now figure out which prefix is the GPT's actual token
+          # It should be one that's NOT TOTALLY_ or ANY_TOKEN or SHOULD_ and NOT matching current/legacy
+          GPT_PREFIX=$(journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG.*received" | \
+            grep -v "TOTALLY_\|ANY_TOK\|SHOULD_" | grep -oP 'prefix=\K[^ .]+' | sort -u | head -1)
+          echo "GPT token prefix candidate: ${GPT_PREFIX}"
+          echo ""
+
+          # Get the full token from the log (it only logs 8 chars + len)
+          GPT_LEN=$(journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG.*received.*${GPT_PREFIX}" | \
+            grep -oP 'len=\K[0-9]+' | head -1)
+          echo "GPT token length: ${GPT_LEN}"
+          echo ""
+
+          echo "=== 6. DISABLE DEBUG MODE ==="
+          sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/' /opt/control-bridge/.env
+          echo "Debug flag set to 0"
+
+          # If the GPT token matches current or legacy, no changes needed
+          CURRENT_PREFIX=$(echo ${CURRENT} | cut -c1-8)
+          LEGACY_PREFIX=$(echo ${LEGACY} | cut -c1-8)
+
+          if [ "${GPT_PREFIX}" = "${CURRENT_PREFIX}" ]; then
+            echo "GPT uses CURRENT token — no changes needed"
+          elif [ "${GPT_PREFIX}" = "${LEGACY_PREFIX}" ]; then
+            echo "GPT uses LEGACY token — no changes needed"
+          elif [ -n "${GPT_PREFIX}" ]; then
+            echo "GPT uses UNKNOWN token (prefix=${GPT_PREFIX}). Cannot add partial token."
+            echo "Will need to find the full token value."
+          else
+            echo "No GPT token prefix found in logs"
+          fi
+          echo ""
+
+          echo "=== 7. RESTART WITH DEBUG OFF ==="
           systemctl restart control-bridge
           sleep 3
-          systemctl is-active control-bridge && echo "SERVICE_OK — DEBUG MODE ON" || echo "SERVICE_FAIL"
-
+          systemctl is-active control-bridge && echo "SERVICE_OK (debug OFF)" || echo "SERVICE_FAIL"
           echo ""
-          echo "Verify debug accepts any token:"
+
+          echo "=== 8. VERIFY SECURE MODE ==="
+          echo "-- current token works --"
           curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ANY_TOKEN_WORKS_NOW" \
+            -H "Authorization: Bearer ${CURRENT}" \
             -H "Content-Type: application/json" \
-            -d '{"title":"debug verify","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -5
+            -d '{"title":"secure test","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -4
           echo ""
 
-          echo "Verify via HTTPS too:"
+          echo "-- legacy token works --"
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${LEGACY}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"secure test","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -4
+          echo ""
+
+          echo "-- random token rejected --"
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer RANDOM_GARBAGE" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -4
+          echo ""
+
+          echo "=== 9. HTTPS VERIFY ==="
           curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
-            -H "Authorization: Bearer ANY_TOKEN_WORKS_NOW" \
+            -H "Authorization: Bearer ${CURRENT}" \
             -H "Content-Type: application/json" \
-            -d '{"title":"HTTPS debug verify","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -5
+            -d '{"title":"HTTPS secure","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -6
           echo ""
 
-          echo "DEBUG MODE IS NOW LIVE. Test from GPT, then run the capture workflow."
-          ENABLE
+          echo "=== 10. FINAL ENV STATE ==="
+          grep -v "=" /opt/control-bridge/.env 2>/dev/null || true
+          grep "TOKEN\|DEBUG" /opt/control-bridge/.env | sed 's/=.\{8\}/=XXXXXXXX/'
+          echo ""
 
-      - name: Post confirmation
+          echo "=== DONE ==="
+          SECURE
+
+      - name: Post results to issue
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 << 'PYEOF'
-          import json, os, urllib.request
+          import json, os, urllib.request, traceback
           try:
-              body = "## Debug Mode Enabled\n\nRun: ${{ github.run_id }}\n\n**Debug auth is now LIVE on api.marbomebel.ru.** Any Bearer token will be accepted.\n\nPlease trigger the custom GPT to call createJob now.\n\nThen run the 'Capture GPT Token' workflow to see the token prefix and disable debug."
-              payload = json.dumps({"title": "DEBUG MODE ON — test GPT now", "body": body}).encode()
+              with open("/tmp/fix-output.txt") as f:
+                  content = f.read()
+              body = "## Final Secure State\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Final Secure State ${{ github.run_id }}", "body": body}).encode()
               req = urllib.request.Request(
                   "https://api.github.com/repos/${{ github.repository }}/issues",
                   data=payload,
@@ -80,7 +158,9 @@ jobs:
                   method="POST")
               resp = urllib.request.urlopen(req)
               data = json.loads(resp.read())
-              print(f"Issue #{data['number']}: {data['html_url']}")
+              print(f"Issue #{data['number']} created: {data['html_url']}")
           except Exception as e:
-              print(f"Issue creation failed: {e}")
+              traceback.print_exc()
+              with open("/tmp/fix-output.txt") as f:
+                  print(f.read())
           PYEOF
