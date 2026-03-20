@@ -1,0 +1,142 @@
+name: "Capture GPT Token and Secure"
+
+on:
+  push:
+    branches: ["claude/*"]
+    paths: [".github/workflows/capture-gpt-token.yml"]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  capture:
+    name: "Capture and Secure"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Capture token, add to env, disable debug, full verify
+        run: |
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            control-bridge/app.py \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/control-bridge/app.py
+
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'SECURE' | tee /tmp/capture-output.txt
+          echo "=== 1. CHECK CAPTURED TOKEN ==="
+          if [ -f /opt/control-bridge/.captured-token ]; then
+            GPT_TOKEN=$(cat /opt/control-bridge/.captured-token)
+            echo "CAPTURED: prefix=$(echo ${GPT_TOKEN} | cut -c1-8)... len=${#GPT_TOKEN}"
+
+            echo ""
+            echo "=== 2. ADD AS BRIDGE_API_TOKEN_GPT ==="
+            grep -q BRIDGE_API_TOKEN_GPT /opt/control-bridge/.env && \
+              sed -i "s|^BRIDGE_API_TOKEN_GPT=.*|BRIDGE_API_TOKEN_GPT=${GPT_TOKEN}|" /opt/control-bridge/.env || \
+              echo "BRIDGE_API_TOKEN_GPT=${GPT_TOKEN}" >> /opt/control-bridge/.env
+            echo "GPT token added"
+          else
+            echo "NO CAPTURE FILE. Checking logs for GPT requests..."
+            journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG" | grep -v "TEST123\|GARBAGE\|SHOULD\|TOTALLY\|ANY_TOK" | tail -10
+            echo ""
+            echo "CANNOT PROCEED — need GPT to call first"
+            exit 1
+          fi
+          echo ""
+
+          echo "=== 3. DISABLE DEBUG + CAPTURE ==="
+          sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/' /opt/control-bridge/.env
+          sed -i 's|^BRIDGE_CAPTURE_TOKEN_FILE=.*|BRIDGE_CAPTURE_TOKEN_FILE=|' /opt/control-bridge/.env
+          rm -f /opt/control-bridge/.captured-token
+          echo "Debug OFF, capture removed"
+          echo ""
+
+          echo "=== 4. RESTART SECURE ==="
+          systemctl restart control-bridge
+          sleep 3
+          systemctl is-active control-bridge && echo "SERVICE_OK" || echo "SERVICE_FAIL"
+          echo ""
+
+          echo "=== 5. TOKEN VERIFICATION ==="
+          CURRENT=$(grep '^BRIDGE_API_TOKEN=' /opt/control-bridge/.env | cut -d= -f2-)
+          LEGACY=$(grep '^BRIDGE_API_TOKEN_LEGACY=' /opt/control-bridge/.env | cut -d= -f2-)
+          GPT_TOK=$(grep '^BRIDGE_API_TOKEN_GPT=' /opt/control-bridge/.env | cut -d= -f2-)
+
+          echo "current: $(echo ${CURRENT} | cut -c1-8)... => $(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${CURRENT}" -H 'Content-Type: application/json' -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}')"
+          echo "legacy:  $(echo ${LEGACY} | cut -c1-8)... => $(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${LEGACY}" -H 'Content-Type: application/json' -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}')"
+          echo "gpt:     $(echo ${GPT_TOK} | cut -c1-8)... => $(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${GPT_TOK}" -H 'Content-Type: application/json' -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}')"
+          echo "random:  GARBAGE... => $(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3000/jobs -H 'Authorization: Bearer GARBAGE' -H 'Content-Type: application/json' -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}')"
+          echo ""
+
+          echo "=== 6. HTTPS FULL CYCLE ==="
+          echo "-- createJob --"
+          CREATE=$(curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ${GPT_TOK}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Secure GPT test","raw_user_request":"Final verify","normalized_brief":"Done"}' 2>&1)
+          echo "${CREATE}"
+          JOB_ID=$(echo "${CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+          echo ""
+
+          if [ -n "${JOB_ID}" ]; then
+            for EP in "confirmJob:POST:${JOB_ID}/confirm" "getJobStatus:GET:${JOB_ID}/status" "getJobResult:GET:${JOB_ID}/result"; do
+              NAME=$(echo $EP | cut -d: -f1)
+              METHOD=$(echo $EP | cut -d: -f2)
+              PATH=$(echo $EP | cut -d: -f3-)
+              echo "-- ${NAME} --"
+              curl -si --connect-timeout 10 -X ${METHOD} "https://api.marbomebel.ru/jobs/${PATH}" \
+                -H "Authorization: Bearer ${GPT_TOK}" 2>&1
+              echo ""
+            done
+
+            echo "-- cancelJob --"
+            C2=$(curl -s -X POST https://api.marbomebel.ru/jobs \
+              -H "Authorization: Bearer ${GPT_TOK}" \
+              -H "Content-Type: application/json" \
+              -d '{"title":"cancel","raw_user_request":"x","normalized_brief":"x"}')
+            CID=$(echo "${C2}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+            curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" \
+              -H "Authorization: Bearer ${GPT_TOK}" 2>&1
+            echo ""
+          fi
+
+          echo "=== 7. FINAL STATE ==="
+          grep "TOKEN\|DEBUG\|CAPTURE" /opt/control-bridge/.env | sed 's/=.\{6\}/=XXXXXX/'
+          echo ""
+          echo "=== DONE ==="
+          SECURE
+
+      - name: Post results
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, urllib.request, traceback
+          try:
+              with open("/tmp/capture-output.txt") as f:
+                  content = f.read()
+              body = "## GPT Token Captured — Final Secure\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "GPT Token Secured ${{ github.run_id }}", "body": body}).encode()
+              req = urllib.request.Request(
+                  "https://api.github.com/repos/${{ github.repository }}/issues",
+                  data=payload,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+                  method="POST")
+              resp = urllib.request.urlopen(req)
+              data = json.loads(resp.read())
+              print(f"Issue #{data['number']}: {data['html_url']}")
+          except Exception as e:
+              traceback.print_exc()
+              with open("/tmp/capture-output.txt") as f:
+                  print(f.read())
+          PYEOF
