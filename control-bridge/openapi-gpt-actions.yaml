@@ -6,7 +6,7 @@ info:
     Jobs are auto-dispatched on creation — NO confirmation needed.
     Flow: createJob → poll getJobStatus → getJobResult when completed.
     Only ONE job can run at a time. Call getActiveJobs first to check.
-  version: "1.4.0"
+  version: "1.4.1"
 servers:
   - url: https://api.marbomebel.ru
     description: Production

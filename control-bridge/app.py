@@ -21,6 +21,10 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("bridge")
 
+# --- Version / uptime ---
+_STARTED_AT = time.time()
+_VERSION = "1.4.1"
+
 # --- Concurrency lock ---
 # Only one task can run at a time to prevent VPS resource exhaustion.
 _running_lock = threading.Lock()
@@ -203,7 +207,7 @@ app = FastAPI(
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "version": _VERSION, "uptime_s": int(time.time() - _STARTED_AT)}
 
 @app.post("/jobs", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def create_job(body: JobCreate, background_tasks: BackgroundTasks):
