@@ -1,7 +1,8 @@
 """
-Control Bridge API — Minimal GPT Actions bridge for marbomebel.ru
+Control Bridge API — GPT Actions bridge for marbomebel.ru
 Runs on 0.0.0.0:3000, behind Traefik reverse proxy.
-Jobs persisted in SQLite at /opt/control-bridge/jobs.db
+Jobs persisted in SQLite. On createJob, dispatches to Control API
+(port 3901) which runs the full pipeline: interpret → confirm → start → Claude Code.
 """
 
 import json
@@ -9,10 +10,16 @@ import os
 import sqlite3
 import uuid
 import time
+import threading
+import logging
+import urllib.request
+import urllib.error
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
 from pydantic import BaseModel
+
+logger = logging.getLogger("bridge")
 
 # --- Auth ---
 API_TOKEN = os.environ.get("BRIDGE_API_TOKEN", "")
@@ -80,6 +87,62 @@ def db_update_status(job_id: str, status: str, result_json: Optional[str] = None
     conn.commit()
     conn.close()
 
+# --- Control API dispatcher ---
+CONTROL_API_URL = os.environ.get("CONTROL_API_URL", "http://127.0.0.1:3901")
+CONTROL_API_TOKEN = os.environ.get("CONTROL_API_TOKEN", "")
+
+def _api_call(method: str, path: str, body: dict = None) -> dict:
+    """Call Control API (port 3901) with Bearer auth."""
+    url = f"{CONTROL_API_URL}{path}"
+    data = json.dumps(body).encode() if body else None
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {CONTROL_API_TOKEN}",
+    }
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode() if e.fp else ""
+        logger.error("Control API %s %s → %d: %s", method, path, e.code, body_text)
+        return {"error": body_text, "status_code": e.code}
+    except Exception as e:
+        logger.error("Control API %s %s failed: %s", method, path, e)
+        return {"error": str(e)}
+
+def dispatch_to_claude(job_id: str, title: str, raw_user_request: str, normalized_brief: str):
+    """Background: create task in Control API and run full pipeline."""
+    try:
+        # 1. Create task
+        task = _api_call("POST", "/api/tasks", {"raw_input": raw_user_request})
+        task_id = task.get("id")
+        if not task_id:
+            logger.error("dispatch job=%s: create failed: %s", job_id, task)
+            db_update_status(job_id, "failed")
+            return
+
+        logger.info("dispatch job=%s → task=%s created", job_id, task_id)
+        db_update_status(job_id, "dispatched")
+
+        # 2. Interpret (LLM call)
+        _api_call("POST", f"/api/tasks/{task_id}/interpret")
+        logger.info("dispatch job=%s → task=%s interpreted", job_id, task_id)
+
+        # 3. Confirm (builds engineering packet)
+        _api_call("POST", f"/api/tasks/{task_id}/confirm")
+        logger.info("dispatch job=%s → task=%s confirmed", job_id, task_id)
+
+        # 4. Start execution (dispatch to tmux)
+        _api_call("POST", f"/api/tasks/{task_id}/start")
+        logger.info("dispatch job=%s → task=%s started (dispatched to Claude Code)", job_id, task_id)
+
+        db_update_status(job_id, "running")
+
+    except Exception as e:
+        logger.error("dispatch job=%s failed: %s", job_id, e)
+        db_update_status(job_id, "failed")
+
 # --- Models ---
 class JobCreate(BaseModel):
     title: str
@@ -116,9 +179,14 @@ def health():
     return {"ok": True}
 
 @app.post("/jobs", response_model=JobResponse, dependencies=[Depends(verify_token)])
-def create_job(body: JobCreate):
+def create_job(body: JobCreate, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
     db_create_job(job_id, body.title, body.raw_user_request, body.normalized_brief)
+    # Dispatch to Control API → Claude Code in background
+    if CONTROL_API_TOKEN:
+        background_tasks.add_task(
+            dispatch_to_claude, job_id, body.title, body.raw_user_request, body.normalized_brief
+        )
     return JobResponse(job_id=job_id, status="queued")
 
 @app.post("/jobs/{job_id}/confirm", response_model=JobResponse, dependencies=[Depends(verify_token)])
@@ -143,18 +211,6 @@ def get_job_result(job_id: str):
     job = db_get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    # Auto-complete running jobs for demo purposes
-    if job["status"] == "running":
-        result_data = JobResultData(
-            summary=f"Job '{job['title']}' completed successfully.",
-            changes_made=[],
-            artifacts=[],
-            tests_run=[],
-            manual_checks=["Review result in dashboard"],
-            risks_remaining=[],
-        )
-        db_update_status(job_id, "completed", json.dumps(result_data.model_dump()))
-        return JobResult(job_id=job_id, status="completed", result=result_data)
     result_data = None
     if job.get("result_json"):
         result_data = JobResultData(**json.loads(job["result_json"]))

@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   fix:
-    name: "Clean Token Reset + Deploy"
+    name: "Deploy Executor Bridge"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy clean app.py, reset token, verify
+      - name: Deploy app.py with executor, configure, verify
         run: |
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
             control-bridge/app.py \
@@ -36,93 +36,64 @@ jobs:
             'bash -l -c '\''
           export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
 
-          echo "=== 1. REPLACE .ENV WITH CLEAN TOKEN ONLY ==="
-          cat > /opt/control-bridge/.env << ENVEOF
-          BRIDGE_API_TOKEN=46924d4253c3dc5dc6474779fdbb595e3f83c29a
-          ENVEOF
-          # Remove leading whitespace from heredoc
-          sed -i "s/^[[:space:]]*//" /opt/control-bridge/.env
+          echo "=== 1. ADD CONTROL_API_TOKEN TO .ENV ==="
+          CTRL_TOKEN=$(grep "^CONTROL_API_TOKEN=" /opt/claude-code/env/control-api.env 2>/dev/null | cut -d= -f2- || echo "")
+          if [ -z "$CTRL_TOKEN" ]; then
+            echo "WARNING: CONTROL_API_TOKEN not found in control-api.env"
+            CTRL_TOKEN="not-configured"
+          fi
+          if ! grep -q "^CONTROL_API_TOKEN=" /opt/control-bridge/.env; then
+            echo "CONTROL_API_TOKEN=${CTRL_TOKEN}" >> /opt/control-bridge/.env
+            echo "Added CONTROL_API_TOKEN"
+          else
+            sed -i "s|^CONTROL_API_TOKEN=.*|CONTROL_API_TOKEN=${CTRL_TOKEN}|" /opt/control-bridge/.env
+            echo "Updated CONTROL_API_TOKEN"
+          fi
           chmod 600 /opt/control-bridge/.env
-          echo ".env reset to single clean token"
-          wc -l /opt/control-bridge/.env
           echo ""
 
-          echo "=== 2. CLEANUP ==="
-          rm -f /opt/control-bridge/.captured-token
-          echo "Removed capture artifacts"
-          echo ""
-
-          echo "=== 3. RESTART ==="
+          echo "=== 2. RESTART ==="
           systemctl restart control-bridge
           sleep 3
-          systemctl is-active control-bridge && echo "SERVICE_OK" || (echo "SERVICE_FAIL" && journalctl -u control-bridge -n 20 --no-pager && exit 1)
+          systemctl is-active control-bridge && echo "SERVICE_OK" || (journalctl -u control-bridge -n 20 --no-pager && exit 1)
           echo ""
 
-          echo "=== 4. VERIFY: clean token accepted ==="
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer 46924d4253c3dc5dc6474779fdbb595e3f83c29a" \
-            -H "Content-Type: application/json" \
-            -d "{\"title\":\"clean token test\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
+          echo "=== 3. CHECK CONTROL API IS RUNNING ==="
+          curl -s http://127.0.0.1:3901/health 2>&1 || echo "CONTROL_API_NOT_RUNNING"
           echo ""
 
-          echo "=== 5. VERIFY: invalid token rejected ==="
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer INVALID_GARBAGE" \
+          echo "=== 4. TEST createJob WITH DISPATCH ==="
+          BRIDGE_TOKEN=$(grep "^BRIDGE_API_TOKEN=" /opt/control-bridge/.env | cut -d= -f2-)
+          CREATE=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${BRIDGE_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}" 2>&1 | head -4
-          echo ""
-
-          echo "=== 6. VERIFY: old tokens rejected ==="
-          curl -s -o /dev/null -w "old_legacy: HTTP %{http_code}\n" -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer 0ORbpHTjaswJvP2J4wO9gUhSvrfl0mbK3h5BVDKSV60" \
-            -H "Content-Type: application/json" \
-            -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}"
-          echo ""
-
-          echo "=== 7. HTTPS FULL CYCLE ==="
-          TOKEN="46924d4253c3dc5dc6474779fdbb595e3f83c29a"
-
-          echo "-- createJob --"
-          CREATE=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"title\":\"Clean token HTTPS test\",\"raw_user_request\":\"Verify\",\"normalized_brief\":\"Test\"}")
-          echo "${CREATE}"
+            -d "{\"title\":\"Executor test\",\"raw_user_request\":\"Тестовая задача для проверки пайплайна GPT -> Claude Code\",\"normalized_brief\":\"Test\"}")
+          echo "createJob: ${CREATE}"
           JOB_ID=$(echo "${CREATE}" | grep -o "\"job_id\":\"[^\"]*\"" | cut -d"\"" -f4)
           echo ""
 
-          if [ -n "${JOB_ID}" ]; then
-            echo "-- confirmJob --"
-            curl -s --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" -H "Authorization: Bearer ${TOKEN}"
-            echo ""
-
-            echo "-- getJobStatus --"
-            curl -s --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" -H "Authorization: Bearer ${TOKEN}"
-            echo ""
-
-            echo "-- getJobResult --"
-            curl -s --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" -H "Authorization: Bearer ${TOKEN}"
-            echo ""
-
-            echo "-- cancelJob --"
-            C2=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
-              -H "Authorization: Bearer ${TOKEN}" \
-              -H "Content-Type: application/json" \
-              -d "{\"title\":\"cancel\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")
-            CID=$(echo "${C2}" | grep -o "\"job_id\":\"[^\"]*\"" | cut -d"\"" -f4)
-            curl -s --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" -H "Authorization: Bearer ${TOKEN}"
-            echo ""
-
-            echo ""
-            echo "-- SQLite persistence --"
-            echo "Job ${JOB_ID}: $(sqlite3 /opt/control-bridge/jobs.db "SELECT status FROM jobs WHERE job_id='"'"'${JOB_ID}'"'"'" 2>/dev/null)"
-            echo "Total jobs: $(sqlite3 /opt/control-bridge/jobs.db "SELECT COUNT(*) FROM jobs" 2>/dev/null)"
-          fi
+          echo "=== 5. WAIT FOR DISPATCH ==="
+          sleep 15
           echo ""
 
-          echo "=== 8. FINAL ENV ==="
-          cat /opt/control-bridge/.env | sed "s/=.\{6\}/=XXXXXX/"
+          echo "=== 6. CHECK JOB STATUS ==="
+          curl -s "http://127.0.0.1:3000/jobs/${JOB_ID}/status" \
+            -H "Authorization: Bearer ${BRIDGE_TOKEN}" 2>&1
           echo ""
+
+          echo "=== 7. CHECK CONTROL API TASKS ==="
+          curl -s "http://127.0.0.1:3901/api/tasks?limit=3" \
+            -H "Authorization: Bearer ${CTRL_TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 8. CHECK TASK FILES ==="
+          ls -la /opt/claude-code/workspace/task-*.md 2>/dev/null | tail -5 || echo "No task files yet"
+          echo ""
+
+          echo "=== 9. BRIDGE LOGS ==="
+          journalctl -u control-bridge -n 30 --no-pager 2>&1 | grep -i "dispatch\|error\|task\|control" | tail -15
+          echo ""
+
           echo "=== DONE ==="
           '\''' | tee /tmp/fix-output.txt
 
@@ -136,8 +107,8 @@ jobs:
           try:
               with open("/tmp/fix-output.txt") as f:
                   content = f.read()
-              body = "## Clean Token Reset\n\n```\n" + content[:60000] + "\n```"
-              payload = json.dumps({"title": "Clean Token Reset ${{ github.run_id }}", "body": body}).encode()
+              body = "## Executor Bridge Deploy\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Executor Deploy ${{ github.run_id }}", "body": body}).encode()
               req = urllib.request.Request(
                   "https://api.github.com/repos/${{ github.repository }}/issues",
                   data=payload,
