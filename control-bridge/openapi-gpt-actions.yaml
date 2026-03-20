@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: Control Bridge API
   description: GPT Actions bridge for marbomebel.ru — create, confirm, monitor and cancel jobs.
-  version: "1.1.0"
+  version: "1.3.0"
 servers:
   - url: https://api.marbomebel.ru
     description: Production
@@ -58,6 +58,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JobResponse"
+        "429":
+          description: "Another job is already running. Wait for it to finish."
+
+  /jobs/active:
+    get:
+      operationId: getActiveJobs
+      summary: "Check if any jobs are currently running (call before createJob)"
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: "List of active jobs (empty array = safe to create)"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    job_id:
+                      type: string
+                    status:
+                      type: string
+                    title:
+                      type: string
+                    created_at:
+                      type: number
 
   /jobs/{job_id}/confirm:
     post:
@@ -167,8 +194,10 @@ components:
           type: string
           enum:
             - queued
+            - dispatched
             - running
             - completed
+            - failed
             - cancelled
       required:
         - job_id

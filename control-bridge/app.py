@@ -21,6 +21,11 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("bridge")
 
+# --- Concurrency lock ---
+# Only one task can run at a time to prevent VPS resource exhaustion.
+_running_lock = threading.Lock()
+_running_job_id: Optional[str] = None
+
 # --- Auth ---
 API_TOKEN = os.environ.get("BRIDGE_API_TOKEN", "")
 
@@ -95,10 +100,9 @@ def _api_call(method: str, path: str, body: dict = None) -> dict:
     """Call Control API (port 3901) with Bearer auth."""
     url = f"{CONTROL_API_URL}{path}"
     data = json.dumps(body).encode() if body else None
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {CONTROL_API_TOKEN}",
-    }
+    headers = {"Authorization": f"Bearer {CONTROL_API_TOKEN}"}
+    if data:
+        headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
@@ -123,8 +127,18 @@ def _api_call_checked(method: str, path: str, body: dict = None, step: str = "")
 def dispatch_to_claude(job_id: str, title: str, raw_user_request: str, normalized_brief: str):
     """Background: create task in Control API and run full pipeline.
     Pipeline: create → interpret (LLM) → confirm (LLM) → start (tmux dispatch).
+    Enforces single-task concurrency to prevent VPS resource exhaustion.
     """
+    global _running_job_id
     try:
+        with _running_lock:
+            _running_job_id = job_id
+
+        # 0. Pre-check: Control API is reachable
+        health = _api_call("GET", "/health")
+        if "error" in health:
+            raise RuntimeError(f"Control API unreachable: {health['error']}")
+
         # 1. Create task
         task = _api_call_checked("POST", "/api/tasks", {"raw_input": raw_user_request}, step="create")
         task_id = task.get("id")
@@ -150,7 +164,11 @@ def dispatch_to_claude(job_id: str, title: str, raw_user_request: str, normalize
 
     except Exception as e:
         logger.error("dispatch job=%s failed at: %s", job_id, e)
-        db_update_status(job_id, "failed")
+        db_update_status(job_id, "failed", result_json=json.dumps({"summary": str(e)}))
+    finally:
+        with _running_lock:
+            if _running_job_id == job_id:
+                _running_job_id = None
 
 # --- Models ---
 class JobCreate(BaseModel):
@@ -189,6 +207,26 @@ def health():
 
 @app.post("/jobs", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def create_job(body: JobCreate, background_tasks: BackgroundTasks):
+    # Concurrency guard: reject if another job is already running
+    with _running_lock:
+        if _running_job_id is not None:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Another job is already running: {_running_job_id}. Wait for it to finish.",
+            )
+
+    # Also check DB for stuck jobs (dispatched/running for > 10 min)
+    conn = _get_db()
+    stuck = conn.execute(
+        "SELECT job_id FROM jobs WHERE status IN ('queued','dispatched','running') AND created_at < ?",
+        (time.time() - 600,),
+    ).fetchall()
+    for row in stuck:
+        conn.execute("UPDATE jobs SET status = 'failed' WHERE job_id = ?", (row["job_id"],))
+        logger.warning("Auto-failed stuck job %s", row["job_id"])
+    conn.commit()
+    conn.close()
+
     job_id = str(uuid.uuid4())
     db_create_job(job_id, body.title, body.raw_user_request, body.normalized_brief)
     # Dispatch to Control API → Claude Code in background
@@ -224,6 +262,16 @@ def get_job_result(job_id: str):
     if job.get("result_json"):
         result_data = JobResultData(**json.loads(job["result_json"]))
     return JobResult(job_id=job_id, status=job["status"], result=result_data)
+
+@app.get("/jobs/active", dependencies=[Depends(verify_token)])
+def get_active_jobs():
+    """Return currently running/queued jobs. GPT can check before submitting."""
+    conn = _get_db()
+    rows = conn.execute(
+        "SELECT job_id, status, title, created_at FROM jobs WHERE status IN ('queued','dispatched','running') ORDER BY created_at DESC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 @app.post("/jobs/{job_id}/cancel", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def cancel_job(job_id: str):
