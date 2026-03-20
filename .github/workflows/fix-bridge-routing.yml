@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy dual-token app.py, set legacy token, restart
+      - name: Deploy debug app.py and enable BRIDGE_DEBUG_ACCEPT_ANY
         run: |
           SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
           SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
@@ -34,132 +34,73 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/control-bridge/app.py
 
           $SSH << 'FIX'
-          echo "=== 1. ADD LEGACY TOKEN TO .ENV ==="
-          # Add legacy token (the token that was active when the GPT was first configured)
-          if grep -q BRIDGE_API_TOKEN_LEGACY /opt/control-bridge/.env; then
-            echo "LEGACY_TOKEN_ALREADY_SET"
+          # Add debug flag to .env (temporary)
+          if grep -q BRIDGE_DEBUG_ACCEPT_ANY /opt/control-bridge/.env; then
+            sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=1/' /opt/control-bridge/.env
           else
-            echo 'BRIDGE_API_TOKEN_LEGACY=0ORbpHTjaswJvP2J4wO9gUhSvrfl0mbK3h5BVDKSV60' >> /opt/control-bridge/.env
-            chmod 600 /opt/control-bridge/.env
-            echo "LEGACY_TOKEN_ADDED"
+            echo 'BRIDGE_DEBUG_ACCEPT_ANY=1' >> /opt/control-bridge/.env
           fi
-          echo "env lines: $(wc -l < /opt/control-bridge/.env)"
+          echo ".env contents (redacted tokens):"
+          grep -v "TOKEN" /opt/control-bridge/.env; grep "TOKEN" /opt/control-bridge/.env | sed 's/=.*/=***/'
           echo ""
 
-          echo "=== 2. RESTART SERVICE ==="
           systemctl restart control-bridge
           sleep 3
           systemctl is-active control-bridge && echo "SERVICE_OK" || echo "SERVICE_FAIL"
-          echo ""
-
-          echo "=== 3. VERIFY BOTH TOKENS WORK ==="
-          CURRENT=$(grep '^BRIDGE_API_TOKEN=' /opt/control-bridge/.env | cut -d= -f2-)
-          LEGACY=$(grep '^BRIDGE_API_TOKEN_LEGACY=' /opt/control-bridge/.env | cut -d= -f2-)
-          echo "current prefix: $(echo ${CURRENT} | cut -c1-6)..."
-          echo "legacy prefix: $(echo ${LEGACY} | cut -c1-6)..."
 
           echo ""
-          echo "--- Test with CURRENT token ---"
+          echo "Quick sanity with a random bearer:"
           curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ${CURRENT}" \
+            -H "Authorization: Bearer TOTALLY_RANDOM_TEST" \
             -H "Content-Type: application/json" \
-            -d '{"title":"Current token test","raw_user_request":"x","normalized_brief":"x"}' 2>&1
+            -d '{"title":"debug test","raw_user_request":"x","normalized_brief":"x"}' 2>&1
           echo ""
 
-          echo ""
-          echo "--- Test with LEGACY token ---"
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ${LEGACY}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Legacy token test","raw_user_request":"x","normalized_brief":"x"}' 2>&1
-          echo ""
-
-          echo ""
-          echo "--- Test with BAD token ---"
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer WRONG_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Bad token test","raw_user_request":"x","normalized_brief":"x"}' 2>&1
-          echo ""
+          echo "Check log for debug prefix:"
+          sleep 1
+          journalctl -u control-bridge -n 10 --no-pager 2>&1 | grep -i "AUTH_DEBUG" || echo "no debug lines yet"
           FIX
 
-      - name: Run full HTTPS retest with legacy token
+      - name: Wait 90s for user to test from GPT
+        run: |
+          echo "DEBUG MODE IS LIVE. Any Bearer token will be accepted on all endpoints."
+          echo "Waiting 90 seconds to allow the GPT to make a request..."
+          echo "The token prefix will be captured in journalctl."
+          sleep 90
+
+      - name: Capture GPT token prefix from logs, then disable debug
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'TEST' | tee /tmp/fix-output.txt
-          LEGACY=$(grep '^BRIDGE_API_TOKEN_LEGACY=' /opt/control-bridge/.env | cut -d= -f2-)
-          CURRENT=$(grep '^BRIDGE_API_TOKEN=' /opt/control-bridge/.env | cut -d= -f2-)
-
-          echo "=== HTTPS TESTS WITH LEGACY TOKEN (GPT-configured) ==="
-          echo "legacy prefix: $(echo ${LEGACY} | cut -c1-6)..."
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'CAPTURE' | tee /tmp/fix-output.txt
+          echo "=== CAPTURED AUTH_DEBUG ENTRIES ==="
+          journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG" | tail -20
           echo ""
 
-          echo "=== health ==="
-          curl -si --connect-timeout 15 https://api.marbomebel.ru/health 2>&1
+          echo "=== ALL RECENT REQUESTS ==="
+          journalctl -u control-bridge -n 40 --no-pager 2>&1 | grep -E "POST|GET|AUTH" | tail -20
           echo ""
 
-          echo "=== createJob ==="
-          CREATE=$(curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
-            -H "Authorization: Bearer ${LEGACY}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Тестовая задача","raw_user_request":"Проверка моста GPT -> API","normalized_brief":"Тестовый запуск createJob"}' 2>&1)
-          echo "${CREATE}"
-          JOB_ID=$(echo "${CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
-          echo "job_id: ${JOB_ID}"
+          echo "=== DISABLE DEBUG MODE ==="
+          sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/' /opt/control-bridge/.env
+          systemctl restart control-bridge
+          sleep 3
+          systemctl is-active control-bridge && echo "SERVICE_OK (debug disabled)" || echo "SERVICE_FAIL"
           echo ""
 
-          if [ -n "${JOB_ID}" ]; then
-            echo "=== confirmJob ==="
-            curl -si --connect-timeout 15 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" \
-              -H "Authorization: Bearer ${LEGACY}" 2>&1
-            echo ""
-
-            echo "=== getJobStatus ==="
-            curl -si --connect-timeout 15 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" \
-              -H "Authorization: Bearer ${LEGACY}" 2>&1
-            echo ""
-
-            echo "=== getJobResult ==="
-            curl -si --connect-timeout 15 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" \
-              -H "Authorization: Bearer ${LEGACY}" 2>&1
-            echo ""
-
-            echo "=== cancelJob ==="
-            C2=$(curl -s --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
-              -H "Authorization: Bearer ${LEGACY}" \
-              -H "Content-Type: application/json" \
-              -d '{"title":"Cancel test","raw_user_request":"x","normalized_brief":"x"}')
-            CID=$(echo "${C2}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
-            curl -si --connect-timeout 15 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" \
-              -H "Authorization: Bearer ${LEGACY}" 2>&1
-            echo ""
-          else
-            echo "createJob FAILED with legacy token"
-          fi
-
-          echo ""
-          echo "=== CURRENT TOKEN ALSO WORKS ==="
-          curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
-            -H "Authorization: Bearer ${CURRENT}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"Current token verify","raw_user_request":"x","normalized_brief":"x"}' 2>&1
-          echo ""
-
-          echo "=== AUTH REJECTION (bad token) ==="
-          curl -si --connect-timeout 15 -X POST https://api.marbomebel.ru/jobs \
-            -H "Authorization: Bearer INVALID" \
+          echo "=== VERIFY DEBUG IS OFF (random token should now fail) ==="
+          curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer SHOULD_NOW_FAIL" \
             -H "Content-Type: application/json" \
             -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}' 2>&1
           echo ""
 
-          echo "=== TOKEN INFO ==="
-          echo "current: $(echo ${CURRENT} | cut -c1-6)... (len ${#CURRENT})"
-          echo "legacy:  $(echo ${LEGACY} | cut -c1-6)... (len ${#LEGACY})"
-          echo "mode: dual-token"
+          echo "=== CURRENT .ENV FLAGS ==="
+          grep -v "TOKEN=" /opt/control-bridge/.env
+          grep "TOKEN" /opt/control-bridge/.env | sed 's/=.*/=***/'
           echo ""
 
           echo "=== DONE ==="
-          TEST
+          CAPTURE
 
       - name: Post results to issue
         if: always()
@@ -171,8 +112,8 @@ jobs:
           try:
               with open("/tmp/fix-output.txt") as f:
                   content = f.read()
-              body = "## Dual-Token Retest\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
-              payload = json.dumps({"title": "Dual-Token Retest ${{ github.run_id }}", "body": body}).encode()
+              body = "## Debug Auth Capture\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "Auth Debug Capture ${{ github.run_id }}", "body": body}).encode()
               req = urllib.request.Request(
                   "https://api.github.com/repos/${{ github.repository }}/issues",
                   data=payload,

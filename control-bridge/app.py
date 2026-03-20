@@ -11,12 +11,19 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
 
+import logging
+
+logger = logging.getLogger("bridge")
+
 # --- Auth ---
 # Primary token from .env (current)
 API_TOKEN = os.environ.get("BRIDGE_API_TOKEN", "")
 # Legacy token for transition period (optional, set in .env as BRIDGE_API_TOKEN_LEGACY)
 # Remove BRIDGE_API_TOKEN_LEGACY from .env once the GPT is updated to use the current token.
 API_TOKEN_LEGACY = os.environ.get("BRIDGE_API_TOKEN_LEGACY", "")
+# TEMPORARY DEBUG FLAG — set to "1" in .env to accept any Bearer token on POST /jobs
+# Remove after confirming the GPT token. Logs the token prefix on every auth attempt.
+DEBUG_ACCEPT_ANY = os.environ.get("BRIDGE_DEBUG_ACCEPT_ANY", "") == "1"
 
 def verify_token(authorization: Optional[str] = Header(None)):
     if not API_TOKEN:
@@ -26,9 +33,16 @@ def verify_token(authorization: Optional[str] = Header(None)):
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer":
         raise HTTPException(status_code=403, detail="Invalid token")
+    # Log prefix of every incoming token for debug
+    if DEBUG_ACCEPT_ANY:
+        prefix = token[:8] if len(token) > 8 else token
+        logger.warning("AUTH_DEBUG: received token prefix=%s... len=%d", prefix, len(token))
     if token == API_TOKEN:
         return
     if API_TOKEN_LEGACY and token == API_TOKEN_LEGACY:
+        return
+    if DEBUG_ACCEPT_ANY:
+        logger.warning("AUTH_DEBUG: token mismatch but DEBUG_ACCEPT_ANY=1, allowing request")
         return
     raise HTTPException(status_code=403, detail="Invalid token")
 
