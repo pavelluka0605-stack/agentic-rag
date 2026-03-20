@@ -101,7 +101,7 @@ def _api_call(method: str, path: str, body: dict = None) -> dict:
     }
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
         body_text = e.read().decode() if e.fp else ""
@@ -111,36 +111,45 @@ def _api_call(method: str, path: str, body: dict = None) -> dict:
         logger.error("Control API %s %s failed: %s", method, path, e)
         return {"error": str(e)}
 
+def _api_call_checked(method: str, path: str, body: dict = None, step: str = "") -> dict:
+    """Call Control API and raise on error."""
+    result = _api_call(method, path, body)
+    if "error" in result and "status_code" in result:
+        raise RuntimeError(f"{step}: HTTP {result['status_code']} — {result['error']}")
+    if "error" in result and not result.get("id"):
+        raise RuntimeError(f"{step}: {result['error']}")
+    return result
+
 def dispatch_to_claude(job_id: str, title: str, raw_user_request: str, normalized_brief: str):
-    """Background: create task in Control API and run full pipeline."""
+    """Background: create task in Control API and run full pipeline.
+    Pipeline: create → interpret (LLM) → confirm (LLM) → start (tmux dispatch).
+    """
     try:
         # 1. Create task
-        task = _api_call("POST", "/api/tasks", {"raw_input": raw_user_request})
+        task = _api_call_checked("POST", "/api/tasks", {"raw_input": raw_user_request}, step="create")
         task_id = task.get("id")
         if not task_id:
-            logger.error("dispatch job=%s: create failed: %s", job_id, task)
-            db_update_status(job_id, "failed")
-            return
+            raise RuntimeError(f"create returned no id: {task}")
 
         logger.info("dispatch job=%s → task=%s created", job_id, task_id)
         db_update_status(job_id, "dispatched")
 
-        # 2. Interpret (LLM call)
-        _api_call("POST", f"/api/tasks/{task_id}/interpret")
+        # 2. Interpret (LLM call — may take 10-20s)
+        _api_call_checked("POST", f"/api/tasks/{task_id}/interpret", step="interpret")
         logger.info("dispatch job=%s → task=%s interpreted", job_id, task_id)
 
-        # 3. Confirm (builds engineering packet)
-        _api_call("POST", f"/api/tasks/{task_id}/confirm")
+        # 3. Confirm with mode=safe (builds engineering packet via LLM — may take 10-20s)
+        _api_call_checked("POST", f"/api/tasks/{task_id}/confirm", {"mode": "safe"}, step="confirm")
         logger.info("dispatch job=%s → task=%s confirmed", job_id, task_id)
 
-        # 4. Start execution (dispatch to tmux)
-        _api_call("POST", f"/api/tasks/{task_id}/start")
+        # 4. Start execution (writes task file + dispatches to tmux)
+        _api_call_checked("POST", f"/api/tasks/{task_id}/start", {}, step="start")
         logger.info("dispatch job=%s → task=%s started (dispatched to Claude Code)", job_id, task_id)
 
         db_update_status(job_id, "running")
 
     except Exception as e:
-        logger.error("dispatch job=%s failed: %s", job_id, e)
+        logger.error("dispatch job=%s failed at: %s", job_id, e)
         db_update_status(job_id, "failed")
 
 # --- Models ---
