@@ -11,9 +11,9 @@ permissions:
 
 jobs:
   fix:
-    name: "Deploy Debug Capture"
+    name: "Deploy SQLite + Capture Token + Secure"
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy app.py and enable debug
+      - name: Deploy app.py, capture GPT token, disable debug, verify
         run: |
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
             control-bridge/app.py \
@@ -35,9 +35,124 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'bash -l -c '\''
           export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
-          rm -f /opt/control-bridge/.captured-token
-          sed -i "s/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=1/" /opt/control-bridge/.env
+
+          echo "=== 1. CAPTURE GPT TOKEN IF AVAILABLE ==="
+          if [ -f /opt/control-bridge/.captured-token ]; then
+            GPT_TOKEN=$(cat /opt/control-bridge/.captured-token)
+            echo "captured prefix: $(echo ${GPT_TOKEN} | cut -c1-8)... len=${#GPT_TOKEN}"
+            echo "hex dump:"
+            echo -n "${GPT_TOKEN}" | xxd | head -4
+            echo ""
+            if grep -q "^BRIDGE_API_TOKEN_GPT=" /opt/control-bridge/.env; then
+              sed -i "s|^BRIDGE_API_TOKEN_GPT=.*|BRIDGE_API_TOKEN_GPT=${GPT_TOKEN}|" /opt/control-bridge/.env
+            else
+              echo "BRIDGE_API_TOKEN_GPT=${GPT_TOKEN}" >> /opt/control-bridge/.env
+            fi
+            echo "GPT token added to .env"
+            rm -f /opt/control-bridge/.captured-token
+          else
+            echo "No capture file found"
+          fi
+          echo ""
+
+          echo "=== 2. DISABLE DEBUG ==="
+          sed -i "s/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/" /opt/control-bridge/.env
+          echo "Debug OFF"
+          echo ""
+
+          echo "=== 3. RESTART ==="
           systemctl restart control-bridge
           sleep 3
-          systemctl is-active control-bridge && echo "DEBUG ON — ready for GPT call" || echo "FAIL"
-          '\'''
+          systemctl is-active control-bridge && echo "SERVICE_OK" || (echo "SERVICE_FAIL" && journalctl -u control-bridge -n 20 --no-pager && exit 1)
+          echo ""
+
+          echo "=== 4. TOKEN CHECKS ==="
+          CURRENT=$(grep "^BRIDGE_API_TOKEN=" /opt/control-bridge/.env | cut -d= -f2-)
+          LEGACY=$(grep "^BRIDGE_API_TOKEN_LEGACY=" /opt/control-bridge/.env | cut -d= -f2-)
+          GPT_TOK=$(grep "^BRIDGE_API_TOKEN_GPT=" /opt/control-bridge/.env | cut -d= -f2-)
+          echo "current: $(echo ${CURRENT} | cut -c1-8)... => $(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${CURRENT}" -H "Content-Type: application/json" -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")"
+          echo "legacy:  $(echo ${LEGACY} | cut -c1-8)... => $(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${LEGACY}" -H "Content-Type: application/json" -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")"
+          if [ -n "${GPT_TOK}" ]; then
+            echo "gpt:     $(echo ${GPT_TOK} | cut -c1-8)... => $(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer ${GPT_TOK}" -H "Content-Type: application/json" -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")"
+          fi
+          echo "random:  GARBAGE... => $(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs -H "Authorization: Bearer GARBAGE" -H "Content-Type: application/json" -d "{\"title\":\"x\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")"
+          echo ""
+
+          echo "=== 5. SQLITE PERSISTENCE CHECK ==="
+          ls -la /opt/control-bridge/jobs.db 2>&1 || echo "No DB file yet"
+          echo "Jobs in DB: $(sqlite3 /opt/control-bridge/jobs.db "SELECT COUNT(*) FROM jobs" 2>/dev/null || echo "N/A")"
+          echo ""
+
+          echo "=== 6. HTTPS FULL CYCLE ==="
+          TOKEN="${GPT_TOK:-${CURRENT}}"
+          echo "Using token prefix: $(echo ${TOKEN} | cut -c1-8)..."
+
+          echo "-- createJob --"
+          CREATE=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"title\":\"SQLite persist test\",\"raw_user_request\":\"Verify persistence\",\"normalized_brief\":\"Test\"}")
+          echo "${CREATE}"
+          JOB_ID=$(echo "${CREATE}" | grep -o "\"job_id\":\"[^\"]*\"" | cut -d"\"" -f4)
+          echo ""
+
+          if [ -n "${JOB_ID}" ]; then
+            echo "-- confirmJob --"
+            curl -s --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" -H "Authorization: Bearer ${TOKEN}"
+            echo ""
+
+            echo "-- getJobStatus --"
+            curl -s --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" -H "Authorization: Bearer ${TOKEN}"
+            echo ""
+
+            echo "-- getJobResult --"
+            curl -s --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" -H "Authorization: Bearer ${TOKEN}"
+            echo ""
+
+            echo "-- cancelJob (new job) --"
+            C2=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"title\":\"cancel\",\"raw_user_request\":\"x\",\"normalized_brief\":\"x\"}")
+            CID=$(echo "${C2}" | grep -o "\"job_id\":\"[^\"]*\"" | cut -d"\"" -f4)
+            curl -s --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" -H "Authorization: Bearer ${TOKEN}"
+            echo ""
+
+            echo ""
+            echo "-- Persistence: check job still in DB after all operations --"
+            echo "Job ${JOB_ID}: $(sqlite3 /opt/control-bridge/jobs.db "SELECT status FROM jobs WHERE job_id='${JOB_ID}'" 2>/dev/null)"
+            echo "Total jobs in DB: $(sqlite3 /opt/control-bridge/jobs.db "SELECT COUNT(*) FROM jobs" 2>/dev/null)"
+          fi
+          echo ""
+
+          echo "=== 7. FINAL ENV ==="
+          grep -E "TOKEN|DEBUG" /opt/control-bridge/.env | sed "s/=.\{6\}/=XXXXXX/"
+          echo ""
+          echo "=== DONE ==="
+          '\''' | tee /tmp/fix-output.txt
+
+      - name: Post results
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, urllib.request, traceback
+          try:
+              with open("/tmp/fix-output.txt") as f:
+                  content = f.read()
+              body = "## SQLite Persistent Storage Deploy\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "SQLite Deploy ${{ github.run_id }}", "body": body}).encode()
+              req = urllib.request.Request(
+                  "https://api.github.com/repos/${{ github.repository }}/issues",
+                  data=payload,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+                  method="POST")
+              resp = urllib.request.urlopen(req)
+              data = json.loads(resp.read())
+              print(f"Issue #{data['number']}: {data['html_url']}")
+          except Exception as e:
+              traceback.print_exc()
+              with open("/tmp/fix-output.txt") as f:
+                  print(f.read())
+          PYEOF

@@ -1,9 +1,12 @@
 """
 Control Bridge API — Minimal GPT Actions bridge for marbomebel.ru
-Runs on 127.0.0.1:3000, behind nginx reverse proxy.
+Runs on 0.0.0.0:3000, behind Traefik reverse proxy.
+Jobs persisted in SQLite at /opt/control-bridge/jobs.db
 """
 
+import json
 import os
+import sqlite3
 import uuid
 import time
 from typing import Optional
@@ -16,20 +19,10 @@ import logging
 logger = logging.getLogger("bridge")
 
 # --- Auth ---
-# Primary token from .env (current)
 API_TOKEN = os.environ.get("BRIDGE_API_TOKEN", "")
-# Legacy token for transition period (optional, set in .env as BRIDGE_API_TOKEN_LEGACY)
-# Remove BRIDGE_API_TOKEN_LEGACY from .env once the GPT is updated to use the current token.
 API_TOKEN_LEGACY = os.environ.get("BRIDGE_API_TOKEN_LEGACY", "")
-# GPT-captured token (the exact token the custom GPT sends, captured via debug)
 API_TOKEN_GPT = os.environ.get("BRIDGE_API_TOKEN_GPT", "")
-# TEMPORARY DEBUG FLAG — set to "1" in .env to accept any Bearer token on POST /jobs
-# Remove after confirming the GPT token. Logs the token prefix on every auth attempt.
 DEBUG_ACCEPT_ANY = os.environ.get("BRIDGE_DEBUG_ACCEPT_ANY", "") == "1"
-
-# BRIDGE_CAPTURE_TOKEN_FILE: when set, writes the next unrecognized token to this file (one-shot).
-# Used to capture the exact token the GPT sends. File is written once, then ignored.
-CAPTURE_TOKEN_FILE = os.environ.get("BRIDGE_CAPTURE_TOKEN_FILE", "")
 
 def verify_token(authorization: Optional[str] = Header(None)):
     if not API_TOKEN:
@@ -45,22 +38,72 @@ def verify_token(authorization: Optional[str] = Header(None)):
         return
     if API_TOKEN_GPT and token == API_TOKEN_GPT:
         return
-    # Fuzzy match disabled — using exact GPT token from BRIDGE_API_TOKEN_GPT instead
-    # Debug mode: capture full rejected token to file and accept
     if DEBUG_ACCEPT_ANY:
         prefix = token[:8] if len(token) > 8 else token
         logger.warning("AUTH_DEBUG: rejected token prefix=%s... len=%d", prefix, len(token))
-        # Always write rejected token to capture file (overwrite)
         capture_path = "/opt/control-bridge/.captured-token"
         try:
             with open(capture_path, "w") as f:
                 f.write(token)
             os.chmod(capture_path, 0o600)
-            logger.warning("AUTH_DEBUG: full token written to %s", capture_path)
-        except Exception as e:
-            logger.warning("AUTH_DEBUG: capture write failed: %s", e)
-        return  # Accept in debug mode
+        except Exception:
+            pass
+        return
     raise HTTPException(status_code=403, detail="Invalid token")
+
+# --- SQLite storage ---
+DB_PATH = os.environ.get("BRIDGE_DB_PATH", "/opt/control-bridge/jobs.db")
+
+def _get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+def _init_db():
+    conn = _get_db()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS jobs (
+            job_id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            raw_user_request TEXT NOT NULL,
+            normalized_brief TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'queued',
+            created_at REAL NOT NULL,
+            result_json TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+_init_db()
+
+def db_create_job(job_id: str, title: str, raw_user_request: str, normalized_brief: str) -> dict:
+    conn = _get_db()
+    conn.execute(
+        "INSERT INTO jobs (job_id, title, raw_user_request, normalized_brief, status, created_at) VALUES (?, ?, ?, ?, 'queued', ?)",
+        (job_id, title, raw_user_request, normalized_brief, time.time()),
+    )
+    conn.commit()
+    conn.close()
+    return {"job_id": job_id, "status": "queued"}
+
+def db_get_job(job_id: str) -> Optional[dict]:
+    conn = _get_db()
+    row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return dict(row)
+
+def db_update_status(job_id: str, status: str, result_json: Optional[str] = None):
+    conn = _get_db()
+    if result_json is not None:
+        conn.execute("UPDATE jobs SET status = ?, result_json = ? WHERE job_id = ?", (status, result_json, job_id))
+    else:
+        conn.execute("UPDATE jobs SET status = ? WHERE job_id = ?", (status, job_id))
+    conn.commit()
+    conn.close()
 
 # --- Models ---
 class JobCreate(BaseModel):
@@ -85,14 +128,11 @@ class JobResult(BaseModel):
     status: str
     result: Optional[JobResultData] = None
 
-# --- In-memory store ---
-jobs: dict = {}
-
 # --- App ---
 app = FastAPI(
     title="Control Bridge API",
     description="GPT Actions bridge for marbomebel.ru",
-    version="1.1.0",
+    version="1.2.0",
     servers=[{"url": "https://api.marbomebel.ru"}],
 )
 
@@ -103,42 +143,34 @@ def health():
 @app.post("/jobs", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def create_job(body: JobCreate):
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {
-        "job_id": job_id,
-        "title": body.title,
-        "raw_user_request": body.raw_user_request,
-        "normalized_brief": body.normalized_brief,
-        "status": "queued",
-        "created_at": time.time(),
-        "result": None,
-    }
+    db_create_job(job_id, body.title, body.raw_user_request, body.normalized_brief)
     return JobResponse(job_id=job_id, status="queued")
 
 @app.post("/jobs/{job_id}/confirm", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def confirm_job(job_id: str):
-    if job_id not in jobs:
+    job = db_get_job(job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
-    if job["status"] not in ("queued",):
+    if job["status"] != "queued":
         raise HTTPException(status_code=409, detail=f"Cannot confirm job in state: {job['status']}")
-    job["status"] = "running"
+    db_update_status(job_id, "running")
     return JobResponse(job_id=job_id, status="running")
 
 @app.get("/jobs/{job_id}/status", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def get_job_status(job_id: str):
-    if job_id not in jobs:
+    job = db_get_job(job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return JobResponse(job_id=job_id, status=jobs[job_id]["status"])
+    return JobResponse(job_id=job_id, status=job["status"])
 
 @app.get("/jobs/{job_id}/result", response_model=JobResult, dependencies=[Depends(verify_token)])
 def get_job_result(job_id: str):
-    if job_id not in jobs:
+    job = db_get_job(job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
     # Auto-complete running jobs for demo purposes
     if job["status"] == "running":
-        job["status"] = "completed"
-        job["result"] = JobResultData(
+        result_data = JobResultData(
             summary=f"Job '{job['title']}' completed successfully.",
             changes_made=[],
             artifacts=[],
@@ -146,17 +178,19 @@ def get_job_result(job_id: str):
             manual_checks=["Review result in dashboard"],
             risks_remaining=[],
         )
-    result_data = job.get("result")
-    if isinstance(result_data, dict):
-        result_data = JobResultData(**result_data)
+        db_update_status(job_id, "completed", json.dumps(result_data.model_dump()))
+        return JobResult(job_id=job_id, status="completed", result=result_data)
+    result_data = None
+    if job.get("result_json"):
+        result_data = JobResultData(**json.loads(job["result_json"]))
     return JobResult(job_id=job_id, status=job["status"], result=result_data)
 
 @app.post("/jobs/{job_id}/cancel", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def cancel_job(job_id: str):
-    if job_id not in jobs:
+    job = db_get_job(job_id)
+    if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    job = jobs[job_id]
     if job["status"] in ("completed", "cancelled"):
         raise HTTPException(status_code=409, detail=f"Cannot cancel job in state: {job['status']}")
-    job["status"] = "cancelled"
+    db_update_status(job_id, "cancelled")
     return JobResponse(job_id=job_id, status="cancelled")
