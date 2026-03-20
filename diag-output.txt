@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Fri Mar 20 03:31:51 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Fri Mar 20 03:34:29 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 1 day 15h ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 122.0M (max: 256.0M available: 133.9M peak: 124.7M)
-        CPU: 10.140s
+     Memory: 121.8M (max: 256.0M available: 134.1M peak: 124.7M)
+        CPU: 10.190s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -26,8 +26,8 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
      Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 1 day 15h ago
    Main PID: 1364558 (node)
       Tasks: 11 (limit: 32)
-     Memory: 30.3M (max: 128.0M available: 97.6M peak: 128.0M swap: 13.6M swap peak: 81.0M)
-        CPU: 8.101s
+     Memory: 30.4M (max: 128.0M available: 97.5M peak: 128.0M swap: 13.6M swap peak: 81.0M)
+        CPU: 8.106s
      CGroup: /system.slice/control-api.service
              └─1364558 /usr/bin/node server.js
 
@@ -132,7 +132,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Fri, 20 Mar 2026 03:31:51 GMT
+Date: Fri, 20 Mar 2026 03:34:29 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,7 +142,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-20T03:31:51.320Z"
+  "timestamp": "2026-03-20T03:34:29.953Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -209,7 +209,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Fri, 20 Mar 2026 03:31:51 GMT
+date: Fri, 20 Mar 2026 03:34:30 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
