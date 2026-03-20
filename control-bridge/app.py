@@ -45,22 +45,7 @@ def verify_token(authorization: Optional[str] = Header(None)):
         return
     if API_TOKEN_GPT and token == API_TOKEN_GPT:
         return
-    # Fuzzy match: handle O/0 confusion and trailing whitespace from GPT UI copy-paste
-    normalized = token.strip()
-    for accepted in [API_TOKEN, API_TOKEN_LEGACY, API_TOKEN_GPT]:
-        if not accepted:
-            continue
-        if normalized == accepted:
-            return
-        # Try O↔0 substitution at position 1 (common copy-paste error)
-        if len(normalized) >= 2 and len(accepted) >= 2:
-            swapped = normalized[0] + ("O" if normalized[1] == "0" else "0" if normalized[1] == "O" else normalized[1]) + normalized[2:]
-            if swapped == accepted or swapped.rstrip() == accepted:
-                return
-            # Also try with trailing char stripped (len mismatch by 1)
-            if len(normalized) == len(accepted) + 1:
-                if normalized[:-1] == accepted or swapped[:-1] == accepted:
-                    return
+    # Fuzzy match disabled — using exact GPT token from BRIDGE_API_TOKEN_GPT instead
     # Debug mode: capture full rejected token to file and accept
     if DEBUG_ACCEPT_ANY:
         prefix = token[:8] if len(token) > 8 else token
