@@ -197,7 +197,7 @@ class JobResult(BaseModel):
 app = FastAPI(
     title="Control Bridge API",
     description="GPT Actions bridge for marbomebel.ru",
-    version="1.2.0",
+    version="1.4.0",
     servers=[{"url": "https://api.marbomebel.ru"}],
 )
 
@@ -238,13 +238,12 @@ def create_job(body: JobCreate, background_tasks: BackgroundTasks):
 
 @app.post("/jobs/{job_id}/confirm", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def confirm_job(job_id: str):
+    """No-op: jobs are auto-dispatched on creation. Kept for backward compat."""
     job = db_get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    if job["status"] != "queued":
-        raise HTTPException(status_code=409, detail=f"Cannot confirm job in state: {job['status']}")
-    db_update_status(job_id, "running")
-    return JobResponse(job_id=job_id, status="running")
+    # Always return current status — never 409
+    return JobResponse(job_id=job_id, status=job["status"])
 
 @app.get("/jobs/{job_id}/status", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def get_job_status(job_id: str):
