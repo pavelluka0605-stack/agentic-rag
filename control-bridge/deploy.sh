@@ -51,6 +51,12 @@ else
     echo "To view: cat ${BRIDGE_DIR}/.env"
 fi
 
+# Ensure MEMORY_DB_PATH is set (shared memory with Claude Code MCP)
+if ! grep -q "MEMORY_DB_PATH=" "${BRIDGE_DIR}/.env" 2>/dev/null; then
+    echo "MEMORY_DB_PATH=/opt/claude-code/memory/memory.db" >> "${BRIDGE_DIR}/.env"
+    echo "Added MEMORY_DB_PATH to .env"
+fi
+
 # --- 5. systemd service ---
 echo ""
 echo "--- Step 5: Installing systemd service ---"

@@ -3,27 +3,32 @@ Control Bridge API — GPT Actions bridge for marbomebel.ru
 Runs on 0.0.0.0:3000, behind Traefik reverse proxy.
 Jobs persisted in SQLite. On createJob, dispatches to Control API
 (port 3901) which runs the full pipeline: interpret → confirm → start → Claude Code.
+
+Memory API — shared memory for GPT and Claude Code.
+Both read/write the same SQLite memory.db (6 layers + FTS5 search).
 """
 
 import json
 import os
+import re
 import sqlite3
 import uuid
 import time
 import threading
 import logging
+import hashlib
 import urllib.request
 import urllib.error
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, Query
 from pydantic import BaseModel
 
 logger = logging.getLogger("bridge")
 
 # --- Version / uptime ---
 _STARTED_AT = time.time()
-_VERSION = "1.4.1"
+_VERSION = "2.0.0"
 
 # --- Concurrency lock ---
 # Only one task can run at a time to prevent VPS resource exhaustion.
@@ -197,11 +202,99 @@ class JobResult(BaseModel):
     status: str
     result: Optional[JobResultData] = None
 
+# --- Memory DB (shared with Claude Code MCP) ---
+MEMORY_DB_PATH = os.environ.get("MEMORY_DB_PATH", "/opt/claude-code/memory/memory.db")
+
+def _get_mem_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(MEMORY_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+def _fts_query(text: str) -> str:
+    """Sanitize text for FTS5 MATCH (same logic as db.js)."""
+    terms = re.sub(r"[^\w\s]", " ", text or "").split()
+    quoted = [f'"{t}"' for t in terms if len(t) > 1]
+    return " OR ".join(quoted) if quoted else '""'
+
+def _fingerprint(text: str) -> str:
+    normalized = re.sub(r"\s+", " ", (text or "").lower()).strip() or "__empty__"
+    return hashlib.sha256(normalized.encode()).hexdigest()[:16]
+
+def _mem_search(query: str, tables: list[str] | None = None, project: str | None = None, limit: int = 10) -> list[dict]:
+    """FTS5 cross-layer search (same as MemoryDB.search in db.js)."""
+    fts_q = _fts_query(query)
+    all_tables = tables or ["incidents", "solutions", "decisions", "contexts", "policies", "episodes"]
+    results = []
+    conn = _get_mem_db()
+    for table in all_tables:
+        try:
+            if project:
+                sql = f"SELECT '{table}' as _type, t.*, fts.rank FROM {table}_fts fts JOIN {table} t ON t.id = fts.rowid WHERE {table}_fts MATCH ? AND t.project = ? ORDER BY fts.rank LIMIT ?"
+                rows = conn.execute(sql, (fts_q, project, limit)).fetchall()
+            else:
+                sql = f"SELECT '{table}' as _type, t.*, fts.rank FROM {table}_fts fts JOIN {table} t ON t.id = fts.rowid WHERE {table}_fts MATCH ? ORDER BY fts.rank LIMIT ?"
+                rows = conn.execute(sql, (fts_q, limit)).fetchall()
+            results.extend(dict(r) for r in rows)
+        except Exception:
+            pass
+    conn.close()
+    results.sort(key=lambda x: x.get("rank", 0))
+    return results[:limit]
+
+def _mem_bootstrap(project: str | None = None) -> dict:
+    """Load session bootstrap context (same as MemoryDB.getBootstrapContext)."""
+    conn = _get_mem_db()
+    ctx = {}
+    try:
+        # Active policies
+        if project:
+            ctx["policies"] = [dict(r) for r in conn.execute("SELECT * FROM policies WHERE active = 1 AND project = ? ORDER BY created_at DESC", (project,)).fetchall()]
+        else:
+            ctx["policies"] = [dict(r) for r in conn.execute("SELECT * FROM policies WHERE active = 1 ORDER BY created_at DESC").fetchall()]
+        # Recent sessions
+        ctx["recent_sessions"] = [dict(r) for r in conn.execute("SELECT * FROM episodes ORDER BY created_at DESC LIMIT 3").fetchall()]
+        # Open incidents
+        ctx["open_incidents"] = [dict(r) for r in conn.execute("SELECT * FROM incidents WHERE status = 'open' ORDER BY updated_at DESC LIMIT 5").fetchall()]
+        # Top verified solutions
+        ctx["top_solutions"] = [dict(r) for r in conn.execute("SELECT * FROM solutions WHERE verified = 1 ORDER BY usefulness_score DESC, use_count DESC LIMIT 5").fetchall()]
+        # Recent decisions
+        ctx["recent_decisions"] = [dict(r) for r in conn.execute("SELECT * FROM decisions ORDER BY created_at DESC LIMIT 5").fetchall()]
+        # Stats
+        stats = {}
+        for t in ["policies", "episodes", "incidents", "solutions", "decisions", "contexts"]:
+            try:
+                stats[t] = conn.execute(f"SELECT COUNT(*) as c FROM {t}").fetchone()["c"]
+            except Exception:
+                stats[t] = 0
+        stats["open_incidents"] = conn.execute("SELECT COUNT(*) as c FROM incidents WHERE status = 'open'").fetchone()["c"]
+        stats["verified_solutions"] = conn.execute("SELECT COUNT(*) as c FROM solutions WHERE verified = 1").fetchone()["c"]
+        ctx["stats"] = stats
+    finally:
+        conn.close()
+    return ctx
+
+def _mem_stats() -> dict:
+    conn = _get_mem_db()
+    stats = {}
+    for t in ["policies", "episodes", "incidents", "solutions", "decisions", "contexts", "github_events"]:
+        try:
+            stats[t] = conn.execute(f"SELECT COUNT(*) as c FROM {t}").fetchone()["c"]
+        except Exception:
+            stats[t] = 0
+    try:
+        stats["open_incidents"] = conn.execute("SELECT COUNT(*) as c FROM incidents WHERE status = 'open'").fetchone()["c"]
+        stats["verified_solutions"] = conn.execute("SELECT COUNT(*) as c FROM solutions WHERE verified = 1").fetchone()["c"]
+    except Exception:
+        pass
+    conn.close()
+    return stats
+
 # --- App ---
 app = FastAPI(
     title="Control Bridge API",
-    description="GPT Actions bridge for marbomebel.ru",
-    version="1.4.0",
+    description="GPT Actions bridge + shared memory for marbomebel.ru",
+    version="2.0.0",
     servers=[{"url": "https://api.marbomebel.ru"}],
 )
 
@@ -285,3 +378,224 @@ def cancel_job(job_id: str):
         raise HTTPException(status_code=409, detail=f"Cannot cancel job in state: {job['status']}")
     db_update_status(job_id, "cancelled")
     return JobResponse(job_id=job_id, status="cancelled")
+
+
+# =============================================================================
+# MEMORY API — shared memory for GPT and Claude Code
+# =============================================================================
+
+@app.get("/memory/search", dependencies=[Depends(verify_token)])
+def memory_search(
+    q: str = Query(..., description="Search query"),
+    tables: Optional[str] = Query(None, description="Comma-separated: incidents,solutions,decisions,contexts,policies,episodes"),
+    project: Optional[str] = Query(None),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """FTS5 full-text search across all memory layers. Returns ranked results."""
+    tbl_list = [t.strip() for t in tables.split(",")] if tables else None
+    return _mem_search(q, tables=tbl_list, project=project, limit=limit)
+
+@app.get("/memory/bootstrap", dependencies=[Depends(verify_token)])
+def memory_bootstrap(project: Optional[str] = Query(None)):
+    """Load full session context: policies, recent sessions, open incidents, top solutions, decisions, stats.
+    Call this at the START of every task to get project context."""
+    return _mem_bootstrap(project)
+
+@app.get("/memory/stats", dependencies=[Depends(verify_token)])
+def memory_stats():
+    """Get counts for all memory layers."""
+    return _mem_stats()
+
+@app.get("/memory/incidents", dependencies=[Depends(verify_token)])
+def memory_incidents(
+    status: Optional[str] = Query(None, description="open, investigating, fixed, wontfix, duplicate"),
+    project: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """List incidents (errors and their fixes)."""
+    conn = _get_mem_db()
+    sql = "SELECT * FROM incidents WHERE 1=1"
+    params: list = []
+    if status:
+        sql += " AND status = ?"
+        params.append(status)
+    if project:
+        sql += " AND project = ?"
+        params.append(project)
+    sql += " ORDER BY updated_at DESC LIMIT ?"
+    params.append(limit)
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+@app.get("/memory/solutions", dependencies=[Depends(verify_token)])
+def memory_solutions(
+    verified: Optional[bool] = Query(None),
+    project: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """List proven solutions and patterns."""
+    conn = _get_mem_db()
+    sql = "SELECT * FROM solutions WHERE 1=1"
+    params: list = []
+    if verified is not None:
+        sql += " AND verified = ?"
+        params.append(1 if verified else 0)
+    if project:
+        sql += " AND project = ?"
+        params.append(project)
+    sql += " ORDER BY usefulness_score DESC, use_count DESC, created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+@app.get("/memory/decisions", dependencies=[Depends(verify_token)])
+def memory_decisions(
+    project: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """List architectural decisions."""
+    conn = _get_mem_db()
+    sql = "SELECT * FROM decisions WHERE 1=1"
+    params: list = []
+    if project:
+        sql += " AND project = ?"
+        params.append(project)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+@app.get("/memory/policies", dependencies=[Depends(verify_token)])
+def memory_policies(
+    project: Optional[str] = Query(None),
+    category: Optional[str] = Query(None, description="rule, constraint, convention, limitation"),
+):
+    """List active project rules and constraints."""
+    conn = _get_mem_db()
+    sql = "SELECT * FROM policies WHERE active = 1"
+    params: list = []
+    if project:
+        sql += " AND project = ?"
+        params.append(project)
+    if category:
+        sql += " AND category = ?"
+        params.append(category)
+    sql += " ORDER BY created_at DESC"
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+@app.get("/memory/episodes", dependencies=[Depends(verify_token)])
+def memory_episodes(
+    project: Optional[str] = Query(None),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """List recent work sessions."""
+    conn = _get_mem_db()
+    sql = "SELECT * FROM episodes WHERE 1=1"
+    params: list = []
+    if project:
+        sql += " AND project = ?"
+        params.append(project)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+@app.get("/memory/contexts", dependencies=[Depends(verify_token)])
+def memory_contexts(
+    category: Optional[str] = Query(None, description="code, infra, docs, deployment, summary, config, api"),
+    project: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+):
+    """List saved code/infra/deployment contexts."""
+    conn = _get_mem_db()
+    sql = "SELECT * FROM contexts WHERE 1=1"
+    params: list = []
+    if category:
+        sql += " AND category = ?"
+        params.append(category)
+    if project:
+        sql += " AND project = ?"
+        params.append(project)
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+# --- Memory write endpoints (GPT can also record findings) ---
+
+class IncidentCreate(BaseModel):
+    error_message: str
+    context: str = ""
+    probable_cause: str = ""
+    project: str = ""
+    service: str = ""
+
+@app.post("/memory/incidents", dependencies=[Depends(verify_token)])
+def memory_add_incident(body: IncidentCreate):
+    """Record a new error/incident. Auto-deduplicates by fingerprint."""
+    conn = _get_mem_db()
+    fp = _fingerprint(body.error_message)
+    existing = conn.execute("SELECT * FROM incidents WHERE fingerprint = ? AND status != 'duplicate'", (fp,)).fetchone()
+    if existing:
+        conn.execute("UPDATE incidents SET occurrence_count = occurrence_count + 1, updated_at = datetime('now') WHERE id = ?", (existing["id"],))
+        conn.commit()
+        result = dict(conn.execute("SELECT * FROM incidents WHERE id = ?", (existing["id"],)).fetchone())
+        result["deduplicated"] = True
+        conn.close()
+        return result
+    conn.execute(
+        "INSERT INTO incidents (project, service, fingerprint, error_message, context, probable_cause) VALUES (?, ?, ?, ?, ?, ?)",
+        (body.project or None, body.service or None, fp, body.error_message, body.context or None, body.probable_cause or None),
+    )
+    conn.commit()
+    row = dict(conn.execute("SELECT * FROM incidents WHERE fingerprint = ?", (fp,)).fetchone())
+    conn.close()
+    return row
+
+class SolutionCreate(BaseModel):
+    title: str
+    description: str
+    code: str = ""
+    tags: str = ""
+    project: str = ""
+    verified: bool = False
+
+@app.post("/memory/solutions", dependencies=[Depends(verify_token)])
+def memory_add_solution(body: SolutionCreate):
+    """Record a working solution or pattern."""
+    conn = _get_mem_db()
+    conn.execute(
+        "INSERT INTO solutions (project, title, description, code, tags, verified) VALUES (?, ?, ?, ?, ?, ?)",
+        (body.project or None, body.title, body.description, body.code or None, body.tags or None, 1 if body.verified else 0),
+    )
+    conn.commit()
+    row = dict(conn.execute("SELECT * FROM solutions ORDER BY id DESC LIMIT 1").fetchone())
+    conn.close()
+    return row
+
+class EpisodeCreate(BaseModel):
+    summary: str
+    what_done: str = ""
+    where_stopped: str = ""
+    what_remains: str = ""
+    project: str = ""
+
+@app.post("/memory/episodes", dependencies=[Depends(verify_token)])
+def memory_add_episode(body: EpisodeCreate):
+    """Record a session summary."""
+    conn = _get_mem_db()
+    conn.execute(
+        "INSERT INTO episodes (project, summary, what_done, where_stopped, what_remains) VALUES (?, ?, ?, ?, ?)",
+        (body.project or None, body.summary, body.what_done or None, body.where_stopped or None, body.what_remains or None),
+    )
+    conn.commit()
+    row = dict(conn.execute("SELECT * FROM episodes ORDER BY id DESC LIMIT 1").fetchone())
+    conn.close()
+    return row
