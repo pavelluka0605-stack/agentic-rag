@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Fri Mar 20 07:35:36 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Fri Mar 20 07:37:58 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 1 day 19h ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 123.0M (max: 256.0M available: 133.0M peak: 124.7M)
-        CPU: 10.760s
+     Memory: 122.7M (max: 256.0M available: 133.2M peak: 124.7M)
+        CPU: 10.788s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -25,11 +25,17 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
      Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 1 day 19h ago
    Main PID: 1364558 (node)
-      Tasks: 11 (limit: 32)
-     Memory: 16.7M (max: 128.0M available: 111.2M peak: 128.0M swap: 29.5M swap peak: 97.6M)
-        CPU: 13.094s
+      Tasks: 27 (limit: 32)
+     Memory: 111.5M (max: 128.0M available: 16.4M peak: 128.0M swap: 80.6M swap peak: 97.6M)
+        CPU: 16.364s
      CGroup: /system.slice/control-api.service
-             └─1364558 /usr/bin/node server.js
+             ├─1364558 /usr/bin/node server.js
+             ├─1709294 /bin/sh -c "bash \"/opt/claude-code/bin/exec-task.sh\" 107 \"/opt/claude-code/workspace/task-107.md\" >> \"/opt/claude-code/logs/exec-task-107.log\" 2>&1"
+             ├─1709295 bash /opt/claude-code/bin/exec-task.sh 107 /opt/claude-code/workspace/task-107.md
+             ├─1709324 bash /opt/claude-code/bin/exec-task.sh 107 /opt/claude-code/workspace/task-107.md
+             ├─1709326 timeout 600 claude -p "You are executing a task from the dashboard task pipeline.\n\nTASK FILE CONTENTS:\n# Task #107: Тестирование пайплайна GPT -> Claude Code\n\n## Objective\nПроверить работоспособность пайплайна между моделями GPT и Claude Code.\n\n## Scope\n- Интерфейс пайплайна\n- Логика обработки данных\n- Вывод результатов\n\n## Steps\n1. Выбрать вариант тестирования\n2. Подготовить тестовые запросы\n3. Запустить тестирование\n4. Собрать и проанализировать результаты\n\n## Constraints\n- Необходимо обеспечить совместимость форматов данных между моделями\n- Тест должен быть выполнен в заданные сроки\n\n## Acceptance Criteria\n- Успешная передача данных между моделями\n- Корректный вывод результатов от обеих моделей\n\n## Mode: safe\n\n---\nReport progress via: POST /api/tasks/107/progress { \"message_ru\": \"...\", \"pct\": N }\nComplete via: POST /api/tasks/107/complete { \"result_summary_ru\": \"...\", \"result_detail\": \"...\" }\nFail via: POST /api/tasks/107/fail { \"error\": \"...\" }\n\nIMPORTANT INSTRUCTIONS:\n1. Execute the task described above\n2. Work in the /opt/claude-code/workspace directory\n3. Be thorough but concise\n4. When done, output a clear summary of what was accomplished\n\nDo NOT call any API endpoints — just do the work and output results."
+             ├─1709327 claude
+             └─1710059 sleep 30
 
 Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
@@ -133,7 +139,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Fri, 20 Mar 2026 07:35:37 GMT
+Date: Fri, 20 Mar 2026 07:37:58 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -143,7 +149,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-20T07:35:37.146Z"
+  "timestamp": "2026-03-20T07:37:58.361Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -154,7 +160,7 @@ Keep-Alive: timeout=5
 total 16
 drwxr-xr-x 2 root root 4096 Mar 19 17:46 .
 drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root  716 Mar 20 07:02 api-bridge.yml
+-rw-r--r-- 1 root root  716 Mar 20 07:36 api-bridge.yml
 -rw-r--r-- 1 root root  671 Mar 18 11:57 dashboard.yml
 --- dashboard.yml ---
 ## Traefik dynamic config — Task Dashboard
@@ -210,7 +216,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Fri, 20 Mar 2026 07:35:37 GMT
+date: Fri, 20 Mar 2026 07:37:58 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
