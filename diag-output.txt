@@ -1,15 +1,15 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Fri Mar 20 08:50:57 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Fri Mar 20 15:56:35 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
 ● dashboard.service - Claude Code Task Dashboard (Next.js)
      Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
-     Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 1 day 20h ago
+     Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 2 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 123.2M (max: 256.0M available: 132.7M peak: 124.7M)
-        CPU: 10.945s
+     Memory: 136.9M (max: 256.0M available: 119.0M peak: 137.4M)
+        CPU: 16.253s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -23,19 +23,13 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 1 day 20h ago
+     Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 2 days ago
    Main PID: 1364558 (node)
-      Tasks: 27 (limit: 32)
-     Memory: 121.7M (max: 128.0M available: 6.2M peak: 128.0M swap: 76.8M swap peak: 97.6M)
-        CPU: 25.039s
+      Tasks: 11 (limit: 32)
+     Memory: 32.9M (max: 128.0M available: 95.0M peak: 128.0M swap: 16.9M swap peak: 97.6M)
+        CPU: 26.129s
      CGroup: /system.slice/control-api.service
-             ├─1364558 /usr/bin/node server.js
-             ├─1720656 /bin/sh -c "bash \"/opt/claude-code/bin/exec-task.sh\" 113 \"/opt/claude-code/workspace/task-113.md\" >> \"/opt/claude-code/logs/exec-task-113.log\" 2>&1"
-             ├─1720657 bash /opt/claude-code/bin/exec-task.sh 113 /opt/claude-code/workspace/task-113.md
-             ├─1720686 bash /opt/claude-code/bin/exec-task.sh 113 /opt/claude-code/workspace/task-113.md
-             ├─1720688 timeout 600 claude -p "You are executing a task from the dashboard task pipeline.\n\nTASK FILE CONTENTS:\n# Task #113: Тестирование пайплайна GPT -> Claude Code\n\n## Objective\nПроверить корректность работы пайплайна, взаимодействующего между моделями GPT и Claude Code.\n\n## Scope\n- Системы обработки данных\n- Интерфейсы API\n- Логирование результатов\n\n## Steps\n1. Подготовить тестовые данные\n2. Запустить тестирование пайплайна\n3. Анализировать результаты\n\n## Constraints\n- Необходимо обеспечить совместимость форматов данных между моделями\n- Тестирование должно быть завершено в течение одного рабочего дня\n\n## Acceptance Criteria\n- Пайплайн успешно обрабатывает тестовые данные\n- Результаты тестирования соответствуют ожидаемым\n\n## Mode: safe\n\n---\nReport progress via: POST /api/tasks/113/progress { \"message_ru\": \"...\", \"pct\": N }\nComplete via: POST /api/tasks/113/complete { \"result_summary_ru\": \"...\", \"result_detail\": \"...\" }\nFail via: POST /api/tasks/113/fail { \"error\": \"...\" }\n\nIMPORTANT INSTRUCTIONS:\n1. Execute the task described above\n2. Work in the /opt/claude-code/workspace directory\n3. Be thorough but concise\n4. When done, output a clear summary of what was accomplished\n\nDo NOT call any API endpoints — just do the work and output results."
-             ├─1720689 claude
-             └─1722270 sleep 30
+             └─1364558 /usr/bin/node server.js
 
 Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
@@ -140,7 +134,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Fri, 20 Mar 2026 08:50:57 GMT
+Date: Fri, 20 Mar 2026 15:56:35 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -150,7 +144,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-20T08:50:57.935Z"
+  "timestamp": "2026-03-20T15:56:36.038Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -202,7 +196,7 @@ drwxr-xr-x 8 root root 4096 Mar 19 17:46 ..
 NAMES                    STATUS                 PORTS
 mebelit-wp-wordpress-1   Up 5 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
 mebelit-wp-db-1          Up 5 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
-n8n-traefik-traefik-1    Up 6 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+n8n-traefik-traefik-1    Up 7 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
 n8n-postgres-1           Up 11 days             5432/tcp
 n8n-voice-app-1          Up 11 days             80/tcp
 n8n-n8n-1                Up 10 days             5678/tcp
@@ -217,7 +211,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Fri, 20 Mar 2026 08:50:58 GMT
+date: Fri, 20 Mar 2026 15:56:36 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
