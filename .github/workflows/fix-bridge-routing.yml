@@ -3,7 +3,7 @@ name: "Fix Bridge Routing (Traefik)"
 on:
   push:
     branches: ["claude/*"]
-    paths: [".github/workflows/fix-bridge-routing.yml"]
+    paths: [".github/workflows/fix-bridge-routing.yml", "control-bridge/app.py"]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   fix:
-    name: "Capture and Secure"
+    name: "Capture Full Token and Secure"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -25,7 +25,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Capture GPT token, add it, disable debug, verify
+      - name: Deploy capture app, enable debug+capture, wait, collect, secure
         run: |
           SCP="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
           SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
@@ -33,107 +33,132 @@ jobs:
           $SCP control-bridge/app.py \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/control-bridge/app.py
 
-          $SSH << 'SECURE' | tee /tmp/fix-output.txt
-          echo "=== 1. CAPTURE GPT TOKEN FROM LOGS ==="
-          # Find all AUTH_DEBUG entries showing tokens that were NOT from our own tests
-          journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG.*received" | grep -v "TOTALLY_\|ANY_TOK\|SHOULD_" | tail -10
-          echo ""
+          # Step 1: Enable debug + capture, restart
+          $SSH << 'ENABLE'
+          rm -f /opt/control-bridge/.captured-token
+          # Set debug accept + capture file
+          sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=1/' /opt/control-bridge/.env 2>/dev/null
+          grep -q BRIDGE_DEBUG_ACCEPT_ANY /opt/control-bridge/.env || echo 'BRIDGE_DEBUG_ACCEPT_ANY=1' >> /opt/control-bridge/.env
+          grep -q BRIDGE_CAPTURE_TOKEN_FILE /opt/control-bridge/.env && \
+            sed -i 's|^BRIDGE_CAPTURE_TOKEN_FILE=.*|BRIDGE_CAPTURE_TOKEN_FILE=/opt/control-bridge/.captured-token|' /opt/control-bridge/.env || \
+            echo 'BRIDGE_CAPTURE_TOKEN_FILE=/opt/control-bridge/.captured-token' >> /opt/control-bridge/.env
 
-          # Extract the actual GPT token (the one used for the successful job b2d468d2)
-          echo "=== 2. FIND TOKEN USED FOR JOB b2d468d2 ==="
-          # Get all AUTH_DEBUG lines around the time of that job
-          journalctl -u control-bridge --no-pager 2>&1 | grep -A2 -B2 "b2d468d2" | head -10
-          echo ""
+          systemctl restart control-bridge
+          sleep 3
+          systemctl is-active control-bridge && echo "DEBUG+CAPTURE ENABLED" || echo "SERVICE_FAIL"
+          ENABLE
 
-          # Get ALL auth debug entries to find the GPT's token prefix
-          echo "=== 3. ALL AUTH_DEBUG ENTRIES ==="
-          journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG" | tail -20
-          echo ""
+      - name: Wait 120s for GPT request
+        run: |
+          echo "DEBUG+CAPTURE mode is LIVE. Waiting 120s for GPT to call..."
+          echo "If you see this in the workflow log, trigger createJob from GPT now."
+          sleep 120
 
-          # Extract the unique token prefixes seen (excluding test tokens)
-          echo "=== 4. UNIQUE TOKEN PREFIXES ==="
-          journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG.*received" | \
-            grep -oP 'prefix=\K[^ ]+' | sort -u
-          echo ""
+      - name: Collect captured token, add to env, disable debug, verify
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'SECURE' | tee /tmp/fix-output.txt
+          echo "=== 1. CHECK CAPTURED TOKEN ==="
+          if [ -f /opt/control-bridge/.captured-token ]; then
+            GPT_TOKEN=$(cat /opt/control-bridge/.captured-token)
+            echo "CAPTURED: prefix=$(echo ${GPT_TOKEN} | cut -c1-8)... len=${#GPT_TOKEN}"
 
-          echo "=== 5. CURRENT ENV TOKENS ==="
-          CURRENT=$(grep '^BRIDGE_API_TOKEN=' /opt/control-bridge/.env | cut -d= -f2-)
-          LEGACY=$(grep '^BRIDGE_API_TOKEN_LEGACY=' /opt/control-bridge/.env | cut -d= -f2-)
-          echo "current: $(echo ${CURRENT} | cut -c1-8)..."
-          echo "legacy:  $(echo ${LEGACY} | cut -c1-8)..."
-          echo ""
-
-          # Now figure out which prefix is the GPT's actual token
-          # It should be one that's NOT TOTALLY_ or ANY_TOKEN or SHOULD_ and NOT matching current/legacy
-          GPT_PREFIX=$(journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG.*received" | \
-            grep -v "TOTALLY_\|ANY_TOK\|SHOULD_" | grep -oP 'prefix=\K[^ .]+' | sort -u | head -1)
-          echo "GPT token prefix candidate: ${GPT_PREFIX}"
-          echo ""
-
-          # Get the full token from the log (it only logs 8 chars + len)
-          GPT_LEN=$(journalctl -u control-bridge --no-pager 2>&1 | grep "AUTH_DEBUG.*received.*${GPT_PREFIX}" | \
-            grep -oP 'len=\K[0-9]+' | head -1)
-          echo "GPT token length: ${GPT_LEN}"
-          echo ""
-
-          echo "=== 6. DISABLE DEBUG MODE ==="
-          sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/' /opt/control-bridge/.env
-          echo "Debug flag set to 0"
-
-          # If the GPT token matches current or legacy, no changes needed
-          CURRENT_PREFIX=$(echo ${CURRENT} | cut -c1-8)
-          LEGACY_PREFIX=$(echo ${LEGACY} | cut -c1-8)
-
-          if [ "${GPT_PREFIX}" = "${CURRENT_PREFIX}" ]; then
-            echo "GPT uses CURRENT token — no changes needed"
-          elif [ "${GPT_PREFIX}" = "${LEGACY_PREFIX}" ]; then
-            echo "GPT uses LEGACY token — no changes needed"
-          elif [ -n "${GPT_PREFIX}" ]; then
-            echo "GPT uses UNKNOWN token (prefix=${GPT_PREFIX}). Cannot add partial token."
-            echo "Will need to find the full token value."
+            echo ""
+            echo "=== 2. ADD AS BRIDGE_API_TOKEN_GPT ==="
+            # Add the GPT's actual token as a third accepted token
+            grep -q BRIDGE_API_TOKEN_GPT /opt/control-bridge/.env && \
+              sed -i "s|^BRIDGE_API_TOKEN_GPT=.*|BRIDGE_API_TOKEN_GPT=${GPT_TOKEN}|" /opt/control-bridge/.env || \
+              echo "BRIDGE_API_TOKEN_GPT=${GPT_TOKEN}" >> /opt/control-bridge/.env
+            echo "GPT token added to .env"
           else
-            echo "No GPT token prefix found in logs"
+            echo "NO CAPTURED TOKEN FILE — GPT did not call during window"
+            echo "Check journalctl for any requests:"
+            journalctl -u control-bridge -n 20 --no-pager 2>&1 | grep -E "POST|AUTH" | tail -10
           fi
           echo ""
 
-          echo "=== 7. RESTART WITH DEBUG OFF ==="
+          echo "=== 3. DISABLE DEBUG + CAPTURE ==="
+          sed -i 's/^BRIDGE_DEBUG_ACCEPT_ANY=.*/BRIDGE_DEBUG_ACCEPT_ANY=0/' /opt/control-bridge/.env
+          sed -i 's|^BRIDGE_CAPTURE_TOKEN_FILE=.*|BRIDGE_CAPTURE_TOKEN_FILE=|' /opt/control-bridge/.env
+          rm -f /opt/control-bridge/.captured-token
+          echo "Debug disabled, capture file removed"
+          echo ""
+
+          echo "=== 4. RESTART SECURE ==="
           systemctl restart control-bridge
           sleep 3
-          systemctl is-active control-bridge && echo "SERVICE_OK (debug OFF)" || echo "SERVICE_FAIL"
+          systemctl is-active control-bridge && echo "SERVICE_OK (secure)" || echo "SERVICE_FAIL"
           echo ""
 
-          echo "=== 8. VERIFY SECURE MODE ==="
-          echo "-- current token works --"
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ${CURRENT}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"secure test","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -4
+          echo "=== 5. VERIFY ALL THREE TOKENS ==="
+          CURRENT=$(grep '^BRIDGE_API_TOKEN=' /opt/control-bridge/.env | cut -d= -f2-)
+          LEGACY=$(grep '^BRIDGE_API_TOKEN_LEGACY=' /opt/control-bridge/.env | cut -d= -f2-)
+          GPT_TOK=$(grep '^BRIDGE_API_TOKEN_GPT=' /opt/control-bridge/.env | cut -d= -f2-)
+
+          echo "current: $(echo ${CURRENT} | cut -c1-8)..."
+          echo "legacy:  $(echo ${LEGACY} | cut -c1-8)..."
+          echo "gpt:     $(echo ${GPT_TOK} | cut -c1-8)..."
           echo ""
 
-          echo "-- legacy token works --"
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer ${LEGACY}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"secure test","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -4
+          for LABEL_TOK in "current:${CURRENT}" "legacy:${LEGACY}" "gpt:${GPT_TOK}"; do
+            LABEL=$(echo ${LABEL_TOK} | cut -d: -f1)
+            TOK=$(echo ${LABEL_TOK} | cut -d: -f2-)
+            if [ -n "${TOK}" ]; then
+              CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:3000/jobs \
+                -H "Authorization: Bearer ${TOK}" \
+                -H "Content-Type: application/json" \
+                -d '{"title":"verify","raw_user_request":"x","normalized_brief":"x"}')
+              echo "${LABEL}: HTTP ${CODE}"
+            fi
+          done
+
+          echo "random: $(curl -s -o /dev/null -w 'HTTP %{http_code}' -X POST http://127.0.0.1:3000/jobs \
+            -H 'Authorization: Bearer GARBAGE' \
+            -H 'Content-Type: application/json' \
+            -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}')"
           echo ""
 
-          echo "-- random token rejected --"
-          curl -si -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer RANDOM_GARBAGE" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -4
-          echo ""
+          echo "=== 6. HTTPS FULL CYCLE WITH GPT TOKEN ==="
+          if [ -n "${GPT_TOK}" ]; then
+            echo "-- createJob --"
+            CREATE=$(curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+              -H "Authorization: Bearer ${GPT_TOK}" \
+              -H "Content-Type: application/json" \
+              -d '{"title":"GPT token secure test","raw_user_request":"Final verification","normalized_brief":"Secure"}' 2>&1)
+            echo "${CREATE}"
+            JOB_ID=$(echo "${CREATE}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+            echo ""
 
-          echo "=== 9. HTTPS VERIFY ==="
-          curl -si --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
-            -H "Authorization: Bearer ${CURRENT}" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"HTTPS secure","raw_user_request":"x","normalized_brief":"x"}' 2>&1 | head -6
-          echo ""
+            if [ -n "${JOB_ID}" ]; then
+              echo "-- confirmJob --"
+              curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${JOB_ID}/confirm" \
+                -H "Authorization: Bearer ${GPT_TOK}" 2>&1
+              echo ""
 
-          echo "=== 10. FINAL ENV STATE ==="
-          grep -v "=" /opt/control-bridge/.env 2>/dev/null || true
-          grep "TOKEN\|DEBUG" /opt/control-bridge/.env | sed 's/=.\{8\}/=XXXXXXXX/'
+              echo "-- getJobStatus --"
+              curl -si --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/status" \
+                -H "Authorization: Bearer ${GPT_TOK}" 2>&1
+              echo ""
+
+              echo "-- getJobResult --"
+              curl -si --connect-timeout 10 "https://api.marbomebel.ru/jobs/${JOB_ID}/result" \
+                -H "Authorization: Bearer ${GPT_TOK}" 2>&1
+              echo ""
+
+              echo "-- cancelJob --"
+              C2=$(curl -s --connect-timeout 10 -X POST https://api.marbomebel.ru/jobs \
+                -H "Authorization: Bearer ${GPT_TOK}" \
+                -H "Content-Type: application/json" \
+                -d '{"title":"cancel","raw_user_request":"x","normalized_brief":"x"}')
+              CID=$(echo "${C2}" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+              curl -si --connect-timeout 10 -X POST "https://api.marbomebel.ru/jobs/${CID}/cancel" \
+                -H "Authorization: Bearer ${GPT_TOK}" 2>&1
+              echo ""
+            fi
+          fi
+
+          echo "=== 7. FINAL ENV STATE ==="
+          grep "TOKEN\|DEBUG\|CAPTURE" /opt/control-bridge/.env | sed 's/=.\{6\}/=XXXXXX/'
           echo ""
 
           echo "=== DONE ==="
@@ -150,7 +175,7 @@ jobs:
               with open("/tmp/fix-output.txt") as f:
                   content = f.read()
               body = "## Final Secure State\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
-              payload = json.dumps({"title": "Final Secure State ${{ github.run_id }}", "body": body}).encode()
+              payload = json.dumps({"title": "Final Secure ${{ github.run_id }}", "body": body}).encode()
               req = urllib.request.Request(
                   "https://api.github.com/repos/${{ github.repository }}/issues",
                   data=payload,

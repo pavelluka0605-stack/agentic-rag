@@ -21,9 +21,15 @@ API_TOKEN = os.environ.get("BRIDGE_API_TOKEN", "")
 # Legacy token for transition period (optional, set in .env as BRIDGE_API_TOKEN_LEGACY)
 # Remove BRIDGE_API_TOKEN_LEGACY from .env once the GPT is updated to use the current token.
 API_TOKEN_LEGACY = os.environ.get("BRIDGE_API_TOKEN_LEGACY", "")
+# GPT-captured token (the exact token the custom GPT sends, captured via debug)
+API_TOKEN_GPT = os.environ.get("BRIDGE_API_TOKEN_GPT", "")
 # TEMPORARY DEBUG FLAG — set to "1" in .env to accept any Bearer token on POST /jobs
 # Remove after confirming the GPT token. Logs the token prefix on every auth attempt.
 DEBUG_ACCEPT_ANY = os.environ.get("BRIDGE_DEBUG_ACCEPT_ANY", "") == "1"
+
+# BRIDGE_CAPTURE_TOKEN_FILE: when set, writes the next unrecognized token to this file (one-shot).
+# Used to capture the exact token the GPT sends. File is written once, then ignored.
+CAPTURE_TOKEN_FILE = os.environ.get("BRIDGE_CAPTURE_TOKEN_FILE", "")
 
 def verify_token(authorization: Optional[str] = Header(None)):
     if not API_TOKEN:
@@ -41,6 +47,17 @@ def verify_token(authorization: Optional[str] = Header(None)):
         return
     if API_TOKEN_LEGACY and token == API_TOKEN_LEGACY:
         return
+    if API_TOKEN_GPT and token == API_TOKEN_GPT:
+        return
+    # One-shot capture: write unrecognized token to file for recovery
+    if CAPTURE_TOKEN_FILE and not os.path.exists(CAPTURE_TOKEN_FILE):
+        try:
+            with open(CAPTURE_TOKEN_FILE, "w") as f:
+                f.write(token)
+            os.chmod(CAPTURE_TOKEN_FILE, 0o600)
+            logger.warning("AUTH_CAPTURE: token written to %s", CAPTURE_TOKEN_FILE)
+        except Exception:
+            pass
     if DEBUG_ACCEPT_ANY:
         logger.warning("AUTH_DEBUG: token mismatch but DEBUG_ACCEPT_ANY=1, allowing request")
         return
