@@ -45,11 +45,6 @@ jobs:
           sleep 3
           systemctl is-active control-bridge && echo "DEBUG+CAPTURE ON — waiting for GPT call" || echo "FAIL"
           echo ""
-          echo "Sanity (random token accepted):"
-          curl -s -o /dev/null -w "HTTP %{http_code}" -X POST http://127.0.0.1:3000/jobs \
-            -H "Authorization: Bearer TEST123" \
-            -H "Content-Type: application/json" \
-            -d '{"title":"x","raw_user_request":"x","normalized_brief":"x"}'
-          echo ""
+          echo "NO sanity test — preserving one-shot capture for GPT"
           echo "Capture file exists: $(test -f /opt/control-bridge/.captured-token && echo YES || echo NO)"
           ENABLE
