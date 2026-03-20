@@ -95,6 +95,27 @@ jobs:
           curl -s http://127.0.0.1:3901/health 2>&1
           echo ""
 
+          echo "=== 8. Test /jobs/active ==="
+          curl -si http://127.0.0.1:3000/jobs/active \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo "=== 9. Test concurrency rejection ==="
+          # Create a job first
+          J1=$(curl -s -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Concurrency test 1","raw_user_request":"Test","normalized_brief":"Test"}')
+          echo "Job 1: ${J1}"
+          sleep 2
+          # Try to create a second while first is running
+          J2=$(curl -si -X POST http://127.0.0.1:3000/jobs \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Concurrency test 2","raw_user_request":"Should get 429","normalized_brief":"Test"}')
+          echo "Job 2 (should be 429): ${J2}"
+          echo ""
+
           echo "=== DONE ==="
           VERIFY
 
