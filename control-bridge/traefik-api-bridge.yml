@@ -11,6 +11,8 @@ http:
       service: api-bridge
       tls:
         certResolver: mytlschallenge
+      middlewares:
+        - api-bridge-headers
 
     api-bridge-http:
       rule: "Host(`api.marbomebel.ru`)"
@@ -25,6 +27,22 @@ http:
       redirectScheme:
         scheme: https
         permanent: true
+    api-bridge-headers:
+      headers:
+        accessControlAllowOriginList:
+          - "https://chat.openai.com"
+          - "https://chatgpt.com"
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "OPTIONS"
+        accessControlAllowHeaders:
+          - "Authorization"
+          - "Content-Type"
+          - "Accept"
+        accessControlMaxAge: 3600
 
   services:
     api-bridge:

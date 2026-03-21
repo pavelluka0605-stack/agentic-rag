@@ -22,13 +22,14 @@ import urllib.error
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 logger = logging.getLogger("bridge")
 
 # --- Version / uptime ---
 _STARTED_AT = time.time()
-_VERSION = "2.2.0"
+_VERSION = "2.3.0"
 
 # --- Concurrency lock ---
 # Only one task can run at a time to prevent VPS resource exhaustion.
@@ -317,8 +318,16 @@ def _mem_stats() -> dict:
 app = FastAPI(
     title="Control Bridge API",
     description="GPT Actions bridge + shared memory for marbomebel.ru",
-    version="2.0.0",
+    version=_VERSION,
     servers=[{"url": "https://api.marbomebel.ru"}],
+)
+
+# CORS — required for GPT Actions (ChatGPT calls from browser-like environment)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://chat.openai.com", "https://chatgpt.com", "*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/health")
