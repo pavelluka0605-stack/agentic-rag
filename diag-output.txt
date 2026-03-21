@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Fri Mar 20 15:56:35 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sat Mar 21 01:25:01 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 2 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 136.9M (max: 256.0M available: 119.0M peak: 137.4M)
-        CPU: 16.253s
+     Memory: 134.3M (max: 256.0M available: 121.6M peak: 137.4M swap: 1.6M swap peak: 1.6M)
+        CPU: 16.802s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -26,8 +26,8 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
      Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 2 days ago
    Main PID: 1364558 (node)
       Tasks: 11 (limit: 32)
-     Memory: 32.9M (max: 128.0M available: 95.0M peak: 128.0M swap: 16.9M swap peak: 97.6M)
-        CPU: 26.129s
+     Memory: 28.0M (max: 128.0M available: 99.9M peak: 128.0M swap: 24.1M swap peak: 97.6M)
+        CPU: 31.184s
      CGroup: /system.slice/control-api.service
              └─1364558 /usr/bin/node server.js
 
@@ -134,7 +134,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Fri, 20 Mar 2026 15:56:35 GMT
+Date: Sat, 21 Mar 2026 01:25:01 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -144,7 +144,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-20T15:56:36.038Z"
+  "timestamp": "2026-03-21T01:25:01.424Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -155,7 +155,7 @@ Keep-Alive: timeout=5
 total 16
 drwxr-xr-x 2 root root 4096 Mar 19 17:46 .
 drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root  716 Mar 20 08:41 api-bridge.yml
+-rw-r--r-- 1 root root  716 Mar 20 15:57 api-bridge.yml
 -rw-r--r-- 1 root root  671 Mar 18 11:57 dashboard.yml
 --- dashboard.yml ---
 ## Traefik dynamic config — Task Dashboard
@@ -194,11 +194,11 @@ drwxr-xr-x 8 root root 4096 Mar 19 17:46 ..
 
 === 15. Docker containers ===
 NAMES                    STATUS                 PORTS
-mebelit-wp-wordpress-1   Up 5 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
-mebelit-wp-db-1          Up 5 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
+mebelit-wp-wordpress-1   Up 6 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
+mebelit-wp-db-1          Up 6 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
 n8n-traefik-traefik-1    Up 7 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
 n8n-postgres-1           Up 11 days             5432/tcp
-n8n-voice-app-1          Up 11 days             80/tcp
+n8n-voice-app-1          Up 12 days             80/tcp
 n8n-n8n-1                Up 10 days             5678/tcp
 openclaw                 Up 2 weeks (healthy)   
 
@@ -211,7 +211,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Fri, 20 Mar 2026 15:56:36 GMT
+date: Sat, 21 Mar 2026 01:25:01 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
