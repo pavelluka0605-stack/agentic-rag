@@ -1,5 +1,6 @@
 #!/bin/bash
 # deploy.sh — Full deployment of Control Bridge API on VPS
+# v2: token notification via Telegram
 # Run as root on the VPS.
 set -euo pipefail
 
