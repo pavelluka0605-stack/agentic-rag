@@ -1,4 +1,4 @@
 {
-  "script_file": ".claude/commands/scripts/full-cycle-bridge.sh",
-  "intent": "Full cycle: diagnose + autofix + verify Control Bridge after deploy"
+  "command": "echo '=== SERVICE ===' && systemctl is-active control-bridge 2>&1 && echo '=== LOCAL HEALTH ===' && curl -sS --connect-timeout 5 http://127.0.0.1:3000/health 2>&1 && echo '=== HTTPS ===' && curl -sS --connect-timeout 5 https://api.marbomebel.ru/health 2>&1 && echo '=== TRAEFIK ===' && ls /opt/n8n-traefik/dynamic/api-bridge.yml 2>&1 && echo '=== PORTS ===' && ss -tlnp | grep -E '3000|3901' 2>&1 && echo '=== DONE ==='",
+  "intent": "Quick health check: service + local + HTTPS + traefik + ports"
 }
