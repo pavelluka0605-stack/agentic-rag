@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sat Mar 21 02:56:28 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sat Mar 21 02:57:47 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 2 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 134.0M (max: 256.0M available: 121.9M peak: 137.4M swap: 2.1M swap peak: 2.1M)
-        CPU: 17.070s
+     Memory: 133.6M (max: 256.0M available: 122.3M peak: 137.4M swap: 2.1M swap peak: 2.1M)
+        CPU: 17.107s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -23,25 +23,25 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sat 2026-03-21 02:53:55 UTC; 2min 33s ago
-   Main PID: 1854897 (node)
+     Active: active (running) since Sat 2026-03-21 02:56:50 UTC; 57s ago
+   Main PID: 1856970 (node)
       Tasks: 11 (limit: 32)
-     Memory: 22.8M (max: 128.0M available: 105.1M peak: 43.1M)
-        CPU: 687ms
+     Memory: 23.5M (max: 128.0M available: 104.4M peak: 43.4M)
+        CPU: 623ms
      CGroup: /system.slice/control-api.service
-             └─1854897 /usr/bin/node server.js
+             └─1856970 /usr/bin/node server.js
 
-Mar 21 02:53:55 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] Listening on 127.0.0.1:3901
-Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] Task DB: ready
-Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] LLM: configured
-Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] Telegram: configured
-Mar 21 02:54:11 fra-1-vm-ckr7 node[1854897]: [cleanup] procs: 179→179, zombies: 0→0, cleaned: [], mem: 1768/3915MB
+Mar 21 02:56:50 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Listening on 127.0.0.1:3901
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Task DB: ready
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] LLM: configured
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Telegram: configured
+Mar 21 02:57:10 fra-1-vm-ckr7 node[1856970]: [cleanup] procs: 178→178, zombies: 0→0, cleaned: [], mem: 1790/3915MB
 
 === 3. Ports listening (3200, 3901, 3847, 3900, 80, 443) ===
-LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=1854897,fd=21))                                                                                                                                
+LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=1856970,fd=21))                                                                                                                                
 LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
 LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
 LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
@@ -81,17 +81,6 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Starting...
 Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 
 === 5. Control API logs (last 20 lines) ===
-Mar 21 01:47:23 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Listening on 127.0.0.1:3901
-Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Task DB: ready
-Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] LLM: configured
-Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Telegram: configured
-Mar 21 01:47:39 fra-1-vm-ckr7 node[1844952]: [cleanup] procs: 181→181, zombies: 0→0, cleaned: [], mem: 1809/3915MB
-Mar 21 02:52:18 fra-1-vm-ckr7 node[1844952]: [cleanup] procs: 180→180, zombies: 0→0, cleaned: [], mem: 1782/3915MB
-Mar 21 02:53:55 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
-Mar 21 02:53:55 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
 Mar 21 02:53:55 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
 Mar 21 02:53:55 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
 Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
@@ -101,6 +90,17 @@ Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] Task DB: ready
 Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] LLM: configured
 Mar 21 02:53:55 fra-1-vm-ckr7 node[1854897]: [control-api] Telegram: configured
 Mar 21 02:54:11 fra-1-vm-ckr7 node[1854897]: [cleanup] procs: 179→179, zombies: 0→0, cleaned: [], mem: 1768/3915MB
+Mar 21 02:56:50 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
+Mar 21 02:56:50 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
+Mar 21 02:56:50 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
+Mar 21 02:56:50 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Listening on 127.0.0.1:3901
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Task DB: ready
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] LLM: configured
+Mar 21 02:56:50 fra-1-vm-ckr7 node[1856970]: [control-api] Telegram: configured
+Mar 21 02:57:10 fra-1-vm-ckr7 node[1856970]: [cleanup] procs: 178→178, zombies: 0→0, cleaned: [], mem: 1790/3915MB
 
 === 6. Dashboard .next/ build exists? ===
 total 180
@@ -132,7 +132,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sat, 21 Mar 2026 02:56:29 GMT
+Date: Sat, 21 Mar 2026 02:57:48 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,7 +142,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-21T02:56:29.060Z"
+  "timestamp": "2026-03-21T02:57:48.089Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -153,7 +153,7 @@ Keep-Alive: timeout=5
 total 16
 drwxr-xr-x 2 root root 4096 Mar 19 17:46 .
 drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root  716 Mar 21 02:54 api-bridge.yml
+-rw-r--r-- 1 root root  716 Mar 21 02:56 api-bridge.yml
 -rw-r--r-- 1 root root  671 Mar 18 11:57 dashboard.yml
 --- dashboard.yml ---
 ## Traefik dynamic config — Task Dashboard
@@ -209,7 +209,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sat, 21 Mar 2026 02:56:29 GMT
+date: Sat, 21 Mar 2026 02:57:48 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
