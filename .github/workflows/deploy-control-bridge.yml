@@ -5,9 +5,7 @@ on:
     branches:
       - main
       - "claude/*"
-    paths:
-      - "control-bridge/**"
-      - ".github/workflows/deploy-control-bridge.yml"
+      - "claude/**"
   workflow_dispatch:
     inputs:
       action:
