@@ -1,0 +1,148 @@
+name: "Diagnose HTTPS 403"
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [".github/workflows/diagnose-https.yml"]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  diagnose:
+    name: "HTTPS Diagnostics"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run HTTPS diagnostics
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' << 'DIAG' | tee /tmp/diag.txt
+          echo "=== 1. CONTROL BRIDGE SERVICE ==="
+          systemctl is-active control-bridge 2>&1
+          echo ""
+
+          echo "=== 2. LOCAL HEALTH (port 3000) ==="
+          curl -si http://127.0.0.1:3000/health 2>&1
+          echo ""
+
+          echo "=== 3. DNS api.marbomebel.ru ==="
+          dig +short api.marbomebel.ru 2>/dev/null || host api.marbomebel.ru 2>/dev/null || echo "FAILED"
+          echo ""
+
+          echo "=== 4. LISTENING PORTS ==="
+          ss -tlnp | grep -E '3000|80|443|8080|8443' 2>&1
+          echo ""
+
+          echo "=== 5. DOCKER CONTAINERS ==="
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>&1
+          echo ""
+
+          echo "=== 6. TRAEFIK CONFIG DIR ==="
+          for d in /opt/n8n-traefik/dynamic /opt/traefik/dynamic /etc/traefik/dynamic; do
+            if [ -d "$d" ]; then
+              echo "Found: $d"
+              ls -la "$d/" 2>&1
+              echo "--- api-bridge.yml content ---"
+              cat "$d/api-bridge.yml" 2>&1
+              echo ""
+            fi
+          done
+          echo ""
+
+          echo "=== 7. TRAEFIK STATIC CONFIG ==="
+          for f in /opt/n8n-traefik/traefik.yml /opt/n8n-traefik/docker-compose.yml /opt/traefik/traefik.yml /etc/traefik/traefik.yml; do
+            if [ -f "$f" ]; then
+              echo "--- $f ---"
+              cat "$f" 2>&1
+              echo ""
+            fi
+          done
+          echo ""
+
+          echo "=== 8. TRAEFIK LOGS (last 50) ==="
+          TRAEFIK_ID=$(docker ps -q --filter "name=traefik" 2>/dev/null | head -1)
+          if [ -n "$TRAEFIK_ID" ]; then
+            docker logs "$TRAEFIK_ID" --tail 50 2>&1
+          else
+            echo "No Traefik container found"
+          fi
+          echo ""
+
+          echo "=== 9. NGINX STATUS ==="
+          systemctl is-active nginx 2>&1 || echo "nginx not running"
+          nginx -t 2>&1 || echo "nginx not installed"
+          echo ""
+
+          echo "=== 10. NGINX SITES ==="
+          ls -la /etc/nginx/sites-enabled/ 2>&1 || echo "no sites-enabled"
+          for f in /etc/nginx/sites-enabled/*; do
+            if [ -f "$f" ]; then
+              echo "--- $f ---"
+              cat "$f" 2>&1
+              echo ""
+            fi
+          done
+          echo ""
+
+          echo "=== 11. SSL CERTS ==="
+          ls -la /etc/letsencrypt/live/ 2>&1 || echo "no letsencrypt"
+          echo ""
+
+          echo "=== 12. CURL HTTPS (verbose) ==="
+          curl -svk https://api.marbomebel.ru/health 2>&1
+          echo ""
+
+          echo "=== 13. CURL HTTP ==="
+          curl -sv http://api.marbomebel.ru/health 2>&1
+          echo ""
+
+          echo "=== 14. IPTABLES (port 3000) ==="
+          iptables -L -n 2>&1 | grep -E '3000|DROP|REJECT' | head -10 || echo "no iptables rules"
+          echo ""
+
+          echo "=== 15. UFW STATUS ==="
+          ufw status 2>&1 || echo "ufw not installed"
+          echo ""
+
+          echo "=== 16. APP VERSION ==="
+          head -3 /opt/control-bridge/app.py 2>&1
+          grep '_VERSION' /opt/control-bridge/app.py 2>&1
+          echo ""
+
+          echo "=== DONE ==="
+          DIAG
+
+      - name: Post results to issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, urllib.request, traceback
+          try:
+              with open("/tmp/diag.txt") as f:
+                  content = f.read()
+              body = "## HTTPS 403 Diagnostics\n\nRun: ${{ github.run_id }}\n\n```\n" + content[:60000] + "\n```"
+              payload = json.dumps({"title": "HTTPS 403 Diag — ${{ github.run_id }}", "body": body}).encode()
+              req = urllib.request.Request(
+                  "https://api.github.com/repos/${{ github.repository }}/issues",
+                  data=payload,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"], "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+                  method="POST")
+              resp = urllib.request.urlopen(req)
+              data = json.loads(resp.read())
+              print(f"Issue #{data['number']} created: {data['html_url']}")
+          except Exception:
+              traceback.print_exc()
+              with open("/tmp/diag.txt") as f:
+                  print(f.read()[:5000])
+          PYEOF
