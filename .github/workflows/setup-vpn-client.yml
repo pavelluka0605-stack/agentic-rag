@@ -129,9 +129,13 @@ jobs:
           fi
 
           KEYS=$($XRAY_BIN x25519)
-          echo "KEYS_OUTPUT=$KEYS"
-          PRIVATE_KEY=$(echo "$KEYS" | grep "Private" | awk '{print $3}')
-          PUBLIC_KEY=$(echo "$KEYS" | grep "Public" | awk '{print $3}')
+          echo "KEYS_RAW:"
+          echo "$KEYS"
+          # Parse keys - format varies by version:
+          # Old: "Private key: xxx" / "Public key: xxx"
+          # New: "PrivateKey: xxx" / "Password: xxx" (Password = Public Key)
+          PRIVATE_KEY=$(echo "$KEYS" | grep -i "private" | awk '{print $NF}')
+          PUBLIC_KEY=$(echo "$KEYS" | grep -iE "(public|password)" | head -1 | awk '{print $NF}')
           echo "PRIVATE_KEY=$PRIVATE_KEY"
           echo "PUBLIC_KEY=$PUBLIC_KEY"
 
