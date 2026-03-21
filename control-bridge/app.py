@@ -45,9 +45,14 @@ def verify_token(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=500, detail="Server token not configured")
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or token != API_TOKEN:
-        raise HTTPException(status_code=403, detail="Invalid token")
+    # Support both "Bearer TOKEN" and raw "TOKEN" (ChatGPT Actions sends raw)
+    if " " in authorization:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or token != API_TOKEN:
+            raise HTTPException(status_code=403, detail="Invalid token")
+    else:
+        if authorization != API_TOKEN:
+            raise HTTPException(status_code=403, detail="Invalid token")
 
 # --- SQLite storage ---
 DB_PATH = os.environ.get("BRIDGE_DB_PATH", "/opt/control-bridge/jobs.db")

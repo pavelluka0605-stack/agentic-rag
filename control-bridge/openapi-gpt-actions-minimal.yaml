@@ -10,11 +10,15 @@ servers:
   - url: https://api.marbomebel.ru
     description: Production
 
+security:
+  - ApiKeyAuth: []
+
 paths:
   /health:
     get:
       operationId: healthCheck
       summary: Health check
+      security: []
       responses:
         "200":
           description: Service healthy
@@ -32,8 +36,6 @@ paths:
     get:
       operationId: getActiveJobs
       summary: Check running jobs. ALWAYS call BEFORE createJob.
-      security:
-        - BearerAuth: []
       responses:
         "200":
           description: Active jobs list. Empty = safe to create.
@@ -55,8 +57,6 @@ paths:
     post:
       operationId: createJob
       summary: Create and auto-start a job. Returns 429 if busy.
-      security:
-        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -91,8 +91,6 @@ paths:
     get:
       operationId: getJobStatus
       summary: Poll job status until completed or failed.
-      security:
-        - BearerAuth: []
       parameters:
         - name: job_id
           in: path
@@ -113,8 +111,6 @@ paths:
     get:
       operationId: getJobResult
       summary: Get result when status is completed.
-      security:
-        - BearerAuth: []
       parameters:
         - name: job_id
           in: path
@@ -149,8 +145,6 @@ paths:
     get:
       operationId: memoryBootstrap
       summary: Load project context. CALL THIS first for every new task.
-      security:
-        - BearerAuth: []
       parameters:
         - name: project
           in: query
@@ -186,9 +180,10 @@ paths:
 
 components:
   securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
+    ApiKeyAuth:
+      type: apiKey
+      name: Authorization
+      in: header
 
   schemas:
     JobResponse:
