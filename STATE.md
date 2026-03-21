@@ -2,7 +2,7 @@
 
 > **ИНСТРУКЦИЯ ДЛЯ CLAUDE:** Этот файл — твоя память. Читай его В НАЧАЛЕ каждой сессии
 > и ПОСЛЕ каждого сжатия контекста. Обновляй после завершения значимых задач.
-> Последнее обновление: 2026-03-16
+> Последнее обновление: 2026-03-21
 
 ---
 
@@ -201,3 +201,61 @@
   - systemd unit: github-webhook.service
 - **Bootstrap обновлён**: теперь ставит memory-server + webhook на VPS
 - Smoke test пройден: все 22 tools работают, FTS5 поиск находит релевантные записи
+
+### Сессия 2026-03-21 (Control Bridge Deploy)
+- **Control Bridge API** — полный статус-аудит проекта
+- Запуск деплоя Control Bridge на VPS (deploy-control-bridge.yml)
+
+---
+
+## Control Bridge (GPT ↔ Claude Code)
+
+### Архитектура
+```
+GPT (ChatGPT Custom Actions)
+  ↓ POST /jobs (Bearer token)
+Control Bridge API (api.marbomebel.ru:443 → localhost:3000)
+  ↓ HTTP POST
+Control API (localhost:3901)
+  ↓ dispatch
+Claude Code (tmux session)
+  ↓ report-complete.sh / report-review.sh
+Control Bridge API → GPT reads result
+```
+
+### Компоненты
+
+| Компонент | Технология | Файлы | Статус |
+|-----------|------------|-------|--------|
+| Control Bridge API | Python FastAPI | `control-bridge/app.py` (44 эндпоинта) | ✅ Код готов, ожидает деплоя |
+| Control API | Node.js | `vps-runtime/control-api/server.js` | ✅ Код готов |
+| GPT Actions OpenAPI | YAML | `control-bridge/openapi-gpt-actions.yaml` | ✅ Готов |
+| GPT Instructions | Markdown | `control-bridge/gpt-instructions.md` | ✅ Готов |
+| Deploy workflow | GitHub Actions | `.github/workflows/deploy-control-bridge.yml` | ✅ Готов |
+| Диагностика | Bash | `.claude/commands/scripts/diagnose-bridge.sh` | ✅ Готов |
+| Автофикс | Bash | `.claude/commands/scripts/fix-bridge.sh` | ✅ Готов |
+| HTTPS (Traefik) | YAML | `control-bridge/traefik-api-bridge.yml` | ✅ Конфиг готов |
+
+### API Endpoints (ключевые)
+- `POST /jobs` — создание задачи (GPT → Claude Code)
+- `GET /jobs/{id}/status` — статус задачи
+- `GET /jobs/{id}/result` — результат выполнения
+- `GET /jobs/pending-reviews` — задачи на ревью
+- `POST /jobs/{id}/feedback` — approve/revise/cancel
+- `GET /memory/bootstrap` — загрузка контекста (6 слоёв)
+- `GET /memory/search` — FTS5 поиск по памяти
+- `POST /memory/incidents` — запись ошибки
+- `POST /memory/solutions` — запись решения
+
+### Деплой
+- **URL:** `https://api.marbomebel.ru`
+- **Auth:** Bearer token (BRIDGE_API_TOKEN)
+- **VPS путь:** `/opt/control-bridge/`
+- **systemd:** `control-bridge.service` (порт 3000, uvicorn 2 workers)
+- **HTTPS:** Traefik reverse proxy + Let's Encrypt
+
+### Что осталось
+- [ ] Деплой на VPS (workflow deploy-control-bridge.yml)
+- [ ] Верификация HTTPS api.marbomebel.ru
+- [ ] Настройка GPT Custom Actions в ChatGPT (вручную: OpenAPI spec + токен)
+- [ ] E2E тест: GPT → создание задачи → Claude Code → результат
