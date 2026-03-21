@@ -317,15 +317,9 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-")
 
-          MSG="🔑 GPT Actions Token (скопируй в ChatGPT → Actions → Authentication):
-
-${BRIDGE_TOKEN}
-
-Настройки:
-• Auth Type: API Key
-• Auth Header: Authorization
-• Prefix: Bearer
-• URL: https://api.marbomebel.ru"
+          MSG="GPT Actions Token: ${BRIDGE_TOKEN}
+          Auth Type: API Key | Header: Authorization | Prefix: Bearer
+          URL: https://api.marbomebel.ru"
 
           curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TG_CHAT}" \
