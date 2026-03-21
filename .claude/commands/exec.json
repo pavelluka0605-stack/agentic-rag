@@ -1,4 +1,4 @@
 {
-  "command": "noop",
-  "intent": "completed"
+  "command": "systemctl is-active x-ui 2>/dev/null && echo X-UI_ACTIVE || echo X-UI_NOT_FOUND; x-ui settings 2>/dev/null; echo '---IP---'; curl -s4 ifconfig.me; echo ''; echo '---PORTS---'; ss -tlnp | grep -E '(2053|443|8443)' 2>/dev/null; echo '---BBR---'; sysctl net.ipv4.tcp_congestion_control 2>/dev/null",
+  "intent": "Check 3X-UI VPN status and get panel info"
 }
