@@ -25,11 +25,12 @@ from fastapi import FastAPI, HTTPException, Depends, Header, BackgroundTasks, Qu
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("bridge")
 
 # --- Version / uptime ---
 _STARTED_AT = time.time()
-_VERSION = "2.3.0"
+_VERSION = "2.4.0"
 
 # --- Concurrency lock ---
 # Only one task can run at a time to prevent VPS resource exhaustion.
@@ -58,27 +59,33 @@ def _get_db() -> sqlite3.Connection:
     return conn
 
 def _init_db():
-    conn = _get_db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            job_id TEXT PRIMARY KEY,
-            title TEXT NOT NULL,
-            raw_user_request TEXT NOT NULL,
-            normalized_brief TEXT NOT NULL DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'queued',
-            created_at REAL NOT NULL,
-            result_json TEXT
-        )
-    """)
-    # Add completed_at column if missing (for tracking duration)
     try:
-        conn.execute("ALTER TABLE jobs ADD COLUMN completed_at REAL")
-    except Exception:
-        pass  # column already exists
-    conn.commit()
-    conn.close()
+        os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+        conn = _get_db()
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS jobs (
+                job_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                raw_user_request TEXT NOT NULL,
+                normalized_brief TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'queued',
+                created_at REAL NOT NULL,
+                result_json TEXT
+            )
+        """)
+        # Add completed_at column if missing (for tracking duration)
+        try:
+            conn.execute("ALTER TABLE jobs ADD COLUMN completed_at REAL")
+        except Exception:
+            pass  # column already exists
+        conn.commit()
+        conn.close()
+        logger.info("DB initialized at %s", DB_PATH)
+    except Exception as e:
+        logger.error("DB init failed: %s — service will start but job storage unavailable", e)
 
 _init_db()
+logger.info("Control Bridge v%s starting on port 3000", _VERSION)
 
 def db_create_job(job_id: str, title: str, raw_user_request: str, normalized_brief: str) -> dict:
     conn = _get_db()
@@ -230,6 +237,8 @@ class JobResult(BaseModel):
 MEMORY_DB_PATH = os.environ.get("MEMORY_DB_PATH", "/opt/claude-code/memory/memory.db")
 
 def _get_mem_db() -> sqlite3.Connection:
+    if not os.path.exists(MEMORY_DB_PATH):
+        raise FileNotFoundError(f"Memory DB not found: {MEMORY_DB_PATH}")
     conn = sqlite3.connect(MEMORY_DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -332,7 +341,31 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": _VERSION, "uptime_s": int(time.time() - _STARTED_AT)}
+    # Check jobs DB
+    db_ok = False
+    try:
+        conn = _get_db()
+        conn.execute("SELECT 1").fetchone()
+        conn.close()
+        db_ok = True
+    except Exception:
+        pass
+    # Check memory DB
+    mem_ok = False
+    try:
+        conn = _get_mem_db()
+        conn.execute("SELECT 1").fetchone()
+        conn.close()
+        mem_ok = True
+    except Exception:
+        pass
+    return {
+        "ok": True,
+        "version": _VERSION,
+        "uptime_s": int(time.time() - _STARTED_AT),
+        "db": db_ok,
+        "memory_db": mem_ok,
+    }
 
 @app.post("/jobs", response_model=JobResponse, dependencies=[Depends(verify_token)])
 def create_job(body: JobCreate, background_tasks: BackgroundTasks):
@@ -579,19 +612,28 @@ def memory_search(
     limit: int = Query(10, ge=1, le=50),
 ):
     """FTS5 full-text search across all memory layers. Returns ranked results."""
-    tbl_list = [t.strip() for t in tables.split(",")] if tables else None
-    return _mem_search(q, tables=tbl_list, project=project, limit=limit)
+    try:
+        tbl_list = [t.strip() for t in tables.split(",")] if tables else None
+        return _mem_search(q, tables=tbl_list, project=project, limit=limit)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.get("/memory/bootstrap", dependencies=[Depends(verify_token)])
 def memory_bootstrap(project: Optional[str] = Query(None)):
     """Load full session context: policies, recent sessions, open incidents, top solutions, decisions, stats.
     Call this at the START of every task to get project context."""
-    return _mem_bootstrap(project)
+    try:
+        return _mem_bootstrap(project)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.get("/memory/stats", dependencies=[Depends(verify_token)])
 def memory_stats():
     """Get counts for all memory layers."""
-    return _mem_stats()
+    try:
+        return _mem_stats()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.get("/memory/incidents", dependencies=[Depends(verify_token)])
 def memory_incidents(
@@ -600,7 +642,10 @@ def memory_incidents(
     limit: int = Query(20, ge=1, le=100),
 ):
     """List incidents (errors and their fixes)."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     sql = "SELECT * FROM incidents WHERE 1=1"
     params: list = []
     if status:
@@ -622,7 +667,10 @@ def memory_solutions(
     limit: int = Query(20, ge=1, le=100),
 ):
     """List proven solutions and patterns."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     sql = "SELECT * FROM solutions WHERE 1=1"
     params: list = []
     if verified is not None:
@@ -643,7 +691,10 @@ def memory_decisions(
     limit: int = Query(20, ge=1, le=100),
 ):
     """List architectural decisions."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     sql = "SELECT * FROM decisions WHERE 1=1"
     params: list = []
     if project:
@@ -661,7 +712,10 @@ def memory_policies(
     category: Optional[str] = Query(None, description="rule, constraint, convention, limitation"),
 ):
     """List active project rules and constraints."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     sql = "SELECT * FROM policies WHERE active = 1"
     params: list = []
     if project:
@@ -681,7 +735,10 @@ def memory_episodes(
     limit: int = Query(10, ge=1, le=50),
 ):
     """List recent work sessions."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     sql = "SELECT * FROM episodes WHERE 1=1"
     params: list = []
     if project:
@@ -700,7 +757,10 @@ def memory_contexts(
     limit: int = Query(20, ge=1, le=100),
 ):
     """List saved code/infra/deployment contexts."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     sql = "SELECT * FROM contexts WHERE 1=1"
     params: list = []
     if category:
@@ -727,7 +787,10 @@ class IncidentCreate(BaseModel):
 @app.post("/memory/incidents", dependencies=[Depends(verify_token)])
 def memory_add_incident(body: IncidentCreate):
     """Record a new error/incident. Auto-deduplicates by fingerprint."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     fp = _fingerprint(body.error_message)
     existing = conn.execute("SELECT * FROM incidents WHERE fingerprint = ? AND status != 'duplicate'", (fp,)).fetchone()
     if existing:
@@ -757,7 +820,10 @@ class SolutionCreate(BaseModel):
 @app.post("/memory/solutions", dependencies=[Depends(verify_token)])
 def memory_add_solution(body: SolutionCreate):
     """Record a working solution or pattern."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     conn.execute(
         "INSERT INTO solutions (project, title, description, code, tags, verified) VALUES (?, ?, ?, ?, ?, ?)",
         (body.project or None, body.title, body.description, body.code or None, body.tags or None, 1 if body.verified else 0),
@@ -777,7 +843,10 @@ class EpisodeCreate(BaseModel):
 @app.post("/memory/episodes", dependencies=[Depends(verify_token)])
 def memory_add_episode(body: EpisodeCreate):
     """Record a session summary."""
-    conn = _get_mem_db()
+    try:
+        conn = _get_mem_db()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     conn.execute(
         "INSERT INTO episodes (project, summary, what_done, where_stopped, what_remains) VALUES (?, ?, ?, ?, ?)",
         (body.project or None, body.summary, body.what_done or None, body.where_stopped or None, body.what_remains or None),
