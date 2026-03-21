@@ -306,6 +306,31 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "rm -rf /tmp/control-bridge-deploy" 2>/dev/null || true
 
+      - name: Send API token to Telegram (for GPT Actions setup)
+        if: success()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          # Read current token from VPS
+          BRIDGE_TOKEN=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-")
+
+          MSG="🔑 GPT Actions Token (скопируй в ChatGPT → Actions → Authentication):
+
+${BRIDGE_TOKEN}
+
+Настройки:
+• Auth Type: API Key
+• Auth Header: Authorization
+• Prefix: Bearer
+• URL: https://api.marbomebel.ru"
+
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
+
       - name: Send Telegram notification
         if: always()
         env:
