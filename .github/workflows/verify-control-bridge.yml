@@ -1,4 +1,4 @@
-name: "Verify Control Bridge API"
+name: "Verify Control Bridge API"  # diag-run-20260321
 
 on:
   push:
