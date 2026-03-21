@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sat Mar 21 14:18:44 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sat Mar 21 17:57:13 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,44 +8,44 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 3 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 97.3M (max: 256.0M available: 158.6M peak: 137.4M swap: 38.8M swap peak: 38.8M)
-        CPU: 18.513s
+     Memory: 96.0M (max: 256.0M available: 159.9M peak: 137.4M swap: 41.4M swap peak: 41.4M)
+        CPU: 19.875s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
-Mar 21 11:37:56 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
-Mar 21 11:37:57 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
-Mar 21 11:37:57 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
-Mar 21 11:37:57 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
-Mar 21 11:49:06 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
-Mar 21 11:49:06 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
-Mar 21 11:49:06 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
-Mar 21 12:09:17 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "j". This request might be from an older or newer deployment.
-Mar 21 12:09:17 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
-Mar 21 12:09:17 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 14:55:50 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "812a70c0". This request might be from an older or newer deployment.
+Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "917af6af". This request might be from an older or newer deployment.
+Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "g". This request might be from an older or newer deployment.
+Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sat 2026-03-21 14:15:12 UTC; 3min 31s ago
-   Main PID: 2016326 (node)
+     Active: active (running) since Sat 2026-03-21 15:49:49 UTC; 2h 7min ago
+   Main PID: 2032225 (node)
       Tasks: 11 (limit: 32)
-     Memory: 23.8M (max: 128.0M available: 104.1M peak: 43.6M)
-        CPU: 791ms
+     Memory: 23.4M (max: 128.0M available: 104.5M peak: 43.7M)
+        CPU: 899ms
      CGroup: /system.slice/control-api.service
-             └─2016326 /usr/bin/node server.js
+             └─2032225 /usr/bin/node server.js
 
-Mar 21 14:15:12 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Listening on 127.0.0.1:3901
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Task DB: ready
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] LLM: configured
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Telegram: configured
-Mar 21 14:15:31 fra-1-vm-ckr7 node[2016326]: [cleanup] procs: 185→182, zombies: 0→0, cleaned: [], mem: 1813/3915MB
+Mar 21 15:49:49 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Listening on 127.0.0.1:3901
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Task DB: ready
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] LLM: configured
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Telegram: configured
+Mar 21 15:50:08 fra-1-vm-ckr7 node[2032225]: [cleanup] procs: 184→184, zombies: 0→0, cleaned: [], mem: 1816/3915MB
 
 === 3. Ports listening (3200, 3901, 3847, 3900, 80, 443) ===
-LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=2016326,fd=21))                                                                                                                                
+LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=2032225,fd=21))                                                                                                                                
 LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
 LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
 LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
@@ -53,21 +53,6 @@ LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy
 LISTEN 0      511                *:3200             *:*    users:(("next-server (v1",pid=1364737,fd=18))                                                                                                                     
 
 === 4. Dashboard logs (last 30 lines) ===
-Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: - Network:       http://72.56.127.126:3200
-Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Starting...
-Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
-Mar 21 11:05:20 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "06wc". This request might be from an older or newer deployment.
-Mar 21 11:05:20 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
-Mar 21 11:05:20 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
-Mar 21 11:15:48 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
-Mar 21 11:15:48 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
-Mar 21 11:15:48 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
-Mar 21 11:18:02 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "bnt0onm". This request might be from an older or newer deployment.
-Mar 21 11:18:02 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
-Mar 21 11:18:02 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
-Mar 21 11:26:41 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
-Mar 21 11:26:41 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
-Mar 21 11:26:41 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 Mar 21 11:28:02 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
 Mar 21 11:28:02 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
 Mar 21 11:28:02 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
@@ -83,28 +68,43 @@ Mar 21 11:49:06 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 Mar 21 12:09:17 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "j". This request might be from an older or newer deployment.
 Mar 21 12:09:17 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
 Mar 21 12:09:17 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 14:55:46 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
+Mar 21 14:55:46 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 21 14:55:46 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 14:55:50 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
+Mar 21 14:55:50 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 21 14:55:50 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "812a70c0". This request might be from an older or newer deployment.
+Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "917af6af". This request might be from an older or newer deployment.
+Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "g". This request might be from an older or newer deployment.
+Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 
 === 5. Control API logs (last 20 lines) ===
-Mar 21 14:15:00 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
-Mar 21 14:15:00 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
-Mar 21 14:15:00 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 21 14:15:00 fra-1-vm-ckr7 node[2015427]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 21 14:15:00 fra-1-vm-ckr7 node[2015427]: [control-api] Listening on 127.0.0.1:3901
-Mar 21 14:15:00 fra-1-vm-ckr7 node[2015427]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 21 14:15:00 fra-1-vm-ckr7 node[2015427]: [control-api] Task DB: ready
-Mar 21 14:15:00 fra-1-vm-ckr7 node[2015427]: [control-api] LLM: configured
-Mar 21 14:15:00 fra-1-vm-ckr7 node[2015427]: [control-api] Telegram: configured
-Mar 21 14:15:12 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
-Mar 21 14:15:12 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
-Mar 21 14:15:12 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
-Mar 21 14:15:12 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Listening on 127.0.0.1:3901
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Task DB: ready
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] LLM: configured
-Mar 21 14:15:12 fra-1-vm-ckr7 node[2016326]: [control-api] Telegram: configured
-Mar 21 14:15:31 fra-1-vm-ckr7 node[2016326]: [cleanup] procs: 185→182, zombies: 0→0, cleaned: [], mem: 1813/3915MB
+Mar 21 14:19:21 fra-1-vm-ckr7 node[2020083]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 21 14:19:21 fra-1-vm-ckr7 node[2020083]: [control-api] Listening on 127.0.0.1:3901
+Mar 21 14:19:21 fra-1-vm-ckr7 node[2020083]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 21 14:19:21 fra-1-vm-ckr7 node[2020083]: [control-api] Task DB: ready
+Mar 21 14:19:21 fra-1-vm-ckr7 node[2020083]: [control-api] LLM: configured
+Mar 21 14:19:21 fra-1-vm-ckr7 node[2020083]: [control-api] Telegram: configured
+Mar 21 14:19:38 fra-1-vm-ckr7 node[2020083]: [cleanup] procs: 183→183, zombies: 0→0, cleaned: [], mem: 1802/3915MB
+Mar 21 15:49:29 fra-1-vm-ckr7 node[2020083]: [cleanup] procs: 186→186, zombies: 0→0, cleaned: [], mem: 1881/3915MB
+Mar 21 15:49:49 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
+Mar 21 15:49:49 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
+Mar 21 15:49:49 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
+Mar 21 15:49:49 fra-1-vm-ckr7 systemd[1]: control-api.service: Consumed 1.096s CPU time, 43.3M memory peak, 0B memory swap peak.
+Mar 21 15:49:49 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Listening on 127.0.0.1:3901
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Task DB: ready
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] LLM: configured
+Mar 21 15:49:49 fra-1-vm-ckr7 node[2032225]: [control-api] Telegram: configured
+Mar 21 15:50:08 fra-1-vm-ckr7 node[2032225]: [cleanup] procs: 184→184, zombies: 0→0, cleaned: [], mem: 1816/3915MB
 
 === 6. Dashboard .next/ build exists? ===
 total 180
@@ -136,7 +136,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sat, 21 Mar 2026 14:18:44 GMT
+Date: Sat, 21 Mar 2026 17:57:13 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -146,7 +146,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-21T14:18:44.688Z"
+  "timestamp": "2026-03-21T17:57:13.529Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -157,7 +157,7 @@ Keep-Alive: timeout=5
 total 16
 drwxr-xr-x 2 root root 4096 Mar 19 17:46 .
 drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root 1191 Mar 21 14:15 api-bridge.yml
+-rw-r--r-- 1 root root 1191 Mar 21 15:49 api-bridge.yml
 -rw-r--r-- 1 root root  671 Mar 18 11:57 dashboard.yml
 --- dashboard.yml ---
 ## Traefik dynamic config — Task Dashboard
@@ -198,9 +198,9 @@ drwxr-xr-x 8 root root 4096 Mar 19 17:46 ..
 NAMES                    STATUS                 PORTS
 mebelit-wp-wordpress-1   Up 6 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
 mebelit-wp-db-1          Up 6 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
-n8n-traefik-traefik-1    Up 7 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+n8n-traefik-traefik-1    Up 8 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
 n8n-postgres-1           Up 12 days             5432/tcp
-n8n-voice-app-1          Up 12 days             80/tcp
+n8n-voice-app-1          Up 13 days             80/tcp
 n8n-n8n-1                Up 11 days             5678/tcp
 openclaw                 Up 2 weeks (healthy)   
 
@@ -213,7 +213,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sat, 21 Mar 2026 14:18:45 GMT
+date: Sat, 21 Mar 2026 17:57:14 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
@@ -245,19 +245,19 @@ x-nextjs-prerender: 1
 
 === 19. Control Bridge service ===
 active
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60152 - "POST /jobs HTTP/1.1" 200 OK
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60162 - "POST /jobs/c0b607f2-3695-492e-9514-f695b17d5060/confirm HTTP/1.1" 200 OK
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60168 - "GET /jobs/c0b607f2-3695-492e-9514-f695b17d5060/status HTTP/1.1" 200 OK
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60180 - "GET /jobs/c0b607f2-3695-492e-9514-f695b17d5060/result HTTP/1.1" 200 OK
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60184 - "POST /jobs HTTP/1.1" 429 Too Many Requests
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60194 - "POST /jobs//cancel HTTP/1.1" 404 Not Found
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60208 - "GET /memory/stats HTTP/1.1" 200 OK
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60214 - "GET /memory/bootstrap HTTP/1.1" 200 OK
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60224 - "GET /jobs/pending-reviews HTTP/1.1" 200 OK
-Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60238 - "POST /jobs HTTP/1.1" 401 Unauthorized
+Mar 21 17:33:30 fra-1-vm-ckr7 uvicorn[2032057]: INFO:     172.19.0.2:44780 - "GET /robots.txt HTTP/1.1" 404 Not Found
+Mar 21 17:33:30 fra-1-vm-ckr7 uvicorn[2032057]: INFO:     172.19.0.2:44780 - "GET /assets/js/message.js HTTP/1.1" 404 Not Found
+Mar 21 17:33:30 fra-1-vm-ckr7 uvicorn[2032057]: INFO:     172.19.0.2:44780 - "GET /js/lkk_ch.js HTTP/1.1" 404 Not Found
+Mar 21 17:33:30 fra-1-vm-ckr7 uvicorn[2032057]: INFO:     172.19.0.2:44780 - "GET /static/style/protect/index.js HTTP/1.1" 404 Not Found
+Mar 21 17:33:30 fra-1-vm-ckr7 uvicorn[2032057]: INFO:     172.19.0.2:44780 - "GET /assets/js/auth.js HTTP/1.1" 404 Not Found
+Mar 21 17:33:30 fra-1-vm-ckr7 uvicorn[2032057]: INFO:     172.19.0.2:44780 - "GET /assets/js/qr_modal.js HTTP/1.1" 404 Not Found
+Mar 21 17:33:30 fra-1-vm-ckr7 uvicorn[2032057]: INFO:     172.19.0.2:44780 - "GET /js/twint_ch.js HTTP/1.1" 404 Not Found
+Mar 21 17:33:30 fra-1-vm-ckr7 uvicorn[2032057]: INFO:     172.19.0.2:44780 - "GET /static/style/sys_files/index.js HTTP/1.1" 404 Not Found
+Mar 21 17:53:57 fra-1-vm-ckr7 uvicorn[2032058]: INFO:     172.19.0.2:34432 - "GET / HTTP/1.1" 404 Not Found
+Mar 21 17:53:57 fra-1-vm-ckr7 uvicorn[2032058]: INFO:     172.19.0.2:34432 - "GET / HTTP/1.1" 404 Not Found
 
 === 20. Control Bridge local health ===
-{"ok":true,"version":"2.3.0","uptime_s":220}
+{"ok":true,"version":"2.4.0","uptime_s":7652,"db":true,"memory_db":true}
 === 21. Control Bridge HTTPS (api.marbomebel.ru) ===
 * Host api.marbomebel.ru:443 was resolved.
 * IPv6: (none)
@@ -317,13 +317,13 @@ Mar 21 14:15:22 fra-1-vm-ckr7 uvicorn[2015836]: INFO:     127.0.0.1:60238 - "POS
 { [5 bytes data]
 < HTTP/2 200 
 < content-type: application/json
-< date: Sat, 21 Mar 2026 14:18:44 GMT
+< date: Sat, 21 Mar 2026 17:57:14 GMT
 < server: uvicorn
-< content-length: 44
+< content-length: 72
 < 
-{ [5 bytes data]
+{ [72 bytes data]
 * Connection #0 to host api.marbomebel.ru left intact
-{"ok":true,"version":"2.3.0","uptime_s":220}
+{"ok":true,"version":"2.4.0","uptime_s":7652,"db":true,"memory_db":true}
 === 22. TLS cert for api.marbomebel.ru ===
 subject=CN = api.marbomebel.ru
 issuer=C = US, O = Let's Encrypt, CN = R12
@@ -331,7 +331,7 @@ notBefore=Mar 19 16:47:49 2026 GMT
 notAfter=Jun 17 16:47:48 2026 GMT
 
 === 23. Docker bridge → port 3000 ===
-{"ok":true,"version":"2.3.0","uptime_s":220}
+{"ok":true,"version":"2.4.0","uptime_s":7652,"db":true,"memory_db":true}
 === 24. CORS check (api.marbomebel.ru) ===
 HTTP/2 200 
 access-control-allow-headers: Authorization,Content-Type,Accept
