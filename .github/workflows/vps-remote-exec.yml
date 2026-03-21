@@ -1,0 +1,168 @@
+name: "VPS Remote Exec"
+
+# Claude Code pushes .claude/commands/exec.json → this workflow runs it on VPS → commits result
+# This gives Claude Code autonomous access to VPS diagnostics and fixes.
+#
+# Usage: push exec.json with:
+#   {"command": "systemctl status control-bridge", "intent": "check bridge status"}
+# Or for scripts:
+#   {"script": "#!/bin/bash\necho hello\ndate", "intent": "test"}
+# Or reference a script from the repo:
+#   {"script_file": ".claude/commands/scripts/diagnose-bridge.sh", "intent": "diagnose"}
+
+on:
+  push:
+    branches: ["main", "claude/*", "claude/**"]
+    paths: [".claude/commands/exec.json"]
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Shell command to run on VPS"
+        required: false
+        type: string
+
+concurrency:
+  group: vps-remote-exec
+  cancel-in-progress: true
+
+jobs:
+  exec:
+    name: "Execute on VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Prepare command
+        run: |
+          if [ -n "${{ inputs.command }}" ]; then
+            echo "${{ inputs.command }}" > /tmp/vps-command.sh
+          elif [ -f .claude/commands/exec.json ]; then
+            python3 << 'PYEOF'
+          import json
+          with open('.claude/commands/exec.json') as f:
+              data = json.load(f)
+          # Priority: script_file > script > command
+          if data.get('script_file'):
+              # Read script from repo
+              with open(data['script_file']) as sf:
+                  cmd = sf.read()
+          elif data.get('script'):
+              cmd = data['script']
+          else:
+              cmd = data.get('command', 'echo NO_COMMAND')
+          with open('/tmp/vps-command.sh', 'w') as f:
+              f.write(cmd)
+          PYEOF
+          else
+            echo "echo NO_COMMAND_FILE" > /tmp/vps-command.sh
+          fi
+          echo "--- Command preview (first 20 lines) ---"
+          head -20 /tmp/vps-command.sh
+
+      - name: Execute on VPS and save result
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+
+          # Execute, capture output and exit code
+          set +e
+          $SSH 'bash -s' < /tmp/vps-command.sh > /tmp/vps-output.txt 2>&1
+          VPS_EXIT=$?
+          set -e
+
+          echo "=== VPS Output (exit=$VPS_EXIT) ==="
+          cat /tmp/vps-output.txt
+          echo "=== End ==="
+
+          # Build result JSON safely with Python
+          python3 << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          with open('/tmp/vps-output.txt', 'r', errors='replace') as f:
+              output = f.read()
+          if len(output) > 60000:
+              output = output[:30000] + "\n\n... TRUNCATED ...\n\n" + output[-30000:]
+
+          result = {
+              "timestamp": datetime.now(timezone.utc).isoformat(),
+              "exit_code": int(os.environ.get('VPS_EXIT', '-1')),
+              "output": output.strip()
+          }
+          try:
+              with open('.claude/commands/exec.json') as f:
+                  cmd_data = json.load(f)
+              result["command"] = (cmd_data.get("command") or cmd_data.get("script_file") or cmd_data.get("script", ""))[:500]
+              result["intent"] = cmd_data.get("intent", "")
+          except Exception:
+              result["command"] = "workflow_dispatch"
+              result["intent"] = ""
+
+          os.makedirs('.claude/commands', exist_ok=True)
+          with open('.claude/commands/result.json', 'w') as f:
+              json.dump(result, f, indent=2, ensure_ascii=False)
+          PYEOF
+        env:
+          VPS_EXIT: ${{ job.status }}
+
+      - name: Fix exit code in result
+        run: |
+          # Re-read actual exit code (env var doesn't work mid-step)
+          SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          set +e
+          $SSH 'echo CONNECTION_OK' > /dev/null 2>&1
+          CONN_OK=$?
+          set -e
+          if [ "$CONN_OK" -ne 0 ]; then
+            python3 -c "
+          import json
+          with open('.claude/commands/result.json') as f: r=json.load(f)
+          r['exit_code']=-1
+          r['output']+='\\n\\nSSH_CONNECTION_FAILED'
+          with open('.claude/commands/result.json','w') as f: json.dump(r,f,indent=2,ensure_ascii=False)
+          "
+          fi
+
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .claude/commands/result.json
+          echo '{"command":"noop","intent":"completed"}' > .claude/commands/exec.json
+          git add .claude/commands/exec.json
+          git commit -m "result: VPS remote exec [skip ci]" || echo "Nothing to commit"
+
+          # Push with retry
+          for i in 1 2 3; do
+            git push && break || sleep $((i * 2))
+          done
+
+      - name: Notify Telegram
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          INTENT=$(python3 -c "
+          import json
+          try:
+            with open('.claude/commands/result.json') as f: r=json.load(f)
+            print(r.get('intent','exec'))
+          except: print('exec')
+          " 2>/dev/null)
+          MSG="VPS Exec: ${{ job.status }} | ${INTENT}"
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
