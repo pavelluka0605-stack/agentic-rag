@@ -1,5 +1,64 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git pull*)",
+      "Bash(git fetch*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git stash*)",
+      "Bash(npm test*)",
+      "Bash(npm run*)",
+      "Bash(node *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(curl -s*)",
+      "Bash(systemctl status*)",
+      "Bash(systemctl is-active*)",
+      "Bash(journalctl*)",
+      "Bash(ss -tlnp*)",
+      "Bash(docker ps*)",
+      "Bash(docker logs*)",
+      "Bash(nginx -t*)",
+      "Bash(crontab -l*)",
+      "Bash(df -h*)",
+      "Bash(free -h*)",
+      "Bash(uptime*)",
+      "Bash(uname*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(mkfs*)",
+      "Bash(dd if=*)",
+      "Bash(chmod 777*)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | bash)"
+    ]
+  },
+  "env": {
+    "CLAUDE_PROJECT": "agentic-rag",
+    "NODE_ENV": "production"
+  },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

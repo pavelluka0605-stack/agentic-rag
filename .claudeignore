@@ -1,0 +1,45 @@
+# === Dependencies ===
+node_modules/
+.claude/mcp/memory-server/node_modules/
+vps-runtime/github-webhook/node_modules/
+
+# === Secrets & credentials ===
+.google-sa.json
+*.pem
+*.key
+**/credentials/*.json
+.env
+vps-runtime/github-webhook/.env
+
+# === Memory DB (large binary) ===
+.claude/memory/*.db
+.claude/memory/*.db-wal
+.claude/memory/*.db-shm
+.claude/memory/*.jsonl
+
+# === Build artifacts ===
+__pycache__/
+*.pyc
+*.pyo
+*.db
+
+# === Logs ===
+*.log
+logs/
+
+# === Lock files ===
+package-lock.json
+
+# === VPN/exec results (transient) ===
+.claude/commands/result.json
+.claude/commands/vpn-result.json
+.claude/commands/vpn-client-result.json
+
+# === Git ===
+.git/
+
+# === Large/binary ===
+*.zip
+*.tar.gz
+*.tgz
+*.bak
