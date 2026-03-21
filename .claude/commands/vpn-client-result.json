@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-21T14:10:37.031832+00:00",
+  "timestamp": "2026-03-21T14:14:31.448981+00:00",
   "intent": "VLESS Reality client setup",
-  "output": "SERVER_IP=72.56.127.126\n>>> Logging in to 3X-UI panel...\nLogin response: {\"success\":true,\"msg\":\" You have successfully logged into your account.\",\"obj\":null}\n>>> Login OK\nExisting inbounds: 0 inbounds\n>>> Generating Reality keys..."
+  "output": "SERVER_IP=72.56.127.126\n>>> Logging in to 3X-UI panel...\nLogin response: {\"success\":true,\"msg\":\" You have successfully logged into your account.\",\"obj\":null}\n>>> Login OK\nExisting inbounds: 0 inbounds\n>>> Generating Reality keys...\nXRAY_BIN=/usr/local/x-ui/bin/xray-linux-amd64\nKEYS_OUTPUT=PrivateKey: mFW3U3FwPO5HaC-MOl7qpw9rYtbtyjzJrcDj5_aP0EM\nPassword: MU0-M2X2Wdf-3IZlf5XrRKOqmN-z5_FeWEHpwtbzY0M\nHash32: UPV_bN5B1gNVHzb-TLJeAmC-i3wyx7NSZq1vMwdAbpU"
 }
