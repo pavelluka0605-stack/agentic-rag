@@ -1,4 +1,4 @@
 {
-  "script_file": ".claude/commands/scripts/full-cycle-bridge.sh",
-  "intent": "Полный цикл v3: диагностика + автофикс + верификация"
+  "command": "echo ALIVE && systemctl is-active control-bridge && curl -sf http://127.0.0.1:3000/health && echo '---' && curl -sf --max-time 10 https://api.marbomebel.ru/health && echo '---HTTPS_OK' || echo '---HTTPS_FAIL'",
+  "intent": "quick bridge health check"
 }
