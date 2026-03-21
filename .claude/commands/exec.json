@@ -1,4 +1,4 @@
 {
-  "script_file": ".claude/commands/scripts/full-cycle-bridge.sh",
-  "intent": "Полный цикл диагностики Control Bridge: ClientResponseError от GPT Actions"
+  "command": "echo '=== DNS ===' && dig api.marbomebel.ru +short && echo '=== SSL CERT ===' && echo | openssl s_client -servername api.marbomebel.ru -connect api.marbomebel.ru:443 2>/dev/null | openssl x509 -noout -subject -issuer -dates 2>/dev/null && echo '=== HEALTH LOCAL ===' && curl -sf http://127.0.0.1:3000/health && echo && echo '=== HEALTH HTTPS ===' && curl -svf --max-time 10 https://api.marbomebel.ru/health 2>&1 && echo && echo '=== TRAEFIK ===' && docker ps --filter name=traefik --format '{{.Status}}' && echo '=== TRAEFIK LOGS ===' && docker logs $(docker ps -q --filter name=traefik 2>/dev/null) --tail 30 2>&1 | grep -iE 'api|error|acme|cert' | tail -15 && echo '=== BRIDGE SERVICE ===' && systemctl status control-bridge --no-pager 2>&1 | head -20 && echo '=== PORTS ===' && ss -tlnp | grep -E '3000|443|80'",
+  "intent": "Full diagnostics: DNS + SSL + Health + Traefik + Service"
 }
