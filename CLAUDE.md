@@ -195,6 +195,65 @@ agentic-rag/
 - **AI автоответы** (P0-07) — GPT-4o классифицирует VK комментарии: консультация / уточнение / сделка
 - **Telegram** — уведомления менеджеру работают
 
+## Автономное управление VPS (Remote Exec)
+
+### Архитектура
+Claude Code **не имеет** прямого SSH на VPS и `gh` CLI. Вместо этого — система управления через git push:
+
+```
+Claude Code пишет exec.json → git push → GitHub Actions → SSH на VPS → выполнение → commit result.json → Claude Code читает результат
+```
+
+### Как использовать
+
+**1. Выполнить произвольную команду на VPS:**
+```python
+# Записать команду
+import json
+with open('.claude/commands/exec.json', 'w') as f:
+    json.dump({"command": "systemctl status control-bridge", "intent": "проверка статуса"}, f)
+# git add, commit, push → workflow запустится автоматически
+```
+
+**2. Запустить готовый скрипт:**
+```python
+import json
+with open('.claude/commands/exec.json', 'w') as f:
+    json.dump({"script_file": ".claude/commands/scripts/full-cycle-bridge.sh", "intent": "полный цикл"}, f)
+```
+
+**3. Прочитать результат:**
+```bash
+git pull origin <branch>
+cat .claude/commands/result.json
+```
+
+### Готовые скрипты
+
+| Скрипт | Описание |
+|--------|----------|
+| `scripts/diagnose-bridge.sh` | 15 проверок Control Bridge (сервис, health, TLS, DNS, Docker, CORS) |
+| `scripts/fix-bridge.sh` | Автофикс типовых проблем (рестарт, nginx конфликт, iptables, зомби) |
+| `scripts/full-cycle-bridge.sh` | Полный цикл: диагностика → автофикс → верификация |
+
+### Workflow
+- **Файл:** `.github/workflows/vps-remote-exec.yml`
+- **Триггер:** push в `.claude/commands/exec.json`
+- **Результат:** коммит в `.claude/commands/result.json` (с `[skip ci]`)
+- **Уведомление:** Telegram
+
+### Цикл работы (автономный)
+1. Обнаружил проблему → записал exec.json с диагностикой
+2. Пуш → workflow выполнил на VPS → закоммитил результат
+3. `git pull` → прочитал result.json → понял проблему
+4. Записал exec.json с фиксом → пуш → проверка
+5. Повторить до решения
+
+### Ограничения
+- Каждый цикл занимает ~2-3 минуты (CI pipeline)
+- Нужен `git pull` перед чтением результата
+- Concurrency: один exec за раз (cancel-in-progress)
+
 ## Возможные дальнейшие улучшения
 
 1. ~~Автоответы клиентам VK~~ → реализовано в P0-07 (AI автоответы GPT-4o)
