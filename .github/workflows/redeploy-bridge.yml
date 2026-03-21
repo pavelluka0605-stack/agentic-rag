@@ -1,0 +1,171 @@
+name: "Redeploy Bridge (one-shot)"
+
+on:
+  push:
+    branches:
+      - "claude/**"
+    paths:
+      - ".github/workflows/redeploy-bridge.yml"
+
+jobs:
+  redeploy:
+    name: "Redeploy Control Bridge"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Copy files to VPS
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          SCP_CMD="scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }}"
+          $SSH_CMD "rm -rf /tmp/control-bridge-deploy && mkdir -p /tmp/control-bridge-deploy"
+          $SCP_CMD \
+            control-bridge/app.py \
+            control-bridge/requirements.txt \
+            control-bridge/control-bridge.service \
+            control-bridge/rotate-token.sh \
+            control-bridge/report-complete.sh \
+            control-bridge/report-review.sh \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge-deploy/
+
+      - name: Deploy and restart service
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' << 'DEPLOY'
+          set -e
+          echo "=== PRE-DEPLOY STATE ==="
+          echo "Processes: $(ps -e | wc -l), Zombies: $(ps -eo stat | grep -c '^Z' || echo 0)"
+          free -m | awk 'NR==2{printf "Memory: %dM/%dM (%.0f%%)\n", $3, $2, $3/$2*100}'
+
+          # Kill zombies and stale processes
+          ps -eo pid,ppid,stat --no-headers | awk '$3~/^Z/{print $2}' | sort -u | while read PPID; do
+            kill -SIGCHLD $PPID 2>/dev/null || true
+          done
+          ps -eo pid,etimes,comm --no-headers | awk '$2 > 7200 && ($3 ~ /claude|timeout/)' | awk '{print $1}' | xargs kill -9 2>/dev/null || true
+
+          # Install deps if needed
+          apt-get update -qq 2>/dev/null
+          apt-get install -y -qq python3 python3-venv python3-pip curl 2>&1 | tail -3
+
+          # Setup app
+          mkdir -p /opt/control-bridge
+          cp /tmp/control-bridge-deploy/app.py /opt/control-bridge/
+          cp /tmp/control-bridge-deploy/requirements.txt /opt/control-bridge/
+          cp /tmp/control-bridge-deploy/rotate-token.sh /opt/control-bridge/
+          cp /tmp/control-bridge-deploy/report-complete.sh /opt/control-bridge/
+          cp /tmp/control-bridge-deploy/report-review.sh /opt/control-bridge/
+          chmod +x /opt/control-bridge/rotate-token.sh /opt/control-bridge/report-complete.sh /opt/control-bridge/report-review.sh
+
+          # Venv
+          test -d /opt/control-bridge/venv || python3 -m venv /opt/control-bridge/venv
+          /opt/control-bridge/venv/bin/pip install --upgrade pip -q
+          /opt/control-bridge/venv/bin/pip install -r /opt/control-bridge/requirements.txt -q
+          echo "VENV_OK"
+
+          # Token
+          if [ -f /opt/control-bridge/.env ] && grep -q BRIDGE_API_TOKEN /opt/control-bridge/.env; then
+            echo "TOKEN_EXISTS"
+          else
+            TOKEN=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+            echo "BRIDGE_API_TOKEN=${TOKEN}" > /opt/control-bridge/.env
+            chmod 600 /opt/control-bridge/.env
+            echo "TOKEN_GENERATED"
+          fi
+
+          # Memory + Telegram env
+          grep -q MEMORY_DB_PATH /opt/control-bridge/.env 2>/dev/null || echo "MEMORY_DB_PATH=/opt/claude-code/memory/memory.db" >> /opt/control-bridge/.env
+
+          # Systemd
+          cp /tmp/control-bridge-deploy/control-bridge.service /etc/systemd/system/control-bridge.service
+          systemctl daemon-reload
+          systemctl enable control-bridge
+          systemctl restart control-bridge
+          sleep 3
+
+          echo "=== SERVICE STATUS ==="
+          systemctl is-active control-bridge && echo "SERVICE_OK" || (journalctl -u control-bridge -n 30 --no-pager; exit 1)
+
+          echo "=== LOCAL HEALTH ==="
+          curl -sf http://127.0.0.1:3000/health && echo " LOCAL_OK" || echo "LOCAL_FAIL"
+
+          echo "=== HTTPS HEALTH ==="
+          curl -sf https://api.marbomebel.ru/health && echo " HTTPS_OK" || echo "HTTPS_FAIL (check Traefik/Nginx)"
+
+          echo "=== PORT CHECK ==="
+          ss -tlnp | grep -E '3000|80|443' || echo "no ports"
+
+          echo "=== DNS CHECK ==="
+          dig +short api.marbomebel.ru 2>/dev/null || host api.marbomebel.ru 2>/dev/null || echo "DNS_FAIL"
+
+          # Traefik config
+          for d in /opt/n8n-traefik/dynamic /opt/traefik/dynamic /etc/traefik/dynamic; do
+            if [ -d "$d" ]; then
+              echo "Traefik dir: $d"
+              ls -la "$d/" 2>/dev/null
+              cat "$d/api-bridge.yml" 2>/dev/null || echo "no api-bridge.yml"
+              break
+            fi
+          done
+
+          echo "=== TOKEN (for Telegram) ==="
+          TOKEN=$(grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-)
+          echo "TOKEN_LENGTH=${#TOKEN}"
+
+          rm -rf /tmp/control-bridge-deploy
+          echo "=== DEPLOY DONE ==="
+          DEPLOY
+
+      - name: Setup Traefik routing
+        run: |
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            control-bridge/traefik-api-bridge.yml \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/traefik-api-bridge.yml
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'TRAEFIK'
+          for d in /opt/n8n-traefik/dynamic /opt/traefik/dynamic /etc/traefik/dynamic; do
+            [ -d "$d" ] && TRAEFIK_DYN="$d" && break
+          done
+          if [ -n "$TRAEFIK_DYN" ]; then
+            cp /tmp/traefik-api-bridge.yml "$TRAEFIK_DYN/api-bridge.yml"
+            echo "TRAEFIK_CONFIG_OK ($TRAEFIK_DYN/api-bridge.yml)"
+          else
+            echo "TRAEFIK_DIR_NOT_FOUND — trying nginx fallback"
+            cp /tmp/traefik-api-bridge.yml /etc/nginx/sites-available/api-marbomebel 2>/dev/null || true
+          fi
+          rm -f /tmp/traefik-api-bridge.yml
+          TRAEFIK
+
+      - name: Send token to Telegram
+        if: success()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          BRIDGE_TOKEN=$(ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "grep BRIDGE_API_TOKEN /opt/control-bridge/.env | cut -d= -f2-")
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=GPT Actions Token: ${BRIDGE_TOKEN} | Auth: Bearer | URL: https://api.marbomebel.ru" > /dev/null 2>&1 || true
+
+      - name: Notify status
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=Control Bridge Redeploy: ${{ job.status }} | URL: https://api.marbomebel.ru | Run: ${{ github.run_id }}" > /dev/null 2>&1 || true
