@@ -196,18 +196,27 @@ jobs:
           rm -f /etc/nginx/sites-enabled/api-marbomebel 2>/dev/null || true
           TRAEFIK
 
-      - name: Service and nginx diagnostics
+      - name: Service and HTTPS diagnostics
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DIAG'
           echo "=== systemctl status control-bridge ==="
           systemctl status control-bridge --no-pager 2>&1 || true
           echo ""
-          echo "=== nginx -t ==="
-          nginx -t 2>&1
-          echo ""
           echo "=== /opt/control-bridge/.env exists ==="
           test -f /opt/control-bridge/.env && echo "YES ($(stat -c '%a' /opt/control-bridge/.env) permissions)" || echo "NO"
+          echo ""
+          echo "=== Traefik logs (api.marbomebel.ru) ==="
+          docker logs $(docker ps -q --filter "name=traefik" 2>/dev/null) --tail 50 2>&1 | grep -i "api\.\|marbomebel\|acme\|cert\|error\|ERR" | tail -20 || echo "no traefik logs"
+          echo ""
+          echo "=== HTTPS verbose test ==="
+          curl -sv --max-time 10 https://api.marbomebel.ru/health 2>&1 || echo "HTTPS_FAIL"
+          echo ""
+          echo "=== TLS cert check ==="
+          echo | openssl s_client -servername api.marbomebel.ru -connect api.marbomebel.ru:443 2>/dev/null | openssl x509 -noout -subject -issuer -dates 2>/dev/null || echo "CERT_CHECK_FAIL"
+          echo ""
+          echo "=== Docker bridge connectivity ==="
+          curl -sf --max-time 5 http://172.17.0.1:3000/health 2>&1 && echo " DOCKER_BRIDGE_OK" || echo "DOCKER_BRIDGE_FAIL"
           DIAG
 
       - name: Run full endpoint verification
