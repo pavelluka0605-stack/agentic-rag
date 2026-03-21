@@ -1,0 +1,132 @@
+name: "Setup VPN (3X-UI + VLESS Reality)"
+
+on:
+  push:
+    branches: ["main", "claude/*", "claude/**"]
+    paths: [".github/workflows/setup-vpn.yml"]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        default: "install"
+        type: choice
+        options:
+          - install
+          - status
+          - create-client
+
+jobs:
+  vpn-setup:
+    name: "VPN Setup on VPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Install 3X-UI + Configure VLESS Reality
+        env:
+          SSH_CMD: ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          ACTION: ${{ inputs.action || 'install' }}
+        run: |
+          if [ "$ACTION" = "status" ]; then
+            $SSH_CMD 'systemctl status x-ui --no-pager 2>&1; x-ui settings 2>&1; echo "---"; curl -s4 ifconfig.me'
+            exit 0
+          fi
+
+          $SSH_CMD 'bash -s' << 'REMOTE_SCRIPT'
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+
+          echo "=== 3X-UI VPN Setup ==="
+          echo "Date: $(date -u)"
+          SERVER_IP=$(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
+          echo "Server IP: $SERVER_IP"
+
+          # Check if already installed
+          if systemctl is-active --quiet x-ui 2>/dev/null; then
+              echo ">>> 3X-UI already running!"
+              x-ui status 2>/dev/null || systemctl status x-ui --no-pager
+              echo "Panel: http://${SERVER_IP}:2053"
+              echo "=== ALREADY INSTALLED ==="
+              exit 0
+          fi
+
+          # System update
+          echo ">>> Updating system..."
+          apt-get update -qq
+          apt-get install -y -qq curl wget unzip jq certbot > /dev/null 2>&1
+          echo ">>> System updated"
+
+          # Install 3X-UI (auto-accept)
+          echo ">>> Installing 3X-UI..."
+          echo "y" | bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+          sleep 5
+
+          # Verify running
+          if ! systemctl is-active --quiet x-ui; then
+              echo "ERROR: x-ui failed to start"
+              journalctl -u x-ui --no-pager -n 20
+              exit 1
+          fi
+          echo ">>> 3X-UI is running"
+
+          # Open firewall
+          if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+              ufw allow 2053/tcp
+              ufw allow 443/tcp
+              echo ">>> UFW: ports 2053, 443 opened"
+          fi
+          iptables -I INPUT -p tcp --dport 2053 -j ACCEPT 2>/dev/null || true
+          iptables -I INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+
+          # Enable BBR
+          if ! sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
+              echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+              echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+              sysctl -p > /dev/null 2>&1
+              echo ">>> BBR enabled"
+          else
+              echo ">>> BBR already active"
+          fi
+
+          # Get panel credentials
+          echo ""
+          echo "=== PANEL INFO ==="
+          x-ui settings 2>/dev/null || echo "(run 'x-ui settings' on VPS)"
+          echo ""
+          echo "Panel URL: http://${SERVER_IP}:2053"
+          echo ""
+          echo "=== SETUP COMPLETE ==="
+          REMOTE_SCRIPT
+
+      - name: Save result
+        if: always()
+        run: |
+          echo "VPN setup workflow completed with status: ${{ job.status }}"
+
+      - name: Notify Telegram
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          STATUS="${{ job.status }}"
+          MSG="🔐 VPN Setup: ${STATUS}
+          Action: ${{ inputs.action || 'install' }}
+          Branch: ${{ github.ref_name }}"
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true

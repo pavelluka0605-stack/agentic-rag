@@ -1,4 +1,4 @@
 {
-  "command": "echo VPS_ALIVE && uname -a && curl -s4 ifconfig.me && echo '' && free -h | head -3 && df -h / | tail -1",
-  "intent": "Quick VPS health check before VPN install"
+  "command": "noop",
+  "intent": "completed"
 }
