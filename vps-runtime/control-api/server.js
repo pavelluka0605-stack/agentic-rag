@@ -166,6 +166,67 @@ function runAsync(cmd) {
   });
 }
 
+/**
+ * Pre-execution cleanup: kill zombies, stale claude/timeout processes,
+ * and check available resources before starting a new task.
+ * Returns { ok, message, stats } — ok=false means VPS is too overloaded.
+ */
+function preExecCleanup() {
+  const stats = { before: {}, after: {}, cleaned: [] };
+  try {
+    stats.before.procs = parseInt(run("ps -e --no-headers | wc -l") || "0");
+    stats.before.zombies = parseInt(run("ps -eo stat --no-headers | grep -c '^Z'") || "0");
+    stats.before.mem = run("free -m | awk 'NR==2{printf \"%d/%dMB\", $3, $2}'") || "?";
+
+    // 1. Kill zombie processes (send SIGCHLD to parents)
+    const zombieParents = run("ps -eo pid,ppid,stat --no-headers | awk '$3~/^Z/{print $2}' | sort -u");
+    if (zombieParents) {
+      for (const ppid of zombieParents.split("\n").filter(Boolean)) {
+        try { process.kill(parseInt(ppid), "SIGCHLD"); } catch {}
+      }
+      // Wait a moment, then force-kill remaining zombie parents
+      const stillZombie = run("ps -eo ppid,stat --no-headers | awk '$2~/^Z/{print $1}' | sort -u");
+      if (stillZombie) {
+        for (const ppid of stillZombie.split("\n").filter(Boolean)) {
+          try { process.kill(parseInt(ppid), 9); stats.cleaned.push(`zombie-parent:${ppid}`); } catch {}
+        }
+      }
+    }
+
+    // 2. Kill stale timeout/claude processes (older than 30 min)
+    const stalePids = run("ps -eo pid,etimes,comm --no-headers | awk '$2 > 1800 && ($3 ~ /timeout/)' | awk '{print $1}'");
+    if (stalePids) {
+      for (const pid of stalePids.split("\n").filter(Boolean)) {
+        try { process.kill(parseInt(pid), 9); stats.cleaned.push(`stale-timeout:${pid}`); } catch {}
+      }
+    }
+
+    // 3. Kill old claude processes (> 20 min, likely stuck from previous tasks)
+    const staleClaudePids = run("ps -eo pid,etimes,args --no-headers | awk '$2 > 1200 && $0 ~ /claude.*--print/ {print $1}'");
+    if (staleClaudePids) {
+      for (const pid of staleClaudePids.split("\n").filter(Boolean)) {
+        try { process.kill(parseInt(pid), 9); stats.cleaned.push(`stale-claude:${pid}`); } catch {}
+      }
+    }
+
+    stats.after.procs = parseInt(run("ps -e --no-headers | wc -l") || "0");
+    stats.after.zombies = parseInt(run("ps -eo stat --no-headers | grep -c '^Z'") || "0");
+    stats.after.mem = run("free -m | awk 'NR==2{printf \"%d/%dMB\", $3, $2}'") || "?";
+
+    // Check if VPS has enough headroom
+    const availMem = parseInt(run("free -m | awk 'NR==2{print $7}'") || "0");
+    if (availMem < 100) {
+      return { ok: false, message: `Insufficient memory: ${availMem}MB available (need 100MB+)`, stats };
+    }
+
+    console.log(`[cleanup] procs: ${stats.before.procs}→${stats.after.procs}, zombies: ${stats.before.zombies}→${stats.after.zombies}, cleaned: [${stats.cleaned.join(",")}], mem: ${stats.after.mem}`);
+    return { ok: true, message: `Cleanup done: ${stats.cleaned.length} processes killed`, stats };
+  } catch (e) {
+    console.warn("[cleanup] error:", e.message);
+    return { ok: true, message: `Cleanup failed (non-fatal): ${e.message}`, stats };
+  }
+}
+
 function json(res, statusCode, data) {
   res.writeHead(statusCode, { "Content-Type": "application/json" });
   res.end(JSON.stringify(data, null, 2));
@@ -578,6 +639,16 @@ async function handleTaskStartExec(req, res, id) {
 
   try {
     const body = await parseBody(req);
+
+    // Pre-execution cleanup: kill zombies and stale processes
+    const cleanup = preExecCleanup();
+    if (!cleanup.ok) {
+      taskDb.addTaskEvent(id, "blocked", `VPS ресурсы исчерпаны: ${cleanup.message}`);
+      return json(res, 503, { error: cleanup.message, stats: cleanup.stats });
+    }
+    if (cleanup.stats.cleaned.length > 0) {
+      taskDb.addTaskEvent(id, "cleanup", `Очищено ${cleanup.stats.cleaned.length} процессов перед запуском`);
+    }
 
     // Parse engineering packet before changing state
     const packet = task.engineering_packet

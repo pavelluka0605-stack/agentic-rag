@@ -136,6 +136,47 @@ jobs:
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "curl -sf http://127.0.0.1:3000/health && echo ' LOCAL_OK' || (echo LOCAL_FAIL && exit 1)"
 
+      - name: Deploy updated control-api server.js
+        run: |
+          scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
+            vps-runtime/control-api/server.js \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/claude-code/control-api/server.js
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "systemctl restart control-api.service 2>/dev/null && echo CONTROL_API_RESTARTED || echo CONTROL_API_RESTART_SKIPPED"
+
+      - name: Install persistent cleanup cron (every 10 min)
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' << 'CRON'
+          # Create cleanup script
+          cat > /opt/control-bridge/cleanup-processes.sh << 'SCRIPT'
+          #!/bin/bash
+          # Kill zombie processes
+          ZOMBIES=$(ps -eo pid,ppid,stat --no-headers | awk '$3~/^Z/{print $2}' | sort -u)
+          for PPID in $ZOMBIES; do
+            kill -SIGCHLD $PPID 2>/dev/null
+          done
+
+          # Kill stale timeout processes (>30 min old)
+          ps -eo pid,etimes,comm --no-headers | awk '$2 > 1800 && $3 == "timeout"' | awk '{print $1}' | while read PID; do
+            kill -9 $PID 2>/dev/null
+          done
+
+          # Kill stale claude --print processes (>20 min old)
+          ps -eo pid,etimes,args --no-headers | awk '$2 > 1200 && $0 ~ /claude.*--print/' | awk '{print $1}' | while read PID; do
+            kill -9 $PID 2>/dev/null
+          done
+          SCRIPT
+          chmod +x /opt/control-bridge/cleanup-processes.sh
+
+          # Install cron (every 10 min)
+          CRON_LINE="*/10 * * * * /opt/control-bridge/cleanup-processes.sh >> /var/log/process-cleanup.log 2>&1"
+          (crontab -l 2>/dev/null | grep -v cleanup-processes; echo "$CRON_LINE") | crontab -
+          echo "CRON_INSTALLED"
+          crontab -l | grep cleanup
+          CRON
+
       - name: Setup Traefik routing
         run: |
           scp -i ~/.ssh/deploy_key -P ${{ secrets.VPS_PORT || 22 }} \
