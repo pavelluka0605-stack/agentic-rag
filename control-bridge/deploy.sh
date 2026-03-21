@@ -28,6 +28,9 @@ mkdir -p "${BRIDGE_DIR}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cp "${SCRIPT_DIR}/app.py" "${BRIDGE_DIR}/app.py"
 cp "${SCRIPT_DIR}/requirements.txt" "${BRIDGE_DIR}/requirements.txt"
+cp "${SCRIPT_DIR}/report-complete.sh" "${BRIDGE_DIR}/report-complete.sh"
+cp "${SCRIPT_DIR}/report-review.sh" "${BRIDGE_DIR}/report-review.sh"
+chmod +x "${BRIDGE_DIR}/report-complete.sh" "${BRIDGE_DIR}/report-review.sh"
 
 # --- 3. Python venv ---
 echo ""
@@ -55,6 +58,13 @@ fi
 if ! grep -q "MEMORY_DB_PATH=" "${BRIDGE_DIR}/.env" 2>/dev/null; then
     echo "MEMORY_DB_PATH=/opt/claude-code/memory/memory.db" >> "${BRIDGE_DIR}/.env"
     echo "Added MEMORY_DB_PATH to .env"
+fi
+
+# Telegram notification vars (from GitHub secrets or manual)
+if ! grep -q "TG_BOT_TOKEN=" "${BRIDGE_DIR}/.env" 2>/dev/null; then
+    echo "TG_BOT_TOKEN=${TG_BOT_TOKEN:-}" >> "${BRIDGE_DIR}/.env"
+    echo "TG_CHAT_ID=${TG_CHAT_ID:-}" >> "${BRIDGE_DIR}/.env"
+    echo "Added TG_BOT_TOKEN and TG_CHAT_ID to .env (set manually if empty)"
 fi
 
 # --- 5. systemd service ---
