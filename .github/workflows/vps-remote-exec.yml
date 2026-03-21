@@ -76,7 +76,7 @@ jobs:
         run: |
           SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
 
-          # Execute, capture output and exit code
+          # Выполнить команду, сохранить вывод и exit code
           set +e
           $SSH 'bash -s' < /tmp/vps-command.sh > /tmp/vps-output.txt 2>&1
           VPS_EXIT=$?
@@ -86,7 +86,10 @@ jobs:
           cat /tmp/vps-output.txt
           echo "=== End ==="
 
-          # Build result JSON safely with Python
+          # Сохранить exit code в файл (env vars не передаются в heredoc Python)
+          echo "$VPS_EXIT" > /tmp/vps-exit-code.txt
+
+          # Собрать result.json через Python (безопасная обработка спецсимволов)
           python3 << 'PYEOF'
           import json, os
           from datetime import datetime, timezone
@@ -96,9 +99,15 @@ jobs:
           if len(output) > 60000:
               output = output[:30000] + "\n\n... TRUNCATED ...\n\n" + output[-30000:]
 
+          try:
+              with open('/tmp/vps-exit-code.txt') as f:
+                  exit_code = int(f.read().strip())
+          except Exception:
+              exit_code = -1
+
           result = {
               "timestamp": datetime.now(timezone.utc).isoformat(),
-              "exit_code": int(os.environ.get('VPS_EXIT', '-1')),
+              "exit_code": exit_code,
               "output": output.strip()
           }
           try:
@@ -113,27 +122,8 @@ jobs:
           os.makedirs('.claude/commands', exist_ok=True)
           with open('.claude/commands/result.json', 'w') as f:
               json.dump(result, f, indent=2, ensure_ascii=False)
+          print(f"Result saved: exit_code={exit_code}, output_len={len(output)}")
           PYEOF
-        env:
-          VPS_EXIT: ${{ job.status }}
-
-      - name: Fix exit code in result
-        run: |
-          # Re-read actual exit code (env var doesn't work mid-step)
-          SSH="ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
-          set +e
-          $SSH 'echo CONNECTION_OK' > /dev/null 2>&1
-          CONN_OK=$?
-          set -e
-          if [ "$CONN_OK" -ne 0 ]; then
-            python3 -c "
-          import json
-          with open('.claude/commands/result.json') as f: r=json.load(f)
-          r['exit_code']=-1
-          r['output']+='\\n\\nSSH_CONNECTION_FAILED'
-          with open('.claude/commands/result.json','w') as f: json.dump(r,f,indent=2,ensure_ascii=False)
-          "
-          fi
 
       - name: Commit result
         run: |

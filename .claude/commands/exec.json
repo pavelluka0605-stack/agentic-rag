@@ -1,4 +1,4 @@
 {
   "script_file": ".claude/commands/scripts/full-cycle-bridge.sh",
-  "intent": "Полный цикл: диагностика + автофикс + верификация Control Bridge API (v2)"
+  "intent": "Полный цикл v3: диагностика + автофикс + верификация"
 }
