@@ -14,7 +14,6 @@ on:
         options:
           - install
           - status
-          - create-client
 
 concurrency:
   group: vpn-setup
@@ -40,92 +39,88 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Install 3X-UI + Configure VLESS Reality
+      - name: Install and configure VPN
+        id: vpn
         env:
-          SSH_CMD: ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
-          ACTION: ${{ inputs.action || 'install' }}
+          SSH_CMD: ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
         run: |
           set +e
-          $SSH_CMD 'bash -s' << 'REMOTE_SCRIPT' > /tmp/vpn-output.txt 2>&1
-          set -euo pipefail
+          $SSH_CMD 'bash -s' << 'REMOTE' > /tmp/vpn-output.txt 2>&1
+          #!/bin/bash
+          set -eo pipefail
           export DEBIAN_FRONTEND=noninteractive
 
-          echo "=== 3X-UI VPN Setup ==="
-          echo "Date: $(date -u)"
           SERVER_IP=$(curl -s4 ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
-          echo "Server IP: $SERVER_IP"
+          echo "SERVER_IP=$SERVER_IP"
+          echo "DATE=$(date -u)"
 
-          # Check if already installed
+          # === Check if 3X-UI already installed ===
           if systemctl is-active --quiet x-ui 2>/dev/null; then
-              echo ">>> 3X-UI ALREADY RUNNING"
-              systemctl status x-ui --no-pager 2>&1 | head -15
-              echo "---SETTINGS---"
-              x-ui settings 2>/dev/null || true
+              echo "STATUS=ALREADY_INSTALLED"
+              x-ui settings 2>&1 || true
               echo "---PORTS---"
-              ss -tlnp | grep -E '(2053|443|8443|x-ui|xray)' 2>/dev/null || true
-              echo "---BBR---"
-              sysctl net.ipv4.tcp_congestion_control 2>/dev/null || true
-              echo "Panel: http://${SERVER_IP}:2053"
-              echo "=== ALREADY INSTALLED ==="
+              ss -tlnp | grep -E '(2053|8443|x-ui|xray)' || true
+              echo "PANEL=http://$SERVER_IP:2053"
               exit 0
           fi
 
-          # System update
-          echo ">>> Updating system..."
+          echo "STATUS=INSTALLING"
+
+          # === Prerequisites ===
           apt-get update -qq
-          apt-get install -y -qq curl wget unzip jq > /dev/null 2>&1
-          echo ">>> System updated"
+          apt-get install -y -qq curl wget jq > /dev/null 2>&1
 
-          # Install 3X-UI (auto-accept)
-          echo ">>> Installing 3X-UI..."
-          echo "y" | bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
-          sleep 5
+          # === Enable BBR ===
+          if ! sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
+              cat >> /etc/sysctl.conf << 'SYSCTL'
+          net.core.default_qdisc=fq
+          net.ipv4.tcp_congestion_control=bbr
+          SYSCTL
+              sysctl -p > /dev/null 2>&1
+              echo "BBR=ENABLED"
+          else
+              echo "BBR=ALREADY_ACTIVE"
+          fi
 
-          # Verify running
-          if ! systemctl is-active --quiet x-ui; then
-              echo "ERROR: x-ui failed to start"
-              journalctl -u x-ui --no-pager -n 20
+          # === Install 3X-UI ===
+          echo "INSTALL=STARTING"
+          # Use the official install script with auto-yes
+          bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) << 'ANSWERS'
+          y
+          ANSWERS
+
+          sleep 3
+
+          if systemctl is-active --quiet x-ui; then
+              echo "INSTALL=SUCCESS"
+          else
+              echo "INSTALL=FAILED"
+              systemctl status x-ui --no-pager 2>&1 || true
+              journalctl -u x-ui -n 30 --no-pager 2>&1 || true
               exit 1
           fi
-          echo ">>> 3X-UI is running"
 
-          # Open firewall
-          if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
-              ufw allow 2053/tcp
-              ufw allow 443/tcp
-              echo ">>> UFW: ports 2053, 443 opened"
-          fi
+          # === Open firewall for panel (2053) and VLESS (8443) ===
           iptables -I INPUT -p tcp --dport 2053 -j ACCEPT 2>/dev/null || true
-          iptables -I INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || true
+          iptables -I INPUT -p tcp --dport 8443 -j ACCEPT 2>/dev/null || true
+          echo "FIREWALL=OPENED"
 
-          # Enable BBR
-          if ! sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
-              echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
-              echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
-              sysctl -p > /dev/null 2>&1
-              echo ">>> BBR enabled"
-          else
-              echo ">>> BBR already active"
-          fi
+          # === Get panel info ===
+          echo "---PANEL_INFO---"
+          x-ui settings 2>&1 || true
+          echo "---END_PANEL_INFO---"
+          echo "PANEL=http://$SERVER_IP:2053"
+          echo "DONE=OK"
+          REMOTE
 
-          # Get panel credentials
-          echo ""
-          echo "=== PANEL INFO ==="
-          x-ui settings 2>/dev/null || echo "(run 'x-ui settings' on VPS)"
-          echo ""
-          echo "Panel URL: http://${SERVER_IP}:2053"
-          echo "=== SETUP COMPLETE ==="
-          REMOTE_SCRIPT
-
-          VPS_EXIT=$?
-          echo "=== VPS Output (exit=$VPS_EXIT) ==="
+          EXIT_CODE=$?
+          echo "--- VPN OUTPUT ---"
           cat /tmp/vpn-output.txt
-          echo "=== End ==="
+          echo "--- EXIT: $EXIT_CODE ---"
 
       - name: Commit result
         if: always()
         run: |
-          # Save output as result file
           python3 << 'PYEOF'
           import json, os
           from datetime import datetime, timezone
@@ -134,37 +129,39 @@ jobs:
               with open('/tmp/vpn-output.txt', 'r', errors='replace') as f:
                   output = f.read().strip()
           except:
-              output = "No output captured"
+              output = "No output"
           result = {
               "timestamp": datetime.now(timezone.utc).isoformat(),
               "intent": "VPN 3X-UI setup",
-              "output": output[:60000]
+              "output": output[:50000]
           }
           os.makedirs('.claude/commands', exist_ok=True)
           with open('.claude/commands/vpn-result.json', 'w') as f:
               json.dump(result, f, indent=2, ensure_ascii=False)
-          print(f"Result saved: {len(output)} chars")
           PYEOF
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .claude/commands/vpn-result.json
-          git commit -m "vpn-result: 3X-UI setup output [skip ci]" || echo "Nothing to commit"
+          git commit -m "vpn-result: 3X-UI setup [skip ci]" || true
 
           for i in 1 2 3 4; do
             git pull --rebase origin ${{ github.ref_name }} 2>/dev/null || true
-            git push origin HEAD:${{ github.ref_name }} && echo "Push OK" && break || sleep $((i * 2))
+            git push origin HEAD:${{ github.ref_name }} && break || sleep $((i * 2))
           done
 
-      - name: Notify Telegram
+      - name: Send result to Telegram
         if: always()
         env:
           TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT_ID }}
         run: |
-          OUTPUT=$(head -c 3000 /tmp/vpn-output.txt 2>/dev/null || echo "no output")
+          OUTPUT=$(cat /tmp/vpn-output.txt 2>/dev/null | tail -40 || echo "no output")
           MSG="🔐 VPN Setup: ${{ job.status }}
-          $OUTPUT"
+
+          ${OUTPUT}"
+          # Truncate to 4000 chars for Telegram
+          MSG="${MSG:0:4000}"
           curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TG_CHAT}" \
             --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
