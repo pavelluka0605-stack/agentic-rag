@@ -144,6 +144,55 @@ jobs:
           echo "=== 18. Dashboard package.json exists? ==="
           cat /opt/claude-code/dashboard/package.json 2>/dev/null | head -20 || echo "(package.json not found)"
 
+          # -----------------------------------------------
+          echo ""
+          echo "=== 19. Control Bridge service ==="
+          systemctl is-active control-bridge 2>&1
+          systemctl status control-bridge --no-pager -l 2>&1 | tail -10 || echo "(control-bridge not found)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 20. Control Bridge local health ==="
+          curl -sf --max-time 5 http://127.0.0.1:3000/health 2>&1 || echo "(LOCAL_FAIL: port 3000 not responding)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 21. Control Bridge HTTPS (api.marbomebel.ru) ==="
+          curl -sv --max-time 10 https://api.marbomebel.ru/health 2>&1 || echo "(HTTPS_FAIL)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 22. TLS cert for api.marbomebel.ru ==="
+          echo | openssl s_client -servername api.marbomebel.ru -connect api.marbomebel.ru:443 2>/dev/null | openssl x509 -noout -subject -issuer -dates 2>/dev/null || echo "(CERT_CHECK_FAIL)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 23. Docker bridge → port 3000 ==="
+          curl -sf --max-time 5 http://172.17.0.1:3000/health 2>&1 || echo "(DOCKER_BRIDGE_FAIL: Traefik can't reach control-bridge)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 24. CORS check (api.marbomebel.ru) ==="
+          curl -sI -X OPTIONS https://api.marbomebel.ru/health \
+            -H "Origin: https://chat.openai.com" \
+            -H "Access-Control-Request-Method: GET" \
+            --max-time 10 2>&1 | grep -i "access-control\|HTTP/" || echo "(NO_CORS_HEADERS)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 25. Traefik api-bridge.yml ==="
+          cat /opt/n8n-traefik/dynamic/api-bridge.yml 2>/dev/null || echo "(api-bridge.yml not found)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 26. Traefik logs (api/cert errors) ==="
+          docker logs $(docker ps -q --filter "name=traefik" 2>/dev/null) --tail 100 2>&1 | grep -i "api\.\|marbomebel\|acme\|cert\|error\|ERR\|404\|502" | tail -15 || echo "(no relevant traefik logs)"
+
+          # -----------------------------------------------
+          echo ""
+          echo "=== 27. VPS exec result.json ==="
+          cat /tmp/vps-exec-result.json 2>/dev/null || echo "(no exec result)"
+
           echo ""
           echo "========================================"
           echo "=== DIAGNOSTIC COMPLETE ==="
