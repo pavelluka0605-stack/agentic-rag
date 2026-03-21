@@ -16,6 +16,10 @@ on:
           - status
           - create-client
 
+concurrency:
+  group: vpn-setup
+  cancel-in-progress: false
+
 jobs:
   vpn-setup:
     name: "VPN Setup on VPS"
@@ -41,12 +45,8 @@ jobs:
           SSH_CMD: ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
           ACTION: ${{ inputs.action || 'install' }}
         run: |
-          if [ "$ACTION" = "status" ]; then
-            $SSH_CMD 'systemctl status x-ui --no-pager 2>&1; x-ui settings 2>&1; echo "---"; curl -s4 ifconfig.me'
-            exit 0
-          fi
-
-          $SSH_CMD 'bash -s' << 'REMOTE_SCRIPT'
+          set +e
+          $SSH_CMD 'bash -s' << 'REMOTE_SCRIPT' > /tmp/vpn-output.txt 2>&1
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
 
@@ -57,8 +57,14 @@ jobs:
 
           # Check if already installed
           if systemctl is-active --quiet x-ui 2>/dev/null; then
-              echo ">>> 3X-UI already running!"
-              x-ui status 2>/dev/null || systemctl status x-ui --no-pager
+              echo ">>> 3X-UI ALREADY RUNNING"
+              systemctl status x-ui --no-pager 2>&1 | head -15
+              echo "---SETTINGS---"
+              x-ui settings 2>/dev/null || true
+              echo "---PORTS---"
+              ss -tlnp | grep -E '(2053|443|8443|x-ui|xray)' 2>/dev/null || true
+              echo "---BBR---"
+              sysctl net.ipv4.tcp_congestion_control 2>/dev/null || true
               echo "Panel: http://${SERVER_IP}:2053"
               echo "=== ALREADY INSTALLED ==="
               exit 0
@@ -67,7 +73,7 @@ jobs:
           # System update
           echo ">>> Updating system..."
           apt-get update -qq
-          apt-get install -y -qq curl wget unzip jq certbot > /dev/null 2>&1
+          apt-get install -y -qq curl wget unzip jq > /dev/null 2>&1
           echo ">>> System updated"
 
           # Install 3X-UI (auto-accept)
@@ -108,14 +114,47 @@ jobs:
           x-ui settings 2>/dev/null || echo "(run 'x-ui settings' on VPS)"
           echo ""
           echo "Panel URL: http://${SERVER_IP}:2053"
-          echo ""
           echo "=== SETUP COMPLETE ==="
           REMOTE_SCRIPT
 
-      - name: Save result
+          VPS_EXIT=$?
+          echo "=== VPS Output (exit=$VPS_EXIT) ==="
+          cat /tmp/vpn-output.txt
+          echo "=== End ==="
+
+      - name: Commit result
         if: always()
         run: |
-          echo "VPN setup workflow completed with status: ${{ job.status }}"
+          # Save output as result file
+          python3 << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+          output = ""
+          try:
+              with open('/tmp/vpn-output.txt', 'r', errors='replace') as f:
+                  output = f.read().strip()
+          except:
+              output = "No output captured"
+          result = {
+              "timestamp": datetime.now(timezone.utc).isoformat(),
+              "intent": "VPN 3X-UI setup",
+              "output": output[:60000]
+          }
+          os.makedirs('.claude/commands', exist_ok=True)
+          with open('.claude/commands/vpn-result.json', 'w') as f:
+              json.dump(result, f, indent=2, ensure_ascii=False)
+          print(f"Result saved: {len(output)} chars")
+          PYEOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .claude/commands/vpn-result.json
+          git commit -m "vpn-result: 3X-UI setup output [skip ci]" || echo "Nothing to commit"
+
+          for i in 1 2 3 4; do
+            git pull --rebase origin ${{ github.ref_name }} 2>/dev/null || true
+            git push origin HEAD:${{ github.ref_name }} && echo "Push OK" && break || sleep $((i * 2))
+          done
 
       - name: Notify Telegram
         if: always()
@@ -123,10 +162,9 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT_ID }}
         run: |
-          STATUS="${{ job.status }}"
-          MSG="🔐 VPN Setup: ${STATUS}
-          Action: ${{ inputs.action || 'install' }}
-          Branch: ${{ github.ref_name }}"
+          OUTPUT=$(head -c 3000 /tmp/vpn-output.txt 2>/dev/null || echo "no output")
+          MSG="🔐 VPN Setup: ${{ job.status }}
+          $OUTPUT"
           curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TG_CHAT}" \
             --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
