@@ -108,12 +108,25 @@ jobs:
 
           # --- 4. Generate Reality keys on VPS ---
           echo ">>> Generating Reality keys..."
-          XRAY_BIN=$(find / -name "xray" -type f 2>/dev/null | head -1)
+          # Find xray binary (could be xray, xray-linux-amd64, etc.)
+          XRAY_BIN=$(find / -name "xray-linux-*" -type f 2>/dev/null | head -1)
           if [ -z "$XRAY_BIN" ]; then
-              XRAY_BIN="/usr/local/x-ui/bin/xray-linux-amd64"
+              XRAY_BIN=$(find / -name "xray" -type f 2>/dev/null | head -1)
+          fi
+          if [ -z "$XRAY_BIN" ]; then
+              # Common paths for 3x-ui
+              for p in /usr/local/x-ui/bin/xray-linux-amd64 /usr/local/x-ui/xray-linux-amd64 /usr/bin/xray; do
+                  if [ -f "$p" ]; then XRAY_BIN="$p"; break; fi
+              done
+          fi
+          echo "XRAY_BIN=$XRAY_BIN"
+          if [ -z "$XRAY_BIN" ]; then
+              echo "ERROR: xray binary not found"
+              find / -path "*/x-ui/*" -type f 2>/dev/null | head -10
+              exit 1
           fi
 
-          KEYS=$($XRAY_BIN x25519 2>/dev/null)
+          KEYS=$($XRAY_BIN x25519)
           PRIVATE_KEY=$(echo "$KEYS" | grep "Private" | awk '{print $3}')
           PUBLIC_KEY=$(echo "$KEYS" | grep "Public" | awk '{print $3}')
           echo "PRIVATE_KEY=$PRIVATE_KEY"
