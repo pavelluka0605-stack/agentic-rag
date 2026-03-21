@@ -108,25 +108,28 @@ jobs:
 
           # --- 4. Generate Reality keys on VPS ---
           echo ">>> Generating Reality keys..."
-          # Find xray binary (could be xray, xray-linux-amd64, etc.)
-          XRAY_BIN=$(find / -name "xray-linux-*" -type f 2>/dev/null | head -1)
+          # Find xray binary - check common paths first
+          XRAY_BIN=""
+          for p in /usr/local/x-ui/bin/xray-linux-amd64 /usr/local/x-ui/xray-linux-amd64 /usr/bin/xray /usr/local/bin/xray; do
+              if [ -f "$p" ]; then XRAY_BIN="$p"; break; fi
+          done
+          # If not found, search with find (use || true to prevent pipefail)
           if [ -z "$XRAY_BIN" ]; then
-              XRAY_BIN=$(find / -name "xray" -type f 2>/dev/null | head -1)
+              XRAY_BIN=$(find /usr/local -name "xray*" -type f -executable 2>/dev/null | grep -v ".dat" | head -1 || true)
           fi
           if [ -z "$XRAY_BIN" ]; then
-              # Common paths for 3x-ui
-              for p in /usr/local/x-ui/bin/xray-linux-amd64 /usr/local/x-ui/xray-linux-amd64 /usr/bin/xray; do
-                  if [ -f "$p" ]; then XRAY_BIN="$p"; break; fi
-              done
+              XRAY_BIN=$(find / -maxdepth 5 -name "xray*" -type f -executable 2>/dev/null | grep -v ".dat" | head -1 || true)
           fi
           echo "XRAY_BIN=$XRAY_BIN"
           if [ -z "$XRAY_BIN" ]; then
-              echo "ERROR: xray binary not found"
-              find / -path "*/x-ui/*" -type f 2>/dev/null | head -10
+              echo "ERROR: xray binary not found. Listing x-ui dirs:"
+              ls -la /usr/local/x-ui/ 2>/dev/null || true
+              ls -la /usr/local/x-ui/bin/ 2>/dev/null || true
               exit 1
           fi
 
           KEYS=$($XRAY_BIN x25519)
+          echo "KEYS_OUTPUT=$KEYS"
           PRIVATE_KEY=$(echo "$KEYS" | grep "Private" | awk '{print $3}')
           PUBLIC_KEY=$(echo "$KEYS" | grep "Public" | awk '{print $3}')
           echo "PRIVATE_KEY=$PRIVATE_KEY"
