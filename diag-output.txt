@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sat Mar 21 01:34:58 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sat Mar 21 01:39:36 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 2 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 133.7M (max: 256.0M available: 122.2M peak: 137.4M swap: 2.1M swap peak: 2.1M)
-        CPU: 16.843s
+     Memory: 133.4M (max: 256.0M available: 122.5M peak: 137.4M swap: 2.1M swap peak: 2.1M)
+        CPU: 16.866s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -25,17 +25,11 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
      Active: active (running) since Wed 2026-03-18 11:57:46 UTC; 2 days ago
    Main PID: 1364558 (node)
-      Tasks: 27 (limit: 32)
-     Memory: 111.6M (max: 128.0M available: 16.3M peak: 128.0M swap: 80.7M swap peak: 97.6M)
-        CPU: 34.763s
+      Tasks: 11 (limit: 32)
+     Memory: 19.1M (max: 128.0M available: 108.8M peak: 128.0M swap: 33.0M swap peak: 97.6M)
+        CPU: 34.972s
      CGroup: /system.slice/control-api.service
-             ├─1364558 /usr/bin/node server.js
-             ├─1837311 /bin/sh -c "bash \"/opt/claude-code/bin/exec-task.sh\" 117 \"/opt/claude-code/workspace/task-117.md\" >> \"/opt/claude-code/logs/exec-task-117.log\" 2>&1"
-             ├─1837312 bash /opt/claude-code/bin/exec-task.sh 117 /opt/claude-code/workspace/task-117.md
-             ├─1837338 bash /opt/claude-code/bin/exec-task.sh 117 /opt/claude-code/workspace/task-117.md
-             ├─1837340 timeout 600 claude -p "You are executing a task from the dashboard task pipeline.\n\nTASK FILE CONTENTS:\n# Task #117: Тестирование пайплайна GPT -> Claude Code\n\n## Objective\nПровести тестирование пайплайна для проверки его работоспособности и выявления возможных ошибок.\n\n## Scope\n- Тестовый код\n- Интерфейс взаимодействия\n- Логи выполнения\n\n## Steps\n1. Разработать тестовый сценарий для проверки основных функций пайплайна.\n2. Настроить автоматизированные тесты для запуска при каждом изменении кода.\n3. Провести ручное тестирование на различных примерах входных данных.\n\n## Constraints\n- Необходимо использовать актуальные версии GPT и Claude Code\n- Тест должен быть завершен в течение одного рабочего дня\n\n## Acceptance Criteria\n- Все тесты проходят успешно\n- Логи выполнения не содержат ошибок\n\n## Mode: safe\n\n---\nReport progress via: POST /api/tasks/117/progress { \"message_ru\": \"...\", \"pct\": N }\nComplete via: POST /api/tasks/117/complete { \"result_summary_ru\": \"...\", \"result_detail\": \"...\" }\nFail via: POST /api/tasks/117/fail { \"error\": \"...\" }\n\nIMPORTANT INSTRUCTIONS:\n1. Execute the task described above\n2. Work in the /opt/claude-code/workspace directory\n3. Be thorough but concise\n4. When done, output a clear summary of what was accomplished\n\nDo NOT call any API endpoints — just do the work and output results."
-             ├─1837341 claude
-             └─1840572 sleep 30
+             └─1364558 /usr/bin/node server.js
 
 Mar 18 11:57:46 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
@@ -140,7 +134,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sat, 21 Mar 2026 01:34:58 GMT
+Date: Sat, 21 Mar 2026 01:39:36 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -150,7 +144,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-21T01:34:58.588Z"
+  "timestamp": "2026-03-21T01:39:36.544Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -217,7 +211,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sat, 21 Mar 2026 01:34:58 GMT
+date: Sat, 21 Mar 2026 01:39:36 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
