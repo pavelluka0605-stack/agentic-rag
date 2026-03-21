@@ -1,0 +1,202 @@
+openapi: 3.0.0
+info:
+  title: Control Bridge API
+  description: |
+    Bridge between ChatGPT and Claude Code on VPS.
+    Flow: getActiveJobs → createJob → poll getJobStatus → getJobResult.
+    Call memoryBootstrap at the START of every new task.
+  version: "2.1.0"
+servers:
+  - url: https://api.marbomebel.ru
+    description: Production
+
+paths:
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  version:
+                    type: string
+
+  /jobs/active:
+    get:
+      operationId: getActiveJobs
+      summary: Check running jobs. ALWAYS call BEFORE createJob.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Active jobs list. Empty = safe to create.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    job_id:
+                      type: string
+                    status:
+                      type: string
+                    title:
+                      type: string
+
+  /jobs:
+    post:
+      operationId: createJob
+      summary: Create and auto-start a job. Returns 429 if busy.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Short job title
+                raw_user_request:
+                  type: string
+                  description: Original user request
+                normalized_brief:
+                  type: string
+                  description: Normalized brief for execution
+                  default: ""
+              required:
+                - title
+                - raw_user_request
+      responses:
+        "200":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "429":
+          description: Another job running — wait.
+
+  /jobs/{job_id}/status:
+    get:
+      operationId: getJobStatus
+      summary: Poll job status until completed or failed.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "404":
+          description: Job not found
+
+  /jobs/{job_id}/result:
+    get:
+      operationId: getJobResult
+      summary: Get result when status is completed.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                  result:
+                    type: object
+                    properties:
+                      summary:
+                        type: string
+                      changes_made:
+                        type: array
+                        items:
+                          type: string
+        "404":
+          description: Job not found
+
+  /memory/bootstrap:
+    get:
+      operationId: memoryBootstrap
+      summary: Load project context. CALL THIS first for every new task.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: project
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full project context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  policies:
+                    type: array
+                    items:
+                      type: object
+                  open_incidents:
+                    type: array
+                    items:
+                      type: object
+                  top_solutions:
+                    type: array
+                    items:
+                      type: object
+                  recent_decisions:
+                    type: array
+                    items:
+                      type: object
+                  stats:
+                    type: object
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    JobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+          enum: [queued, dispatched, running, review, completed, failed, cancelled]
+      required: [job_id, status]
