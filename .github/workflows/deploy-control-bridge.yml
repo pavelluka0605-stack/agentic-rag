@@ -49,6 +49,8 @@ jobs:
             control-bridge/control-bridge.service \
             control-bridge/deploy.sh \
             control-bridge/rotate-token.sh \
+            control-bridge/report-complete.sh \
+            control-bridge/report-review.sh \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge-deploy/
 
       - name: Install packages on VPS
@@ -61,13 +63,32 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "mkdir -p /opt/control-bridge && cp /tmp/control-bridge-deploy/app.py /tmp/control-bridge-deploy/requirements.txt /tmp/control-bridge-deploy/rotate-token.sh /opt/control-bridge/ && chmod +x /opt/control-bridge/rotate-token.sh && (test -d /opt/control-bridge/venv || python3 -m venv /opt/control-bridge/venv) && /opt/control-bridge/venv/bin/pip install --upgrade pip -q && /opt/control-bridge/venv/bin/pip install -r /opt/control-bridge/requirements.txt -q && echo VENV_OK"
+            "mkdir -p /opt/control-bridge && cp /tmp/control-bridge-deploy/app.py /tmp/control-bridge-deploy/requirements.txt /tmp/control-bridge-deploy/rotate-token.sh /tmp/control-bridge-deploy/report-complete.sh /tmp/control-bridge-deploy/report-review.sh /opt/control-bridge/ && chmod +x /opt/control-bridge/rotate-token.sh /opt/control-bridge/report-complete.sh /opt/control-bridge/report-review.sh && (test -d /opt/control-bridge/venv || python3 -m venv /opt/control-bridge/venv) && /opt/control-bridge/venv/bin/pip install --upgrade pip -q && /opt/control-bridge/venv/bin/pip install -r /opt/control-bridge/requirements.txt -q && echo VENV_OK"
 
       - name: Generate API token (if missing)
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "if [ -f /opt/control-bridge/.env ] && grep -q BRIDGE_API_TOKEN /opt/control-bridge/.env; then echo TOKEN_EXISTS; else TOKEN=\$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))') && echo \"BRIDGE_API_TOKEN=\${TOKEN}\" > /opt/control-bridge/.env && chmod 600 /opt/control-bridge/.env && echo TOKEN_GENERATED; fi"
+
+      - name: Set Memory + Telegram env vars
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << ENVSETUP
+          # MEMORY_DB_PATH
+          grep -q MEMORY_DB_PATH /opt/control-bridge/.env 2>/dev/null || echo "MEMORY_DB_PATH=/opt/claude-code/memory/memory.db" >> /opt/control-bridge/.env
+          # TG_BOT_TOKEN
+          if ! grep -q TG_BOT_TOKEN /opt/control-bridge/.env 2>/dev/null; then
+            echo "TG_BOT_TOKEN=${TG_BOT_TOKEN}" >> /opt/control-bridge/.env
+            echo "TG_CHAT_ID=${TG_CHAT_ID}" >> /opt/control-bridge/.env
+            echo "TG_VARS_ADDED"
+          else
+            echo "TG_VARS_EXIST"
+          fi
+          ENVSETUP
 
       - name: Setup systemd service and restart
         run: |
@@ -169,6 +190,24 @@ jobs:
             -d '{"title":"Cancel test","raw_user_request":"Test cancel","normalized_brief":"Cancel"}')
           CID=$(echo "${CANCEL_CREATE}" | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])" 2>/dev/null)
           curl -si -X POST "http://127.0.0.1:3000/jobs/${CID}/cancel" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo ""
+          echo "--- memory/stats ---"
+          curl -si "http://127.0.0.1:3000/memory/stats" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo ""
+          echo "--- memory/bootstrap ---"
+          curl -si "http://127.0.0.1:3000/memory/bootstrap" \
+            -H "Authorization: Bearer ${TOKEN}" 2>&1
+          echo ""
+
+          echo ""
+          echo "--- pending-reviews ---"
+          curl -si "http://127.0.0.1:3000/jobs/pending-reviews" \
             -H "Authorization: Bearer ${TOKEN}" 2>&1
           echo ""
 
