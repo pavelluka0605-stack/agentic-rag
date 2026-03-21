@@ -28,7 +28,7 @@ logger = logging.getLogger("bridge")
 
 # --- Version / uptime ---
 _STARTED_AT = time.time()
-_VERSION = "2.1.0"
+_VERSION = "2.2.0"
 
 # --- Concurrency lock ---
 # Only one task can run at a time to prevent VPS resource exhaustion.
