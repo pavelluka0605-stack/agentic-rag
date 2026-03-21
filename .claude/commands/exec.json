@@ -1,4 +1,4 @@
 {
-  "script_file": ".claude/commands/scripts/setup-vpn-3xui.sh",
-  "intent": "Install 3X-UI VPN panel with VLESS Reality on Frankfurt VPS"
+  "command": "echo VPS_ALIVE && uname -a && curl -s4 ifconfig.me && echo '' && free -h | head -3 && df -h / | tail -1",
+  "intent": "Quick VPS check before VPN install"
 }
