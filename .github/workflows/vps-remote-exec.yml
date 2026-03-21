@@ -144,8 +144,9 @@ jobs:
           git add .claude/commands/exec.json
           git commit -m "result: VPS remote exec [skip ci]" || echo "Nothing to commit"
 
-          # Push with retry
-          for i in 1 2 3; do
+          # Pull с rebase перед push (чтобы не конфликтовать с параллельными коммитами)
+          for i in 1 2 3 4; do
+            git pull --rebase origin ${{ github.ref_name }} 2>/dev/null || true
             git push && break || sleep $((i * 2))
           done
 
