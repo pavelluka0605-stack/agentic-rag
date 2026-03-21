@@ -1,4 +1,4 @@
 {
-  "command": "curl -sS --connect-timeout 5 https://api.marbomebel.ru/health 2>&1; echo '---'; systemctl is-active control-bridge 2>&1; echo '---'; curl -sS --connect-timeout 5 http://127.0.0.1:3000/health 2>&1",
-  "intent": "Verify Control Bridge deploy: HTTPS health, service status, local health"
+  "script_file": ".claude/commands/scripts/full-cycle-bridge.sh",
+  "intent": "Full cycle: diagnose + autofix + verify Control Bridge after deploy"
 }
