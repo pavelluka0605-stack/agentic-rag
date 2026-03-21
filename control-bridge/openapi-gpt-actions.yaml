@@ -20,7 +20,14 @@ info:
 
     ALWAYS call memoryBootstrap at the START of a new task to load project context.
     Use memorySearch to find relevant experience before starting work.
-  version: "2.0.0"
+
+    ## Review Loop
+    Claude Code can request human review. Flow:
+    1. Claude Code posts review request → you get notified
+    2. Call getPendingReviews to see what needs attention
+    3. Discuss with user
+    4. Send feedback via jobFeedback (approve/revise/cancel)
+  version: "2.1.0"
 servers:
   - url: https://api.marbomebel.ru
     description: Production
@@ -177,6 +184,110 @@ paths:
                 $ref: "#/components/schemas/JobResponse"
         "404":
           description: "Job not found"
+
+  # ─── Review Loop ────────────────────────────────────────────────────────────
+  /jobs/pending-reviews:
+    get:
+      operationId: getPendingReviews
+      summary: "Check for jobs waiting for review. Call at START of every conversation and when user asks 'what happened?'"
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: "Jobs in review/approved/revision_requested status"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    job_id:
+                      type: string
+                    title:
+                      type: string
+                    status:
+                      type: string
+                    review_data:
+                      type: object
+                      properties:
+                        summary:
+                          type: string
+                        questions:
+                          type: array
+                          items:
+                            type: string
+                        alternatives:
+                          type: array
+                          items:
+                            type: string
+
+  /jobs/{job_id}/review:
+    get:
+      operationId: getJobReview
+      summary: "Read review details for a specific job"
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Review data"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                  review:
+                    type: object
+
+  /jobs/{job_id}/feedback:
+    post:
+      operationId: jobFeedback
+      summary: "Send feedback after discussing review with user. Decision: approve, revise, or cancel."
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, revise, cancel]
+                comment:
+                  type: string
+                  description: "Instructions for revision or reason for cancel"
+              required:
+                - decision
+      responses:
+        "200":
+          description: "Feedback accepted"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
 
   # ─── Memory: Read ───────────────────────────────────────────────────────────
   /memory/bootstrap:
@@ -606,7 +717,7 @@ components:
           type: string
         status:
           type: string
-          enum: [queued, dispatched, running, completed, failed, cancelled]
+          enum: [queued, dispatched, running, review, approved, revision_requested, completed, failed, cancelled]
       required: [job_id, status]
 
     JobResultData:

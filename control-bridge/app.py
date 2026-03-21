@@ -28,7 +28,7 @@ logger = logging.getLogger("bridge")
 
 # --- Version / uptime ---
 _STARTED_AT = time.time()
-_VERSION = "2.0.0"
+_VERSION = "2.1.0"
 
 # --- Concurrency lock ---
 # Only one task can run at a time to prevent VPS resource exhaustion.
@@ -69,6 +69,11 @@ def _init_db():
             result_json TEXT
         )
     """)
+    # Add completed_at column if missing (for tracking duration)
+    try:
+        conn.execute("ALTER TABLE jobs ADD COLUMN completed_at REAL")
+    except Exception:
+        pass  # column already exists
     conn.commit()
     conn.close()
 
@@ -100,6 +105,23 @@ def db_update_status(job_id: str, status: str, result_json: Optional[str] = None
         conn.execute("UPDATE jobs SET status = ? WHERE job_id = ?", (status, job_id))
     conn.commit()
     conn.close()
+
+# --- Telegram notifications ---
+TG_BOT_TOKEN = os.environ.get("TG_BOT_TOKEN", "")
+TG_CHAT_ID = os.environ.get("TG_CHAT_ID", "")
+
+def _send_telegram(text: str):
+    """Send message to Telegram. Fire-and-forget, never raises."""
+    if not TG_BOT_TOKEN or not TG_CHAT_ID:
+        logger.warning("Telegram not configured (TG_BOT_TOKEN or TG_CHAT_ID missing)")
+        return
+    try:
+        url = f"https://api.telegram.org/bot{TG_BOT_TOKEN}/sendMessage"
+        data = json.dumps({"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "Markdown"}).encode()
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        logger.error("Telegram send failed: %s", e)
 
 # --- Control API dispatcher ---
 CONTROL_API_URL = os.environ.get("CONTROL_API_URL", "http://127.0.0.1:3901")
@@ -174,6 +196,7 @@ def dispatch_to_claude(job_id: str, title: str, raw_user_request: str, normalize
     except Exception as e:
         logger.error("dispatch job=%s failed at: %s", job_id, e)
         db_update_status(job_id, "failed", result_json=json.dumps({"summary": str(e)}))
+        _send_telegram(f"*Job Failed*\n_{title}_\n\n{e}")
     finally:
         with _running_lock:
             if _running_job_id == job_id:
@@ -378,6 +401,161 @@ def cancel_job(job_id: str):
         raise HTTPException(status_code=409, detail=f"Cannot cancel job in state: {job['status']}")
     db_update_status(job_id, "cancelled")
     return JobResponse(job_id=job_id, status="cancelled")
+
+
+# =============================================================================
+# JOB COMPLETION — Claude Code reports results back
+# =============================================================================
+
+class JobCompleteBody(BaseModel):
+    summary: str
+    changes_made: list[str] = []
+    artifacts: list[str] = []
+    tests_run: list[str] = []
+    manual_checks: list[str] = []
+    risks_remaining: list[str] = []
+    alternatives_considered: list[str] = []
+
+@app.post("/jobs/{job_id}/complete", dependencies=[Depends(verify_token)])
+def complete_job(job_id: str, body: JobCompleteBody):
+    """Claude Code calls this when job is done. Saves result, notifies Telegram, writes memory episode."""
+    job = db_get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["status"] in ("completed", "cancelled"):
+        raise HTTPException(status_code=409, detail=f"Job already in state: {job['status']}")
+
+    result_json = json.dumps({
+        "summary": body.summary,
+        "changes_made": body.changes_made,
+        "artifacts": body.artifacts,
+        "tests_run": body.tests_run,
+        "manual_checks": body.manual_checks,
+        "risks_remaining": body.risks_remaining,
+        "alternatives_considered": body.alternatives_considered,
+    })
+    db_update_status(job_id, "completed", result_json=result_json)
+
+    # Write episode to shared memory
+    try:
+        conn = _get_mem_db()
+        conn.execute(
+            "INSERT INTO episodes (summary, what_done, what_remains) VALUES (?, ?, ?)",
+            (
+                f"Job: {job.get('title', 'unknown')} — {body.summary}",
+                "\n".join(body.changes_made) if body.changes_made else body.summary,
+                "\n".join(body.risks_remaining) if body.risks_remaining else None,
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error("Failed to write episode for job %s: %s", job_id, e)
+
+    # Telegram notification
+    title = job.get("title", "unknown")
+    changes_text = "\n".join(f"  - {c}" for c in body.changes_made[:5]) if body.changes_made else "нет деталей"
+    risks_text = "\n".join(f"  - {r}" for r in body.risks_remaining[:3]) if body.risks_remaining else "нет"
+    alts_text = "\n".join(f"  - {a}" for a in body.alternatives_considered[:3]) if body.alternatives_considered else ""
+    tg_msg = f"*Job Done*\n_{title}_\n\n*Итог:* {body.summary}\n\n*Изменения:*\n{changes_text}"
+    if body.risks_remaining:
+        tg_msg += f"\n\n*Риски:*\n{risks_text}"
+    if body.alternatives_considered:
+        tg_msg += f"\n\n*Альтернативы:*\n{alts_text}"
+    if body.manual_checks:
+        tg_msg += f"\n\n*Проверить вручную:*\n" + "\n".join(f"  - {m}" for m in body.manual_checks[:3])
+    _send_telegram(tg_msg)
+
+    return {"job_id": job_id, "status": "completed"}
+
+
+class JobReviewBody(BaseModel):
+    summary: str
+    changes_made: list[str] = []
+    questions: list[str] = []
+    alternatives: list[str] = []
+    risks: list[str] = []
+
+@app.post("/jobs/{job_id}/review", dependencies=[Depends(verify_token)])
+def review_job(job_id: str, body: JobReviewBody):
+    """Claude Code requests human/GPT review before completing. Sends to Telegram + saves for GPT to read."""
+    job = db_get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    result_json = json.dumps({
+        "summary": body.summary,
+        "changes_made": body.changes_made,
+        "questions": body.questions,
+        "alternatives": body.alternatives,
+        "risks": body.risks,
+    })
+    db_update_status(job_id, "review", result_json=result_json)
+
+    title = job.get("title", "unknown")
+    questions_text = "\n".join(f"  - {q}" for q in body.questions) if body.questions else ""
+    alts_text = "\n".join(f"  - {a}" for a in body.alternatives) if body.alternatives else ""
+    tg_msg = f"*Review Needed*\n_{title}_\n\n*Итог:* {body.summary}"
+    if body.questions:
+        tg_msg += f"\n\n*Вопросы к тебе:*\n{questions_text}"
+    if body.alternatives:
+        tg_msg += f"\n\n*Варианты:*\n{alts_text}"
+    tg_msg += "\n\nОтветь в GPT чате — он передаст решение."
+    _send_telegram(tg_msg)
+
+    return {"job_id": job_id, "status": "review"}
+
+
+@app.get("/jobs/{job_id}/review", dependencies=[Depends(verify_token)])
+def get_job_review(job_id: str):
+    """GPT reads the review request to discuss with user."""
+    job = db_get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    review_data = json.loads(job["result_json"]) if job.get("result_json") else {}
+    return {"job_id": job_id, "status": job["status"], "review": review_data}
+
+
+class JobFeedbackBody(BaseModel):
+    decision: str  # "approve", "revise", "cancel"
+    comment: str = ""
+
+@app.post("/jobs/{job_id}/feedback", dependencies=[Depends(verify_token)])
+def job_feedback(job_id: str, body: JobFeedbackBody):
+    """GPT sends feedback after reviewing with the user. Claude Code polls this."""
+    job = db_get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if body.decision == "approve":
+        db_update_status(job_id, "approved")
+    elif body.decision == "revise":
+        # Store revision request for Claude Code to pick up
+        existing = json.loads(job["result_json"]) if job.get("result_json") else {}
+        existing["revision_request"] = body.comment
+        db_update_status(job_id, "revision_requested", result_json=json.dumps(existing))
+    elif body.decision == "cancel":
+        db_update_status(job_id, "cancelled")
+
+    return {"job_id": job_id, "status": body.decision, "comment": body.comment}
+
+
+@app.get("/jobs/pending-reviews", dependencies=[Depends(verify_token)])
+def get_pending_reviews():
+    """GPT checks if there are jobs waiting for review. Call this regularly."""
+    conn = _get_db()
+    rows = conn.execute(
+        "SELECT job_id, title, status, result_json FROM jobs WHERE status IN ('review', 'revision_requested', 'approved') ORDER BY created_at DESC"
+    ).fetchall()
+    conn.close()
+    results = []
+    for r in rows:
+        item = dict(r)
+        if item.get("result_json"):
+            item["review_data"] = json.loads(item["result_json"])
+            del item["result_json"]
+        results.append(item)
+    return results
 
 
 # =============================================================================
