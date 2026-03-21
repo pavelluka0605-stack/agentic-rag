@@ -53,6 +53,40 @@ jobs:
             control-bridge/report-review.sh \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/control-bridge-deploy/
 
+      - name: VPS Resource Cleanup (kill zombies + stale processes)
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' << 'CLEANUP'
+          echo "=== PRE-DEPLOY CLEANUP ==="
+          echo "Before: $(ps -e | wc -l) processes, $(ps -eo stat | grep -c "^Z" || echo 0) zombies"
+          echo "Memory: $(free -m | awk 'NR==2{printf "%dM/%dM (%.0f%%)", $3, $2, $3/$2*100}')"
+          echo "Load: $(cat /proc/loadavg)"
+
+          # Kill zombies
+          ZOMBIE_PIDS=$(ps -eo pid,ppid,stat | awk '$3~/^Z/{print $1,$2}')
+          if [ -n "$ZOMBIE_PIDS" ]; then
+            echo "$ZOMBIE_PIDS" | while read ZPID ZPPID; do
+              kill -SIGCHLD $ZPPID 2>/dev/null
+              sleep 0.1
+              if ps -p $ZPID -o stat= 2>/dev/null | grep -q '^Z'; then
+                kill -9 $ZPPID 2>/dev/null || true
+              fi
+            done
+            echo "Zombie cleanup done"
+          fi
+
+          # Kill stale claude/timeout processes (>2h old)
+          STALE_PIDS=$(ps -eo pid,etimes,comm --no-headers | awk '$2 > 7200 && ($3 ~ /claude|timeout/)' | awk '{print $1}')
+          if [ -n "$STALE_PIDS" ]; then
+            echo "Killing stale processes: $STALE_PIDS"
+            echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true
+          fi
+
+          echo "After: $(ps -e | wc -l) processes, $(ps -eo stat | grep -c "^Z" || echo 0) zombies"
+          echo "Memory: $(free -m | awk 'NR==2{printf "%dM/%dM (%.0f%%)", $3, $2, $3/$2*100}')"
+          echo "=== CLEANUP DONE ==="
+          CLEANUP
+
       - name: Install packages on VPS
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} \
