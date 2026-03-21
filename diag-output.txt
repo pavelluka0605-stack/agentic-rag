@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sat Mar 21 04:21:19 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sat Mar 21 04:25:01 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 2 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 134.1M (max: 256.0M available: 121.8M peak: 137.4M swap: 2.1M swap peak: 2.1M)
-        CPU: 17.344s
+     Memory: 133.8M (max: 256.0M available: 122.1M peak: 137.4M swap: 2.1M swap peak: 2.1M)
+        CPU: 17.365s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -23,11 +23,11 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sat 2026-03-21 04:15:50 UTC; 5min ago
+     Active: active (running) since Sat 2026-03-21 04:15:50 UTC; 9min ago
    Main PID: 1886053 (node)
       Tasks: 11 (limit: 32)
      Memory: 23.6M (max: 128.0M available: 104.3M peak: 43.3M)
-        CPU: 658ms
+        CPU: 664ms
      CGroup: /system.slice/control-api.service
              └─1886053 /usr/bin/node server.js
 
@@ -132,7 +132,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sat, 21 Mar 2026 04:21:19 GMT
+Date: Sat, 21 Mar 2026 04:25:01 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,7 +142,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-21T04:21:19.658Z"
+  "timestamp": "2026-03-21T04:25:01.543Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -209,7 +209,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sat, 21 Mar 2026 04:21:20 GMT
+date: Sat, 21 Mar 2026 04:25:01 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
