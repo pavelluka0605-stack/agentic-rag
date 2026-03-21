@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sat Mar 21 02:52:14 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sat Mar 21 02:53:36 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 2 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 133.8M (max: 256.0M available: 122.1M peak: 137.4M swap: 2.1M swap peak: 2.1M)
-        CPU: 17.032s
+     Memory: 133.5M (max: 256.0M available: 122.4M peak: 137.4M swap: 2.1M swap peak: 2.1M)
+        CPU: 17.053s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -23,11 +23,11 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sat 2026-03-21 01:47:23 UTC; 1h 4min ago
+     Active: active (running) since Sat 2026-03-21 01:47:23 UTC; 1h 6min ago
    Main PID: 1844952 (node)
       Tasks: 11 (limit: 32)
-     Memory: 24.8M (max: 128.0M available: 103.1M peak: 44.7M)
-        CPU: 712ms
+     Memory: 25.1M (max: 128.0M available: 102.8M peak: 44.7M)
+        CPU: 934ms
      CGroup: /system.slice/control-api.service
              └─1844952 /usr/bin/node server.js
 
@@ -39,6 +39,7 @@ Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Task DB: ready
 Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] LLM: configured
 Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Telegram: configured
 Mar 21 01:47:39 fra-1-vm-ckr7 node[1844952]: [cleanup] procs: 181→181, zombies: 0→0, cleaned: [], mem: 1809/3915MB
+Mar 21 02:52:18 fra-1-vm-ckr7 node[1844952]: [cleanup] procs: 180→180, zombies: 0→0, cleaned: [], mem: 1782/3915MB
 
 === 3. Ports listening (3200, 3901, 3847, 3900, 80, 443) ===
 LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=1844952,fd=21))                                                                                                                                
@@ -81,7 +82,6 @@ Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Starting...
 Mar 18 11:57:52 fra-1-vm-ckr7 node[1364737]: ✓ Ready in 983ms
 
 === 5. Control API logs (last 20 lines) ===
-Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Listening on 127.0.0.1:3901
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] Task DB: ready
 Mar 18 11:57:46 fra-1-vm-ckr7 node[1364558]: [control-api] LLM: configured
@@ -101,6 +101,7 @@ Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Task DB: ready
 Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] LLM: configured
 Mar 21 01:47:23 fra-1-vm-ckr7 node[1844952]: [control-api] Telegram: configured
 Mar 21 01:47:39 fra-1-vm-ckr7 node[1844952]: [cleanup] procs: 181→181, zombies: 0→0, cleaned: [], mem: 1809/3915MB
+Mar 21 02:52:18 fra-1-vm-ckr7 node[1844952]: [cleanup] procs: 180→180, zombies: 0→0, cleaned: [], mem: 1782/3915MB
 
 === 6. Dashboard .next/ build exists? ===
 total 180
@@ -132,7 +133,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sat, 21 Mar 2026 02:52:14 GMT
+Date: Sat, 21 Mar 2026 02:53:36 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,7 +143,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-21T02:52:14.894Z"
+  "timestamp": "2026-03-21T02:53:36.456Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -209,7 +210,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sat, 21 Mar 2026 02:52:15 GMT
+date: Sat, 21 Mar 2026 02:53:36 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
