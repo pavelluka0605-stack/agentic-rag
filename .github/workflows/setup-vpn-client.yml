@@ -1,0 +1,257 @@
+name: "Setup VLESS Reality Client"
+
+on:
+  push:
+    branches: ["main", "claude/*", "claude/**"]
+    paths: [".github/workflows/setup-vpn-client.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vpn-client-setup
+  cancel-in-progress: false
+
+jobs:
+  setup-client:
+    name: "Create VLESS Reality inbound"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Create VLESS Reality inbound via x-ui API
+        env:
+          SSH_CMD: ssh -o ConnectTimeout=10 -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+        run: |
+          set +e
+          $SSH_CMD 'bash -s' << 'REMOTE' > /tmp/vpn-client.txt 2>&1
+          #!/bin/bash
+          set -eo pipefail
+
+          SERVER_IP=$(curl -s4 ifconfig.me)
+          echo "SERVER_IP=$SERVER_IP"
+
+          # --- 1. Get default panel credentials ---
+          # Default 3x-ui creds: admin/admin on port 2053
+          PANEL="http://127.0.0.1:2053"
+          USERNAME="admin"
+          PASSWORD="admin"
+
+          # --- 2. Login to panel API ---
+          echo ">>> Logging in to 3X-UI panel..."
+          LOGIN_RESP=$(curl -s -c /tmp/cookies.txt -X POST "$PANEL/login" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "username=$USERNAME&password=$PASSWORD")
+          echo "Login response: $LOGIN_RESP"
+
+          if ! echo "$LOGIN_RESP" | grep -q '"success":true'; then
+              echo "ERROR: Login failed"
+              exit 1
+          fi
+          echo ">>> Login OK"
+
+          # --- 3. Check existing inbounds ---
+          INBOUNDS=$(curl -s -b /tmp/cookies.txt "$PANEL/panel/api/inbounds/list")
+          echo "Existing inbounds: $(echo "$INBOUNDS" | python3 -c "import sys,json; data=json.load(sys.stdin); print(len(data.get('obj',[])), 'inbounds')" 2>/dev/null || echo "unknown")"
+
+          # Check if VLESS Reality already exists
+          if echo "$INBOUNDS" | grep -q '"reality"'; then
+              echo ">>> VLESS Reality inbound already exists!"
+              echo "$INBOUNDS" | python3 << 'PYEOF'
+          import sys, json, urllib.parse
+          data = json.load(sys.stdin)
+          for inb in data.get("obj", []):
+              settings = json.loads(inb.get("settings", "{}"))
+              stream = json.loads(inb.get("streamSettings", "{}"))
+              if stream.get("security") == "reality":
+                  print(f"PORT={inb['port']}")
+                  print(f"REMARK={inb['remark']}")
+                  clients = settings.get("clients", [])
+                  for c in clients:
+                      print(f"CLIENT_ID={c['id']}")
+                      print(f"CLIENT_EMAIL={c.get('email','')}")
+          PYEOF
+              # Get client link
+              INBOUND_ID=$(echo "$INBOUNDS" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for inb in data.get('obj', []):
+              stream = json.loads(inb.get('streamSettings', '{}'))
+              if stream.get('security') == 'reality':
+                  print(inb['id'])
+                  break
+          " 2>/dev/null)
+              if [ -n "$INBOUND_ID" ]; then
+                  echo ">>> Getting client link..."
+                  # Get the sub link
+                  CLIENT_LINK=$(curl -s -b /tmp/cookies.txt "$PANEL/panel/api/inbounds/clientIps/$INBOUND_ID" 2>/dev/null || true)
+                  echo "CLIENT_INFO=$CLIENT_LINK"
+              fi
+              echo "DONE=EXISTING"
+              exit 0
+          fi
+
+          # --- 4. Generate Reality keys on VPS ---
+          echo ">>> Generating Reality keys..."
+          XRAY_BIN=$(find / -name "xray" -type f 2>/dev/null | head -1)
+          if [ -z "$XRAY_BIN" ]; then
+              XRAY_BIN="/usr/local/x-ui/bin/xray-linux-amd64"
+          fi
+
+          KEYS=$($XRAY_BIN x25519 2>/dev/null)
+          PRIVATE_KEY=$(echo "$KEYS" | grep "Private" | awk '{print $3}')
+          PUBLIC_KEY=$(echo "$KEYS" | grep "Public" | awk '{print $3}')
+          echo "PRIVATE_KEY=$PRIVATE_KEY"
+          echo "PUBLIC_KEY=$PUBLIC_KEY"
+
+          # Generate short ID
+          SHORT_ID=$(openssl rand -hex 8)
+          echo "SHORT_ID=$SHORT_ID"
+
+          # Generate client UUID
+          CLIENT_UUID=$(cat /proc/sys/kernel/random/uuid)
+          echo "CLIENT_UUID=$CLIENT_UUID"
+
+          # --- 5. Create VLESS Reality inbound ---
+          # Use port 8443 since 443 is taken by Docker
+          VLESS_PORT=8443
+          DEST="www.google.com:443"
+          SNI="www.google.com"
+
+          echo ">>> Creating VLESS Reality inbound on port $VLESS_PORT..."
+
+          SETTINGS="{\"clients\":[{\"id\":\"$CLIENT_UUID\",\"flow\":\"xtls-rprx-vision\",\"email\":\"iphone@vpn\",\"limitIp\":0,\"totalGB\":0,\"expiryTime\":0,\"enable\":true,\"tgId\":\"\",\"subId\":\"\"}],\"decryption\":\"none\",\"fallbacks\":[]}"
+          STREAM="{\"network\":\"tcp\",\"security\":\"reality\",\"externalProxy\":[],\"realitySettings\":{\"show\":false,\"xver\":0,\"dest\":\"$DEST\",\"serverNames\":[\"$SNI\",\"www.google.com\"],\"privateKey\":\"$PRIVATE_KEY\",\"minClient\":\"\",\"maxClient\":\"\",\"maxTimediff\":0,\"shortIds\":[\"$SHORT_ID\"]},\"tcpSettings\":{\"acceptProxyProtocol\":false,\"header\":{\"type\":\"none\"}}}"
+          SNIFFING="{\"enabled\":true,\"destOverride\":[\"http\",\"tls\",\"quic\",\"fakedns\"],\"metadataOnly\":false,\"routeOnly\":false}"
+
+          CREATE_RESP=$(curl -s -b /tmp/cookies.txt -X POST "$PANEL/panel/api/inbounds/add" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"up\": 0,
+              \"down\": 0,
+              \"total\": 0,
+              \"remark\": \"VLESS-Reality-iPhone\",
+              \"enable\": true,
+              \"expiryTime\": 0,
+              \"listen\": \"\",
+              \"port\": $VLESS_PORT,
+              \"protocol\": \"vless\",
+              \"settings\": $(echo "$SETTINGS" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))'),
+              \"streamSettings\": $(echo "$STREAM" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))'),
+              \"sniffing\": $(echo "$SNIFFING" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read().strip()))')
+            }")
+
+          echo "Create response: $CREATE_RESP"
+
+          if echo "$CREATE_RESP" | grep -q '"success":true'; then
+              echo ">>> VLESS Reality inbound created!"
+          else
+              echo "ERROR: Failed to create inbound"
+              exit 1
+          fi
+
+          # --- 6. Open port 8443 ---
+          iptables -I INPUT -p tcp --dport $VLESS_PORT -j ACCEPT 2>/dev/null || true
+          echo ">>> Firewall: port $VLESS_PORT opened"
+
+          # --- 7. Build VLESS link for client ---
+          VLESS_LINK="vless://${CLIENT_UUID}@${SERVER_IP}:${VLESS_PORT}?type=tcp&security=reality&pbk=${PUBLIC_KEY}&fp=chrome&sni=${SNI}&sid=${SHORT_ID}&spx=%2F&flow=xtls-rprx-vision#VPN-Frankfurt"
+
+          echo ""
+          echo "=== VLESS CONNECTION LINK ==="
+          echo "$VLESS_LINK"
+          echo "=== END LINK ==="
+          echo ""
+          echo "PUBLIC_KEY=$PUBLIC_KEY"
+          echo "PORT=$VLESS_PORT"
+          echo "UUID=$CLIENT_UUID"
+          echo "SNI=$SNI"
+          echo "SHORT_ID=$SHORT_ID"
+          echo "DONE=CREATED"
+          REMOTE
+
+          EXIT_CODE=$?
+          echo "--- Output (exit=$EXIT_CODE) ---"
+          cat /tmp/vpn-client.txt
+          echo "--- End ---"
+
+      - name: Commit result
+        if: always()
+        run: |
+          python3 << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+          output = ""
+          try:
+              with open('/tmp/vpn-client.txt', 'r', errors='replace') as f:
+                  output = f.read().strip()
+          except:
+              output = "No output"
+          result = {
+              "timestamp": datetime.now(timezone.utc).isoformat(),
+              "intent": "VLESS Reality client setup",
+              "output": output[:50000]
+          }
+          os.makedirs('.claude/commands', exist_ok=True)
+          with open('.claude/commands/vpn-client-result.json', 'w') as f:
+              json.dump(result, f, indent=2, ensure_ascii=False)
+          PYEOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .claude/commands/vpn-client-result.json
+          git commit -m "vpn-client: VLESS Reality setup result [skip ci]" || true
+
+          for i in 1 2 3 4; do
+            git pull --rebase origin ${{ github.ref_name }} 2>/dev/null || true
+            git push origin HEAD:${{ github.ref_name }} && break || sleep $((i * 2))
+          done
+
+      - name: Send VLESS link to Telegram
+        if: always()
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          # Extract VLESS link from output
+          VLESS_LINK=$(grep "^vless://" /tmp/vpn-client.txt 2>/dev/null || echo "")
+          OUTPUT=$(cat /tmp/vpn-client.txt 2>/dev/null | tail -30 || echo "no output")
+
+          if [ -n "$VLESS_LINK" ]; then
+            MSG="🔐 VPN Ready!
+
+          📱 Ссылка для iPhone (Streisand/V2Box):
+          $VLESS_LINK
+
+          📋 Инструкция:
+          1. Скачай Streisand из App Store
+          2. Нажми + → Import from clipboard
+          3. Скопируй ссылку выше и вставь
+          4. Settings → Routing → Bypass China → включить bypass для .ru доменов
+
+          Server: Frankfurt 🇩🇪"
+          else
+            MSG="🔐 VPN Setup: ${{ job.status }}
+
+          $OUTPUT"
+          fi
+
+          MSG="${MSG:0:4000}"
+          curl -s -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" \
+            --data-urlencode "text=${MSG}" > /dev/null 2>&1 || true
