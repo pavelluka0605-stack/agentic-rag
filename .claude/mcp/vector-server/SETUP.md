@@ -1,81 +1,18 @@
 # Vector Memory Server — Setup Guide
 
-## 1. Определить пользователя PostgreSQL на VPS
+## Текущий статус: ГОТОВО
 
-```bash
-# SSH на VPS, затем:
-docker exec n8n-postgres-1 env | grep POSTGRES
-# Или посмотреть в compose:
-cat /opt/n8n/docker-compose.yml | grep -A10 postgres
-# Или найти пользователя из pg_roles:
-docker exec n8n-postgres-1 psql -U $(docker exec n8n-postgres-1 env | grep POSTGRES_USER | cut -d= -f2) -c '\du'
+БД `vector_memory` создана на VPS (22.03.2026):
+- **User:** `n8n`
+- **Password:** задан в POSTGRES_PASSWORD
+- **pgvector:** v0.8.2
+- **Таблица:** `embeddings` (owner: n8n)
+- **Индексы:** layer, created_at
+
+## PG_URL
+
 ```
-
-## 2. Создать БД и таблицу
-
-Заменить `PGUSER` на найденного пользователя:
-
-```bash
-PGUSER=root  # или postgres, n8n, etc.
-
-# Создать БД
-docker exec n8n-postgres-1 psql -U $PGUSER -c 'CREATE DATABASE vector_memory;'
-
-# Включить pgvector
-docker exec n8n-postgres-1 psql -U $PGUSER -d vector_memory -c 'CREATE EXTENSION IF NOT EXISTS vector;'
-
-# Создать таблицу
-docker exec n8n-postgres-1 psql -U $PGUSER -d vector_memory -c '
-CREATE TABLE IF NOT EXISTS embeddings (
-    id SERIAL PRIMARY KEY,
-    content TEXT NOT NULL,
-    embedding vector(1536),
-    layer TEXT NOT NULL DEFAULT '\''general'\'',
-    metadata JSONB DEFAULT '\''{}'\'' ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_embeddings_cosine ON embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 50);
-CREATE INDEX IF NOT EXISTS idx_embeddings_layer ON embeddings (layer);
-CREATE INDEX IF NOT EXISTS idx_embeddings_created ON embeddings (created_at);
-'
-
-# Проверить
-docker exec n8n-postgres-1 psql -U $PGUSER -d vector_memory -c '\dt'
-docker exec n8n-postgres-1 psql -U $PGUSER -d vector_memory -c "SELECT extversion FROM pg_extension WHERE extname='vector';"
-```
-
-## 3. Установить зависимости
-
-```bash
-cd .claude/mcp/vector-server
-npm install
-```
-
-## 4. Настроить переменные окружения
-
-Задать в среде Claude Code (или в .claude/settings.json env):
-
-```bash
-export PG_URL="postgresql://PGUSER:PASSWORD@127.0.0.1:5432/vector_memory"
-export OPENAI_API_KEY="sk-..."
-```
-
-Или через VPS /home/rag/.env:
-```
-PG_URL=postgresql://PGUSER:PASSWORD@127.0.0.1:5432/vector_memory
-OPENAI_API_KEY=sk-...
-```
-
-## 5. Проверить работу
-
-```bash
-# Проверка подключения:
-PG_URL="postgresql://..." OPENAI_API_KEY="sk-..." node -e "
-import { VectorDB } from './db.js';
-const db = new VectorDB({ pgUrl: process.env.PG_URL, openaiKey: process.env.OPENAI_API_KEY });
-console.log(await db.health());
-await db.close();
-"
+postgresql://n8n:<POSTGRES_PASSWORD>@127.0.0.1:5432/vector_memory
 ```
 
 ## MCP Tools
@@ -98,4 +35,24 @@ Claude Code
                   n8n-postgres-1:5432
                   БД: vector_memory
                   Модель: text-embedding-3-small (1536 dim)
+```
+
+## Пересоздание (если нужно)
+
+```bash
+docker exec n8n-postgres-1 psql -U n8n -c "ALTER DATABASE template1 REFRESH COLLATION VERSION;"
+docker exec n8n-postgres-1 psql -U n8n -c "CREATE DATABASE vector_memory TEMPLATE template0;"
+docker exec n8n-postgres-1 psql -U n8n -d vector_memory -c "CREATE EXTENSION IF NOT EXISTS vector;"
+docker exec n8n-postgres-1 psql -U n8n -d vector_memory -c "
+CREATE TABLE IF NOT EXISTS embeddings (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    embedding vector(1536),
+    layer TEXT NOT NULL DEFAULT 'general',
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_embeddings_layer ON embeddings (layer);
+CREATE INDEX IF NOT EXISTS idx_embeddings_created ON embeddings (created_at);
+"
 ```
