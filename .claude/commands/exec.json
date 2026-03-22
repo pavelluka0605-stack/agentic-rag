@@ -1,1 +1,1 @@
-{"script_file": ".claude/commands/scripts/phase1-2-fixes-cleanup.sh", "intent": "Phase 1-2: Kill duplicate N8N, move AMOCRM_TOKEN to .env, close ports, fix acme.json, cleanup"}
+{"command":"noop","intent":"completed"}
