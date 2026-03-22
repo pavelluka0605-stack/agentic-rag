@@ -139,6 +139,15 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"}
+    },
+    "vector": {
+      "command": "node",
+      "args": [".claude/mcp/vector-server/index.js"],
+      "cwd": "/home/user/agentic-rag",
+      "env": {
+        "PG_URL": "${PG_URL}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+      }
     }
   }
 }

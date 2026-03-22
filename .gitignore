@@ -11,5 +11,6 @@ claude-chat/data/
 .claude/memory/*.db-wal
 .claude/memory/*.db-shm
 .claude/mcp/memory-server/node_modules/
+.claude/mcp/vector-server/node_modules/
 vps-runtime/github-webhook/node_modules/
 vps-runtime/github-webhook/.env
