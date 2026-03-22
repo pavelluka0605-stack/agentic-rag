@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sun Mar 22 04:01:24 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sun Mar 22 04:14:43 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 3 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 83.1M (max: 256.0M available: 172.8M peak: 137.4M swap: 54.3M swap peak: 54.3M)
-        CPU: 21.008s
+     Memory: 83.7M (max: 256.0M available: 172.2M peak: 137.4M swap: 54.3M swap peak: 54.3M)
+        CPU: 21.046s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -27,26 +27,25 @@ Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sun 2026-03-22 00:24:22 UTC; 3h 37min ago
-   Main PID: 2102247 (node)
+     Active: active (running) since Sun 2026-03-22 04:01:52 UTC; 12min ago
+   Main PID: 2132207 (node)
       Tasks: 11 (limit: 32)
-     Memory: 23.2M (max: 128.0M available: 104.7M peak: 44.6M)
-        CPU: 1.102s
+     Memory: 22.7M (max: 128.0M available: 105.2M peak: 45.7M)
+        CPU: 628ms
      CGroup: /system.slice/control-api.service
-             └─2102247 /usr/bin/node server.js
+             └─2132207 /usr/bin/node server.js
 
-Mar 22 00:24:22 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Listening on 127.0.0.1:3901
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Task DB: ready
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] LLM: configured
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Telegram: configured
-Mar 22 00:24:31 fra-1-vm-ckr7 node[2102247]: [cleanup] procs: 189→189, zombies: 0→0, cleaned: [], mem: 1725/3915MB
-Mar 22 00:24:40 fra-1-vm-ckr7 node[2102247]: [cleanup] procs: 190→190, zombies: 0→0, cleaned: [], mem: 1727/3915MB
+Mar 22 04:01:52 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Listening on 127.0.0.1:3901
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Task DB: ready
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] LLM: configured
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Telegram: configured
+Mar 22 04:02:00 fra-1-vm-ckr7 node[2132207]: [cleanup] procs: 189→187, zombies: 0→0, cleaned: [], mem: 1722/3915MB
 
 === 3. Ports listening (3200, 3901, 3847, 3900, 80, 443) ===
-LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=2102247,fd=21))                                                                                                                                
+LISTEN 0      511        127.0.0.1:3901       0.0.0.0:*    users:(("node",pid=2132207,fd=21))                                                                                                                                
 LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=577291,fd=7))                                                                                                                          
 LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=577305,fd=7))                                                                                                                          
 LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=577298,fd=7))                                                                                                                          
@@ -86,26 +85,26 @@ Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/
 Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 
 === 5. Control API logs (last 20 lines) ===
-Mar 22 00:24:13 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
-Mar 22 00:24:13 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 22 00:24:13 fra-1-vm-ckr7 node[2101825]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 22 00:24:13 fra-1-vm-ckr7 node[2101825]: [control-api] Listening on 127.0.0.1:3901
-Mar 22 00:24:13 fra-1-vm-ckr7 node[2101825]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 22 00:24:13 fra-1-vm-ckr7 node[2101825]: [control-api] Task DB: ready
-Mar 22 00:24:13 fra-1-vm-ckr7 node[2101825]: [control-api] LLM: configured
-Mar 22 00:24:13 fra-1-vm-ckr7 node[2101825]: [control-api] Telegram: configured
-Mar 22 00:24:22 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
-Mar 22 00:24:22 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
-Mar 22 00:24:22 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
-Mar 22 00:24:22 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Listening on 127.0.0.1:3901
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Task DB: ready
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] LLM: configured
-Mar 22 00:24:22 fra-1-vm-ckr7 node[2102247]: [control-api] Telegram: configured
-Mar 22 00:24:31 fra-1-vm-ckr7 node[2102247]: [cleanup] procs: 189→189, zombies: 0→0, cleaned: [], mem: 1725/3915MB
-Mar 22 00:24:40 fra-1-vm-ckr7 node[2102247]: [cleanup] procs: 190→190, zombies: 0→0, cleaned: [], mem: 1727/3915MB
+Mar 22 04:01:44 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
+Mar 22 04:01:44 fra-1-vm-ckr7 systemd[1]: control-api.service: Consumed 1.114s CPU time, 44.6M memory peak, 0B memory swap peak.
+Mar 22 04:01:44 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 22 04:01:45 fra-1-vm-ckr7 node[2131780]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 22 04:01:45 fra-1-vm-ckr7 node[2131780]: [control-api] Listening on 127.0.0.1:3901
+Mar 22 04:01:45 fra-1-vm-ckr7 node[2131780]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 22 04:01:45 fra-1-vm-ckr7 node[2131780]: [control-api] Task DB: ready
+Mar 22 04:01:45 fra-1-vm-ckr7 node[2131780]: [control-api] LLM: configured
+Mar 22 04:01:45 fra-1-vm-ckr7 node[2131780]: [control-api] Telegram: configured
+Mar 22 04:01:52 fra-1-vm-ckr7 systemd[1]: Stopping control-api.service - Claude Code Control API...
+Mar 22 04:01:52 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
+Mar 22 04:01:52 fra-1-vm-ckr7 systemd[1]: Stopped control-api.service - Claude Code Control API.
+Mar 22 04:01:52 fra-1-vm-ckr7 systemd[1]: Started control-api.service - Claude Code Control API.
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Task DB initialized from /opt/claude-code/memory/memory.db
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Listening on 127.0.0.1:3901
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Auth: disabled (set CONTROL_API_TOKEN)
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Task DB: ready
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] LLM: configured
+Mar 22 04:01:52 fra-1-vm-ckr7 node[2132207]: [control-api] Telegram: configured
+Mar 22 04:02:00 fra-1-vm-ckr7 node[2132207]: [cleanup] procs: 189→187, zombies: 0→0, cleaned: [], mem: 1722/3915MB
 
 === 6. Dashboard .next/ build exists? ===
 total 180
@@ -137,7 +136,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sun, 22 Mar 2026 04:01:24 GMT
+Date: Sun, 22 Mar 2026 04:14:43 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -147,7 +146,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-22T04:01:24.908Z"
+  "timestamp": "2026-03-22T04:14:43.658Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -158,7 +157,7 @@ Keep-Alive: timeout=5
 total 16
 drwxr-xr-x 2 root root 4096 Mar 19 17:46 .
 drwxr-xr-x 5 root root 4096 Mar 13 14:29 ..
--rw-r--r-- 1 root root 1191 Mar 22 00:24 api-bridge.yml
+-rw-r--r-- 1 root root 1191 Mar 22 04:01 api-bridge.yml
 -rw-r--r-- 1 root root  671 Mar 18 11:57 dashboard.yml
 --- dashboard.yml ---
 ## Traefik dynamic config — Task Dashboard
@@ -214,7 +213,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sun, 22 Mar 2026 04:01:25 GMT
+date: Sun, 22 Mar 2026 04:14:43 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
@@ -246,19 +245,19 @@ x-nextjs-prerender: 1
 
 === 19. Control Bridge service ===
 active
-Mar 22 03:04:26 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     91.224.92.177:60260 - "POST / HTTP/1.1" 404 Not Found
-Mar 22 03:46:12 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     64.62.156.132:3164 - "GET / HTTP/1.1" 404 Not Found
-Mar 22 03:47:40 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     64.62.156.134:65497 - "GET /favicon.ico HTTP/1.1" 404 Not Found
-Mar 22 03:47:46 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     185.242.3.66:36614 - "POST / HTTP/1.1" 404 Not Found
-Mar 22 03:47:46 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     185.242.3.66:36624 - "POST / HTTP/1.1" 404 Not Found
-Mar 22 03:53:37 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     64.89.163.241:52426 - "POST / HTTP/1.1" 404 Not Found
-Mar 22 03:57:53 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     64.89.163.241:48536 - "POST / HTTP/1.1" 404 Not Found
-Mar 22 03:58:40 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     127.0.0.1:40722 - "GET /health HTTP/1.1" 200 OK
-Mar 22 03:58:40 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     172.19.0.2:42214 - "GET /health HTTP/1.1" 200 OK
-Mar 22 03:58:40 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     72.56.127.126:57296 - "GET /health HTTP/1.1" 200 OK
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56432 - "POST /jobs//confirm HTTP/1.1" 404 Not Found
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56434 - "GET /jobs//status HTTP/1.1" 404 Not Found
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56448 - "GET /jobs//result HTTP/1.1" 404 Not Found
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56462 - "POST /jobs HTTP/1.1" 429 Too Many Requests
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56464 - "POST /jobs//cancel HTTP/1.1" 404 Not Found
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56478 - "GET /memory/stats HTTP/1.1" 200 OK
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56480 - "GET /memory/bootstrap HTTP/1.1" 200 OK
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56496 - "GET /jobs/pending-reviews HTTP/1.1" 200 OK
+Mar 22 04:02:00 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     127.0.0.1:56504 - "POST /jobs HTTP/1.1" 401 Unauthorized
+Mar 22 04:05:06 fra-1-vm-ckr7 uvicorn[2131709]: INFO:     45.156.87.91:59152 - "GET / HTTP/1.0" 404 Not Found
 
 === 20. Control Bridge local health ===
-{"ok":true,"version":"2.3.0","uptime_s":13032}
+{"ok":true,"version":"2.3.0","uptime_s":779}
 === 21. Control Bridge HTTPS (api.marbomebel.ru) ===
 * Host api.marbomebel.ru:443 was resolved.
 * IPv6: (none)
@@ -318,13 +317,13 @@ Mar 22 03:58:40 fra-1-vm-ckr7 uvicorn[2101765]: INFO:     72.56.127.126:57296 - 
 { [5 bytes data]
 < HTTP/2 200 
 < content-type: application/json
-< date: Sun, 22 Mar 2026 04:01:24 GMT
+< date: Sun, 22 Mar 2026 04:14:43 GMT
 < server: uvicorn
-< content-length: 46
+< content-length: 44
 < 
-{ [46 bytes data]
+{ [44 bytes data]
 * Connection #0 to host api.marbomebel.ru left intact
-{"ok":true,"version":"2.3.0","uptime_s":13032}
+{"ok":true,"version":"2.3.0","uptime_s":779}
 === 22. TLS cert for api.marbomebel.ru ===
 subject=CN = api.marbomebel.ru
 issuer=C = US, O = Let's Encrypt, CN = R12
@@ -332,7 +331,7 @@ notBefore=Mar 19 16:47:49 2026 GMT
 notAfter=Jun 17 16:47:48 2026 GMT
 
 === 23. Docker bridge → port 3000 ===
-{"ok":true,"version":"2.3.0","uptime_s":13032}
+{"ok":true,"version":"2.3.0","uptime_s":779}
 === 24. CORS check (api.marbomebel.ru) ===
 HTTP/2 200 
 access-control-allow-headers: Authorization,Content-Type,Accept
