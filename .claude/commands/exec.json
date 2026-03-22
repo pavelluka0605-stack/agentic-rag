@@ -1,1 +1,1 @@
-{"script_file": ".claude/commands/scripts/full-audit-p2.sh", "intent": "VPS audit part 2 — git repos, databases, env files, domains, xray, structure, iptables"}
+{"command":"noop","intent":"completed"}
