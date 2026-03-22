@@ -125,24 +125,37 @@ jobs:
           print(f"Result saved: exit_code={exit_code}, output_len={len(output)}")
           PYEOF
 
+      - name: Upload result artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vps-result
+          path: .claude/commands/result.json
+          retention-days: 7
+
       - name: Commit result
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Fetch latest to avoid conflicts with auto-merge
-          git fetch origin ${{ github.ref_name }} 2>/dev/null || true
-          git reset --mixed origin/${{ github.ref_name }} 2>/dev/null || true
+          BRANCH="${{ github.ref_name }}"
 
-          git add .claude/commands/result.json
+          # Ensure we have proper remote tracking
+          git fetch origin "$BRANCH" 2>/dev/null || true
+
+          git add -f .claude/commands/result.json
           echo '{"command":"noop","intent":"completed"}' > .claude/commands/exec.json
           git add .claude/commands/exec.json
-          git commit -m "result: VPS remote exec [skip ci]" || echo "Nothing to commit"
+          git diff --cached --quiet && echo "Nothing to commit" && exit 0
 
-          # Push with retry
+          git commit -m "result: VPS remote exec [skip ci]"
+
+          # Push with retry and proper ref
           for i in 1 2 3 4; do
-            git pull --rebase origin ${{ github.ref_name }} 2>/dev/null || true
-            git push origin HEAD:${{ github.ref_name }} && break || sleep $((i * 2))
+            git push origin "HEAD:refs/heads/$BRANCH" && echo "Push OK" && break || {
+              echo "Push attempt $i failed, retrying..."
+              sleep $((i * 2))
+              git pull --rebase origin "$BRANCH" 2>/dev/null || true
+            }
           done
 
       - name: Notify Telegram
