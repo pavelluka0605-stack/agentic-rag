@@ -1,4 +1,1 @@
-{
-  "command": "docker exec n8n-postgres-1 env | grep -iE 'POSTGRES|PG' && docker exec n8n-postgres-1 cat /etc/passwd | head -3 && cat /opt/n8n/docker-compose.yml | grep -B2 -A10 postgres",
-  "intent": "Определить пользователя PostgreSQL в контейнере"
-}
+{"command":"noop","intent":"completed"}
