@@ -1,4 +1,1 @@
-{
-  "command": "echo '=== КЛЮЧИ ===' && cat /root/.ssh/authorized_keys && echo '=== ПРАВА ===' && stat -c '%a %U:%G' /root/.ssh /root/.ssh/authorized_keys /root && echo '=== SSHD ===' && grep -E '^PasswordAuth|^PubkeyAuth|^AuthorizedKeys|^PermitRoot' /etc/ssh/sshd_config",
-  "intent": "Проверка SSH конфигурации: ключи, права, настройки sshd"
-}
+{"command":"noop","intent":"completed"}
