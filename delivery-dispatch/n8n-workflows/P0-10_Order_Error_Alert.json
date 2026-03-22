@@ -1,0 +1,129 @@
+{
+  "name": "P0-10_Order_Error_Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 2 }]
+        }
+      },
+      "id": "cron-2min",
+      "name": "Every 2 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Доставка_Заказы",
+          "mode": "name"
+        },
+        "options": {
+          "range": "A:AA"
+        }
+      },
+      "id": "read-orders",
+      "name": "Read Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter orders with status = 'Ошибка' not yet reported\nconst items = $input.all();\nconst errors = items.filter(item => {\n  const status = item.json.status;\n  const notes = item.json.notes || '';\n  return status === 'Ошибка' && !notes.includes('[error_reported]');\n});\n\nif (errors.length === 0) {\n  return [{ json: { hasErrors: false, count: 0 } }];\n}\n\nconst orders = errors.map(item => ({\n  order_id: item.json.order_id,\n  client_name: item.json.client_name,\n  notes: item.json.notes || 'Нет описания ошибки',\n  row_number: item.json.row_number || items.indexOf(item) + 2\n}));\n\nreturn [{ json: { hasErrors: true, count: orders.length, orders } }];"
+      },
+      "id": "filter-errors",
+      "name": "Filter Errors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-has-errors",
+              "leftValue": "={{ $json.hasErrors }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-errors",
+      "name": "Has Errors?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build error alert message\nconst data = $input.first().json;\nconst lines = data.orders.map(o => \n  `⚠️ ${o.order_id} (${o.client_name})\\n   ${o.notes}`\n);\n\nconst text = `🔴 Ошибки доставки: ${data.count}\\n\\n${lines.join('\\n\\n')}\\n\\n⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Krasnoyarsk' })}`;\n\nreturn [{ json: { text, orders: data.orders } }];"
+      },
+      "id": "build-error-msg",
+      "name": "Build Error Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": {{ JSON.stringify($json.text) }},\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-telegram",
+      "name": "Telegram Error Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {},
+      "id": "no-errors-noop",
+      "name": "No Errors",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 500]
+    }
+  ],
+  "connections": {
+    "Every 2 min": {
+      "main": [[{ "node": "Read Orders", "type": "main", "index": 0 }]]
+    },
+    "Read Orders": {
+      "main": [[{ "node": "Filter Errors", "type": "main", "index": 0 }]]
+    },
+    "Filter Errors": {
+      "main": [[{ "node": "Has Errors?", "type": "main", "index": 0 }]]
+    },
+    "Has Errors?": {
+      "main": [
+        [{ "node": "Build Error Message", "type": "main", "index": 0 }],
+        [{ "node": "No Errors", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Error Message": {
+      "main": [[{ "node": "Telegram Error Alert", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

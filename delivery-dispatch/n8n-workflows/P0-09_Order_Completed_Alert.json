@@ -1,0 +1,161 @@
+{
+  "name": "P0-09_Order_Completed_Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 2 }]
+        }
+      },
+      "id": "cron-2min",
+      "name": "Every 2 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Доставка_Заказы",
+          "mode": "name"
+        },
+        "options": {
+          "range": "A:AA"
+        }
+      },
+      "id": "read-orders",
+      "name": "Read Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter orders with status = 'Оформлен' that haven't been notified yet\nconst items = $input.all();\nconst completed = items.filter(item => {\n  const status = item.json.status;\n  const notes = item.json.notes || '';\n  return status === 'Оформлен' && !notes.includes('[notified]');\n});\n\nif (completed.length === 0) {\n  return [{ json: { hasOrders: false, count: 0 } }];\n}\n\nconst orders = completed.map(item => ({\n  order_id: item.json.order_id,\n  client_name: item.json.client_name,\n  chosen_carrier: item.json.chosen_carrier,\n  track_number: item.json.track_number,\n  best_price: item.json.best_price,\n  message_for_client: item.json.message_for_client,\n  vk_dialog_url: item.json.vk_dialog_url,\n  row_number: item.json.row_number || items.indexOf(item) + 2\n}));\n\nreturn [{ json: { hasOrders: true, count: orders.length, orders } }];"
+      },
+      "id": "filter-completed",
+      "name": "Filter Completed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-has-orders",
+              "leftValue": "={{ $json.hasOrders }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-completed",
+      "name": "Has Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Telegram messages for each completed order\nconst data = $input.first().json;\nconst messages = [];\n\nfor (const order of data.orders) {\n  const vkLink = order.vk_dialog_url ? `\\n\\n📎 Отправь в ВК: ${order.vk_dialog_url}` : '';\n  \n  const text = `✅ Заказ ${order.order_id} оформлен!\\n` +\n    `👤 ${order.client_name}\\n` +\n    `🚚 ${order.chosen_carrier}\\n` +\n    `📋 Трек: ${order.track_number}\\n` +\n    `💰 ${order.best_price}₽\\n` +\n    `🖨️ Этикетка напечатана\\n\\n` +\n    `Текст для клиента:\\n───────────────\\n${order.message_for_client}\\n───────────────` +\n    vkLink;\n  \n  messages.push({\n    json: {\n      text,\n      order_id: order.order_id,\n      row_number: order.row_number\n    }\n  });\n}\n\nreturn messages;"
+      },
+      "id": "build-messages",
+      "name": "Build Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": {{ JSON.stringify($json.text) }},\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-telegram",
+      "name": "Telegram Notify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Доставка_Заказы",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "notes": "={{ $json.notes ? $json.notes + ' [notified]' : '[notified]' }}"
+          }
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "mark-notified",
+      "name": "Mark Notified",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {},
+      "id": "no-orders-noop",
+      "name": "No Completed Orders",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 500]
+    }
+  ],
+  "connections": {
+    "Every 2 min": {
+      "main": [[{ "node": "Read Orders", "type": "main", "index": 0 }]]
+    },
+    "Read Orders": {
+      "main": [[{ "node": "Filter Completed", "type": "main", "index": 0 }]]
+    },
+    "Filter Completed": {
+      "main": [[{ "node": "Has Completed?", "type": "main", "index": 0 }]]
+    },
+    "Has Completed?": {
+      "main": [
+        [{ "node": "Build Messages", "type": "main", "index": 0 }],
+        [{ "node": "No Completed Orders", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Messages": {
+      "main": [[{ "node": "Telegram Notify", "type": "main", "index": 0 }]]
+    },
+    "Telegram Notify": {
+      "main": [[{ "node": "Mark Notified", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

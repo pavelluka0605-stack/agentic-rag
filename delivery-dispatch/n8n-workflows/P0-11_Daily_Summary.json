@@ -1,0 +1,86 @@
+{
+  "name": "P0-11_Daily_Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-daily",
+      "name": "Daily 20:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SPREADSHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Доставка_Заказы",
+          "mode": "name"
+        },
+        "options": {
+          "range": "A:AA"
+        }
+      },
+      "id": "read-orders",
+      "name": "Read All Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Daily summary of delivery orders\nconst items = $input.all();\nconst today = new Date();\nconst todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD\n\n// Filter today's orders (by created_at)\nconst todayOrders = items.filter(item => {\n  const created = item.json.created_at || '';\n  return created.startsWith(todayStr);\n});\n\nconst total = todayOrders.length;\nconst completed = todayOrders.filter(i => i.json.status === 'Оформлен').length;\nconst errors = todayOrders.filter(i => i.json.status === 'Ошибка').length;\nconst inProgress = todayOrders.filter(i => ['Новый', 'Расчёт', 'Рассчитан', 'Оформляется'].includes(i.json.status)).length;\n\n// Carrier breakdown\nconst yandex = todayOrders.filter(i => (i.json.chosen_carrier || '').includes('Яндекс')).length;\nconst ozon = todayOrders.filter(i => (i.json.chosen_carrier || '').includes('Озон')).length;\n\n// Average price\nconst prices = todayOrders\n  .map(i => parseFloat(i.json.best_price))\n  .filter(p => !isNaN(p) && p > 0);\nconst avgPrice = prices.length > 0 \n  ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) \n  : 0;\n\n// Total spent\nconst totalSpent = prices.reduce((a, b) => a + b, 0);\n\nconst dateFormatted = today.toLocaleDateString('ru-RU', { \n  timeZone: 'Asia/Krasnoyarsk',\n  day: '2-digit', \n  month: '2-digit', \n  year: 'numeric' \n});\n\nconst text = `📊 Итого за ${dateFormatted}:\\n\\n` +\n  `📦 Заказов: ${total}\\n` +\n  `✅ Оформлено: ${completed}\\n` +\n  `⏳ В работе: ${inProgress}\\n` +\n  `❌ Ошибок: ${errors}\\n\\n` +\n  `🚚 Яндекс: ${yandex} | Озон: ${ozon}\\n` +\n  `💰 Средняя цена: ${avgPrice}₽\\n` +\n  `💵 Всего: ${Math.round(totalSpent)}₽`;\n\nreturn [{ json: { text, total, completed, errors } }];"
+      },
+      "id": "build-summary",
+      "name": "Build Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_MANAGER_CHAT_ID }}\",\n  \"text\": {{ JSON.stringify($json.text) }}\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "send-summary",
+      "name": "Telegram Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Daily 20:00": {
+      "main": [[{ "node": "Read All Orders", "type": "main", "index": 0 }]]
+    },
+    "Read All Orders": {
+      "main": [[{ "node": "Build Summary", "type": "main", "index": 0 }]]
+    },
+    "Build Summary": {
+      "main": [[{ "node": "Telegram Summary", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

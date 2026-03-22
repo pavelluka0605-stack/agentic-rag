@@ -85,8 +85,24 @@
 - [x] smoke-test.sh + smoke-test.yml — тестирование всех страниц
 - [x] DEPLOY-GUIDE.md — пошаговая инструкция деплоя (10 шагов)
 
+**Delivery Dispatch v5 — автоматизация доставки**
+- [x] Архитектура и документация — `delivery-dispatch/docs/ARCHITECTURE.md`
+- [x] Скрипт создания Google Sheets (Доставка_Заказы + Доставка_Настройки) — `delivery-dispatch/scripts/setup-sheets.py`
+- [x] n8n P0-09: уведомление менеджеру при "Оформлен" — `delivery-dispatch/n8n-workflows/P0-09_Order_Completed_Alert.json`
+- [x] n8n P0-10: алерт при "Ошибка" — `delivery-dispatch/n8n-workflows/P0-10_Order_Error_Alert.json`
+- [x] n8n P0-11: ежедневная сводка 20:00 — `delivery-dispatch/n8n-workflows/P0-11_Daily_Summary.json`
+- [x] Шаблон промпта для Claude in Chrome Scheduled Task — `delivery-dispatch/templates/scheduled-task-prompt.md`
+- [x] Скрипт проверки мини-ПК — `delivery-dispatch/scripts/setup-mini-pc.sh`
+- [x] GitHub Actions деплой — `.github/workflows/deploy-delivery-dispatch.yml`
+
 ### Что дальше
-- [ ] Выполнить деплой на VPS (запуск скриптов)
+- [ ] Запустить deploy-delivery-dispatch.yml → action: full-setup (создать листы + задеплоить workflows)
+- [ ] Купить/выделить мини-ПК + подключить принтер
+- [ ] Настроить Chrome + Claude in Chrome на мини-ПК
+- [ ] Записать 4 workflow (Яндекс расчёт, Озон расчёт, Яндекс оформление, Озон оформление)
+- [ ] Настроить Scheduled Task в Claude in Chrome
+- [ ] Тест: менеджер вносит → Claude рассчитал + оформил + напечатал
+- [ ] Выполнить деплой сайта на VPS (запуск скриптов)
 - [ ] DNS: A-запись кухнирема.рф → VPS IP
 - [ ] SSL: certbot для кухнирема.рф
 - [ ] Bricks Builder: визуальный импорт шаблонов

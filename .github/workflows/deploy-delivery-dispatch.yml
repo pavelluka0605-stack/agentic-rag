@@ -1,0 +1,176 @@
+name: Deploy Delivery Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Действие'
+        required: true
+        type: choice
+        options:
+          - setup-sheets
+          - deploy-n8n-workflows
+          - full-setup
+      dry_run:
+        description: 'Пробный запуск (без изменений)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  setup-sheets:
+    if: inputs.action == 'setup-sheets' || inputs.action == 'full-setup'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install google-auth requests
+
+      - name: Setup Google Sheets
+        if: inputs.dry_run == false
+        env:
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: python3 delivery-dispatch/scripts/setup-sheets.py
+
+      - name: Dry run — показ структуры
+        if: inputs.dry_run == true
+        run: |
+          echo "=== DRY RUN — листы не будут созданы ==="
+          echo ""
+          echo "Будут созданы листы:"
+          echo "  1. Доставка_Заказы (27 колонок: order_id .. updated_at)"
+          echo "  2. Доставка_Настройки (11 параметров)"
+          echo ""
+          echo "Статусы заказов: Новый → Расчёт → Рассчитан → Оформляется → Оформлен | Ошибка"
+          echo ""
+          echo "Условное форматирование:"
+          echo "  Новый    → жёлтый"
+          echo "  Оформлен → зелёный"
+          echo "  Ошибка   → красный"
+
+  deploy-n8n:
+    if: inputs.action == 'deploy-n8n-workflows' || inputs.action == 'full-setup'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy n8n workflows to VPS
+        if: inputs.dry_run == false
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "=== Деплой n8n workflows для Delivery Dispatch ==="
+
+            N8N_URL="${{ secrets.N8N_BASE_URL }}"
+            N8N_KEY="${{ secrets.N8N_API_KEY }}"
+            WORKFLOW_DIR="/tmp/delivery-dispatch-workflows"
+
+            mkdir -p "$WORKFLOW_DIR"
+
+      - name: Copy workflows to VPS
+        if: inputs.dry_run == false
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "delivery-dispatch/n8n-workflows/*.json"
+          target: "/tmp/"
+          strip_components: 0
+
+      - name: Import and activate workflows
+        if: inputs.dry_run == false
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            N8N_URL="${{ secrets.N8N_BASE_URL }}"
+            N8N_KEY="${{ secrets.N8N_API_KEY }}"
+
+            for wf in /tmp/delivery-dispatch/n8n-workflows/P0-*.json; do
+              NAME=$(jq -r '.name' "$wf")
+              echo "Importing: $NAME"
+
+              # Проверить, существует ли уже
+              EXISTING=$(curl -s -H "X-N8N-API-KEY: $N8N_KEY" \
+                "$N8N_URL/api/v1/workflows" | \
+                jq -r ".data[] | select(.name == \"$NAME\") | .id")
+
+              if [ -n "$EXISTING" ]; then
+                echo "  Обновление существующего (ID: $EXISTING)..."
+                curl -s -X PUT \
+                  -H "X-N8N-API-KEY: $N8N_KEY" \
+                  -H "Content-Type: application/json" \
+                  -d @"$wf" \
+                  "$N8N_URL/api/v1/workflows/$EXISTING" > /dev/null
+              else
+                echo "  Создание нового..."
+                RESULT=$(curl -s -X POST \
+                  -H "X-N8N-API-KEY: $N8N_KEY" \
+                  -H "Content-Type: application/json" \
+                  -d @"$wf" \
+                  "$N8N_URL/api/v1/workflows")
+                EXISTING=$(echo "$RESULT" | jq -r '.id')
+              fi
+
+              # Активировать
+              curl -s -X PATCH \
+                -H "X-N8N-API-KEY: $N8N_KEY" \
+                -H "Content-Type: application/json" \
+                -d '{"active": true}' \
+                "$N8N_URL/api/v1/workflows/$EXISTING" > /dev/null
+
+              echo "  ✅ $NAME — активирован"
+            done
+
+            # Очистка
+            rm -rf /tmp/delivery-dispatch
+            echo ""
+            echo "=== Все workflows импортированы и активированы ==="
+
+      - name: Dry run — показ workflows
+        if: inputs.dry_run == true
+        run: |
+          echo "=== DRY RUN — workflows не будут задеплоены ==="
+          echo ""
+          for wf in delivery-dispatch/n8n-workflows/P0-*.json; do
+            NAME=$(jq -r '.name' "$wf")
+            NODES=$(jq '.nodes | length' "$wf")
+            echo "  $NAME ($NODES нод)"
+          done
+
+  notify:
+    needs: [setup-sheets, deploy-n8n]
+    if: always() && inputs.dry_run == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Telegram notification
+        env:
+          TG_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          SHEETS_STATUS="${{ needs.setup-sheets.result }}"
+          N8N_STATUS="${{ needs.deploy-n8n.result }}"
+
+          TEXT="🚚 Delivery Dispatch v5 — деплой%0A%0A"
+          TEXT+="📊 Google Sheets: ${SHEETS_STATUS}%0A"
+          TEXT+="⚙️ n8n workflows: ${N8N_STATUS}%0A"
+          TEXT+="%0A⏰ $(date '+%d.%m.%Y %H:%M')"
+
+          curl -s "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT}" \
+            -d "text=${TEXT}" > /dev/null 2>&1 || true
