@@ -25,6 +25,9 @@ concurrency:
   group: vps-remote-exec
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   exec:
     name: "Execute on VPS"
