@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sun Mar 22 04:32:20 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sun Mar 22 04:36:07 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 3 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 82.5M (max: 256.0M available: 173.4M peak: 137.4M swap: 55.3M swap peak: 55.3M)
-        CPU: 21.134s
+     Memory: 82.3M (max: 256.0M available: 173.6M peak: 137.4M swap: 55.3M swap peak: 55.3M)
+        CPU: 21.158s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -27,11 +27,11 @@ Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sun 2026-03-22 04:27:44 UTC; 4min 36s ago
+     Active: active (running) since Sun 2026-03-22 04:27:44 UTC; 8min ago
    Main PID: 2147162 (node)
       Tasks: 11 (limit: 32)
-     Memory: 22.8M (max: 128.0M available: 105.1M peak: 45.5M)
-        CPU: 933ms
+     Memory: 22.9M (max: 128.0M available: 105.0M peak: 45.5M)
+        CPU: 942ms
      CGroup: /system.slice/control-api.service
              └─2147162 /usr/bin/node server.js
 
@@ -137,7 +137,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sun, 22 Mar 2026 04:32:20 GMT
+Date: Sun, 22 Mar 2026 04:36:08 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -147,7 +147,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-22T04:32:20.801Z"
+  "timestamp": "2026-03-22T04:36:08.158Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -214,7 +214,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sun, 22 Mar 2026 04:32:21 GMT
+date: Sun, 22 Mar 2026 04:36:08 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
@@ -246,9 +246,6 @@ x-nextjs-prerender: 1
 
 === 19. Control Bridge service ===
 active
-Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49898 - "POST /jobs HTTP/1.1" 200 OK
-Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49908 - "POST /jobs/f443e52d-9d24-4209-890b-475d5e1b7e3a/confirm HTTP/1.1" 200 OK
-Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49912 - "GET /jobs/f443e52d-9d24-4209-890b-475d5e1b7e3a/status HTTP/1.1" 200 OK
 Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49922 - "GET /jobs/f443e52d-9d24-4209-890b-475d5e1b7e3a/result HTTP/1.1" 200 OK
 Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49928 - "POST /jobs HTTP/1.1" 429 Too Many Requests
 Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49934 - "POST /jobs//cancel HTTP/1.1" 404 Not Found
@@ -256,9 +253,12 @@ Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49938 - "GET
 Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49944 - "GET /memory/bootstrap HTTP/1.1" 200 OK
 Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49946 - "GET /jobs/pending-reviews HTTP/1.1" 200 OK
 Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49950 - "POST /jobs HTTP/1.1" 401 Unauthorized
+Mar 22 04:32:21 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:41700 - "GET /health HTTP/1.1" 200 OK
+Mar 22 04:32:21 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     172.19.0.2:53436 - "GET /health HTTP/1.1" 200 OK
+Mar 22 04:32:21 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     72.56.127.126:44204 - "GET /health HTTP/1.1" 200 OK
 
 === 20. Control Bridge local health ===
-{"ok":true,"version":"2.3.0","uptime_s":285}
+{"ok":true,"version":"2.3.0","uptime_s":512}
 === 21. Control Bridge HTTPS (api.marbomebel.ru) ===
 * Host api.marbomebel.ru:443 was resolved.
 * IPv6: (none)
@@ -318,13 +318,13 @@ Mar 22 04:27:55 fra-1-vm-ckr7 uvicorn[2146679]: INFO:     127.0.0.1:49950 - "POS
 { [5 bytes data]
 < HTTP/2 200 
 < content-type: application/json
-< date: Sun, 22 Mar 2026 04:32:20 GMT
+< date: Sun, 22 Mar 2026 04:36:08 GMT
 < server: uvicorn
 < content-length: 44
 < 
-{ [44 bytes data]
+{ [5 bytes data]
 * Connection #0 to host api.marbomebel.ru left intact
-{"ok":true,"version":"2.3.0","uptime_s":285}
+{"ok":true,"version":"2.3.0","uptime_s":512}
 === 22. TLS cert for api.marbomebel.ru ===
 subject=CN = api.marbomebel.ru
 issuer=C = US, O = Let's Encrypt, CN = R12
@@ -332,7 +332,7 @@ notBefore=Mar 19 16:47:49 2026 GMT
 notAfter=Jun 17 16:47:48 2026 GMT
 
 === 23. Docker bridge → port 3000 ===
-{"ok":true,"version":"2.3.0","uptime_s":285}
+{"ok":true,"version":"2.3.0","uptime_s":513}
 === 24. CORS check (api.marbomebel.ru) ===
 HTTP/2 200 
 access-control-allow-headers: Authorization,Content-Type,Accept
