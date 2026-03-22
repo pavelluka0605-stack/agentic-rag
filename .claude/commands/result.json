@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-22T17:55:30.452976+00:00",
-  "exit_code": 2,
-  "output": "=== 1. DOCKER PS (supabase/postgres) ===\nNAMES                    IMAGE                         STATUS                 PORTS\nn8n-postgres-1           pgvector/pgvector:pg16        Up 4 hours             127.0.0.1:5432->5432/tcp\n\n=== 2. PGVECTOR EXTENSION ===",
-  "command": "echo '=== 1. DOCKER PS (supabase/postgres) ===' && docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | grep -iE 'supabase|postgres|pgvector|NAME' && echo '' && echo '=== 2. PGVECTOR EXTENSION ===' && docker exec n8n-postgres-1 psql -U postgres -c \"SELECT version();\" 2>/dev/null && docker exec n8n-postgres-1 psql -U postgres -c \"SELECT * FROM pg_available_extensions WHERE name = 'vector';\" 2>/dev/null && docker exec n8n-postgres-1 psql -U postgres -c \"SELECT extname, extv",
-  "intent": "Проверка Supabase, pgvector, PostgreSQL конфигурации и /home/rag/.env на VPS"
+  "timestamp": "2026-03-22T18:03:56.303411+00:00",
+  "exit_code": 0,
+  "output": "psql: error: connection to server on socket \"/var/run/postgresql/.s.PGSQL.5432\" failed: FATAL:  role \"postgres\" does not exist\npsql: error: connection to server on socket \"/var/run/postgresql/.s.PGSQL.5432\" failed: FATAL:  role \"postgres\" does not exist\nNo /home/rag/.env PG vars",
+  "command": "docker exec n8n-postgres-1 psql -U postgres -c \"SELECT 1 FROM pg_database WHERE datname='vector_memory'\" | grep -q '1' || docker exec n8n-postgres-1 psql -U postgres -c 'CREATE DATABASE vector_memory;' && docker exec n8n-postgres-1 psql -U postgres -d vector_memory -c 'CREATE EXTENSION IF NOT EXISTS vector;' && docker exec n8n-postgres-1 psql -U postgres -d vector_memory -c 'CREATE TABLE IF NOT EXISTS embeddings (id SERIAL PRIMARY KEY, content TEXT NOT NULL, embedding vector(1536), layer TEXT NO",
+  "intent": "Создание БД vector_memory, расширения pgvector, таблицы embeddings с индексами на VPS"
 }
