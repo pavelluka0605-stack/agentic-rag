@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-22T16:43:13.245554+00:00",
+  "timestamp": "2026-03-22T16:48:34.473440+00:00",
   "exit_code": 0,
-  "output": "=== КЛЮЧИ ===\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMh7L57vPq/yjp/KOuov4kaiVLLVl6cC4vluJMrzvPBe root@fra-1-vm-ckr7\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA55OsJMhobQNRF88OLAT6UTK42GUN8vZFRxeZGc0l00 openclaw-hp\n=== ПРАВА ===\n700 root:root\n600 root:root\n700 root:root\n=== SSHD ===\nPermitRootLogin prohibit-password\nPasswordAuthentication yes",
-  "command": "echo '=== КЛЮЧИ ===' && cat /root/.ssh/authorized_keys && echo '=== ПРАВА ===' && stat -c '%a %U:%G' /root/.ssh /root/.ssh/authorized_keys /root && echo '=== SSHD ===' && grep -E '^PasswordAuth|^PubkeyAuth|^AuthorizedKeys|^PermitRoot' /etc/ssh/sshd_config",
-  "intent": "Проверка SSH конфигурации: ключи, права, настройки sshd"
+  "output": "Готово: ключ добавлен, пароль отключён",
+  "command": "echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFRFt/qiO2pNr9r96ft/eGhv8nmeqOdERLJ4vJHRAVHg iphone-vps' >> /root/.ssh/authorized_keys && sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && systemctl restart sshd && echo 'Готово: ключ добавлен, пароль отключён'",
+  "intent": "Добавить SSH ключ iPhone, отключить PasswordAuthentication, перезапустить sshd"
 }
