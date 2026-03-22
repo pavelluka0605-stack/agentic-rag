@@ -125,6 +125,14 @@ jobs:
           print(f"Result saved: exit_code={exit_code}, output_len={len(output)}")
           PYEOF
 
+      - name: Output result to job summary
+        if: always()
+        run: |
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat .claude/commands/result.json >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
       - name: Upload result artifact
         uses: actions/upload-artifact@v4
         with:
