@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-22T13:43:35.108271+00:00",
-  "exit_code": 0,
-  "output": "=== POSTGRES ENV ===\n172.19.0.4\n\n=== PORT 5432 ===\nnot listening on host\n\n=== DOCKER COMPOSE for n8n ===\nno postgres in compose\n\n=== GITHUB TOKEN SEARCH ===",
-  "command": "echo '=== POSTGRES ENV ===' && grep -i postgres /opt/n8n-traefik/.env 2>/dev/null && echo '---' && grep -i postgres /opt/n8n/.env 2>/dev/null && echo '' && echo '=== POSTGRES CONTAINER ===' && docker ps --filter 'name=postgres' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null && echo '' && echo '=== POSTGRES IP ===' && docker inspect n8n-traefik-db-1 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null || docker inspect n8n-postgres-1 --format '{{range .N",
-  "intent": "Check PostgreSQL credentials and GitHub tokens on VPS"
+  "timestamp": "2026-03-22T13:47:08.592615+00:00",
+  "exit_code": 1,
+  "output": "=== ALL POSTGRES ENV VARS ===\nPOSTGRES_PASSWORD=222222222222222222222222\nPOSTGRES_DB=n8n\nPOSTGRES_USER=n8n\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/16/bin\nPGDATA=/var/lib/postgresql/data\n\n=== POSTGRES CONTAINER NAME ===\nn8n-postgres-1\n\n=== N8N DB CONFIG ===\nDB_POSTGRESDB_DATABASE=n8n\nDB_POSTGRESDB_USER=n8n\nDB_POSTGRESDB_PORT=5432\nDB_POSTGRESDB_PASSWORD=222222222222222222222222\nDB_POSTGRESDB_HOST=postgres\nDB_TYPE=postgresdb\n\n=== COMPOSE FILES WITH POSTGRES ===\n/opt/n8n/docker-compose.yml\n/opt/n8n/docker-compose.yml.bak.2026-03-02_111236\n/opt/n8n/docker-compose.yml.bak.2026-03-02-113249",
+  "command": "echo '=== ALL POSTGRES ENV VARS ===' && docker inspect $(docker ps --filter 'name=postgres' --format '{{.Names}}' | head -1) --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep -i 'POSTGRES\\|DB_\\|DATABASE' && echo '' && echo '=== POSTGRES CONTAINER NAME ===' && docker ps --filter 'name=postgres' --format '{{.Names}}' 2>/dev/null && echo '' && echo '=== N8N DB CONFIG ===' && docker inspect $(docker ps --filter 'name=n8n' --format '{{.Names}}' | head -1) --format '{{range .Conf",
+  "intent": "Get PostgreSQL credentials for MCP setup"
 }
