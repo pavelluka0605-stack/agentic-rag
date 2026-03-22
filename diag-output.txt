@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sun Mar 22 09:30:27 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sun Mar 22 09:35:58 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,8 +8,8 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 3 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 59.5M (max: 256.0M available: 196.4M peak: 137.4M swap: 77.1M swap peak: 77.1M)
-        CPU: 21.705s
+     Memory: 53.2M (max: 256.0M available: 202.7M peak: 137.4M swap: 82.8M swap peak: 82.8M)
+        CPU: 21.738s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
@@ -27,11 +27,11 @@ Mar 22 05:31:39 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sun 2026-03-22 09:23:08 UTC; 7min ago
+     Active: active (running) since Sun 2026-03-22 09:23:08 UTC; 12min ago
    Main PID: 2197070 (node)
       Tasks: 11 (limit: 32)
      Memory: 23.4M (max: 128.0M available: 104.5M peak: 43.6M)
-        CPU: 748ms
+        CPU: 761ms
      CGroup: /system.slice/control-api.service
              └─2197070 /usr/bin/node server.js
 
@@ -136,7 +136,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sun, 22 Mar 2026 09:30:28 GMT
+Date: Sun, 22 Mar 2026 09:35:59 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -146,7 +146,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-22T09:30:28.081Z"
+  "timestamp": "2026-03-22T09:35:59.085Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -213,7 +213,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sun, 22 Mar 2026 09:30:28 GMT
+date: Sun, 22 Mar 2026 09:35:59 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
@@ -245,7 +245,6 @@ x-nextjs-prerender: 1
 
 === 19. Control Bridge service ===
 active
-        CPU: 1.302s
      CGroup: /system.slice/control-bridge.service
              └─2198451 /opt/control-bridge/venv/bin/python3 /opt/control-bridge/venv/bin/uvicorn app:app --host 127.0.0.1 --port 3000 --workers 1 --log-level info
 
@@ -255,9 +254,10 @@ Mar 22 09:26:32 fra-1-vm-ckr7 uvicorn[2198451]: INFO:     Waiting for applicatio
 Mar 22 09:26:32 fra-1-vm-ckr7 uvicorn[2198451]: INFO:     Application startup complete.
 Mar 22 09:26:32 fra-1-vm-ckr7 uvicorn[2198451]: INFO:     Uvicorn running on http://127.0.0.1:3000 (Press CTRL+C to quit)
 Mar 22 09:26:44 fra-1-vm-ckr7 uvicorn[2198451]: INFO:     127.0.0.1:36696 - "GET /health HTTP/1.1" 200 OK
+Mar 22 09:30:29 fra-1-vm-ckr7 uvicorn[2198451]: INFO:     127.0.0.1:49960 - "GET /health HTTP/1.1" 200 OK
 
 === 20. Control Bridge local health ===
-{"ok":true,"version":"2.3.0","uptime_s":237}
+{"ok":true,"version":"2.3.0","uptime_s":567}
 === 21. Control Bridge HTTPS (api.marbomebel.ru) ===
 * Host api.marbomebel.ru:443 was resolved.
 * IPv6: (none)
@@ -317,7 +317,7 @@ Mar 22 09:26:44 fra-1-vm-ckr7 uvicorn[2198451]: INFO:     127.0.0.1:36696 - "GET
 { [5 bytes data]
 < HTTP/2 502 
 < content-length: 11
-< date: Sun, 22 Mar 2026 09:30:29 GMT
+< date: Sun, 22 Mar 2026 09:35:59 GMT
 < 
 { [11 bytes data]
 * Connection #0 to host api.marbomebel.ru left intact
