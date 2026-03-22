@@ -1,15 +1,15 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sun Mar 22 18:29:08 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sun Mar 22 18:32:08 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
 ● dashboard.service - Claude Code Task Dashboard (Next.js)
      Loaded: loaded (/etc/systemd/system/dashboard.service; enabled; preset: enabled)
-     Active: active (running) since Sun 2026-03-22 13:06:48 UTC; 5h 22min ago
+     Active: active (running) since Sun 2026-03-22 13:06:48 UTC; 5h 25min ago
    Main PID: 2249497 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 38.0M (max: 256.0M available: 217.9M peak: 129.1M swap: 43.5M swap peak: 43.5M)
-        CPU: 2.969s
+     Memory: 34.3M (max: 256.0M available: 221.6M peak: 129.1M swap: 43.6M swap peak: 43.6M)
+        CPU: 2.990s
      CGroup: /system.slice/dashboard.service
              └─2249497 "next-server (v16.1.6)"
 
@@ -23,11 +23,11 @@ Mar 22 13:06:54 fra-1-vm-ckr7 node[2249497]: ✓ Ready in 4.7s
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sun 2026-03-22 18:18:42 UTC; 10min ago
+     Active: active (running) since Sun 2026-03-22 18:18:42 UTC; 13min ago
    Main PID: 2332978 (node)
       Tasks: 11 (limit: 32)
-     Memory: 24.8M (max: 128.0M available: 103.1M peak: 44.7M)
-        CPU: 719ms
+     Memory: 24.4M (max: 128.0M available: 103.5M peak: 44.7M)
+        CPU: 728ms
      CGroup: /system.slice/control-api.service
              └─2332978 /usr/bin/node server.js
 
@@ -132,7 +132,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sun, 22 Mar 2026 18:29:08 GMT
+Date: Sun, 22 Mar 2026 18:32:08 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -142,7 +142,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-22T18:29:08.999Z"
+  "timestamp": "2026-03-22T18:32:08.848Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -232,8 +232,6 @@ openclaw                 Up 2 weeks (healthy)
 
 === 19. Control Bridge service ===
 active
-Mar 22 18:19:34 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44464 - "POST /jobs HTTP/1.1" 429 Too Many Requests
-Mar 22 18:19:35 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44476 - "POST /jobs//confirm HTTP/1.1" 404 Not Found
 Mar 22 18:19:35 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44488 - "GET /jobs//status HTTP/1.1" 404 Not Found
 Mar 22 18:19:35 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44496 - "GET /jobs//result HTTP/1.1" 404 Not Found
 Mar 22 18:19:35 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44504 - "POST /jobs HTTP/1.1" 429 Too Many Requests
@@ -242,9 +240,11 @@ Mar 22 18:19:35 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44530 - "GET
 Mar 22 18:19:35 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44542 - "GET /memory/bootstrap HTTP/1.1" 200 OK
 Mar 22 18:19:35 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44548 - "GET /jobs/pending-reviews HTTP/1.1" 200 OK
 Mar 22 18:19:35 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:44554 - "POST /jobs HTTP/1.1" 401 Unauthorized
+Mar 22 18:29:14 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     127.0.0.1:40248 - "GET /health HTTP/1.1" 200 OK
+Mar 22 18:29:24 fra-1-vm-ckr7 uvicorn[2332495]: INFO:     72.56.127.126:37494 - "GET /health HTTP/1.1" 200 OK
 
 === 20. Control Bridge local health ===
-{"ok":true,"version":"2.3.0","uptime_s":641}
+{"ok":true,"version":"2.3.0","uptime_s":821}
 === 21. Control Bridge HTTPS (api.marbomebel.ru) ===
 * Host api.marbomebel.ru:443 was resolved.
 * IPv6: (none)
@@ -313,7 +313,7 @@ notBefore=Mar 19 16:47:49 2026 GMT
 notAfter=Jun 17 16:47:48 2026 GMT
 
 === 23. Docker bridge → port 3000 ===
-{"ok":true,"version":"2.3.0","uptime_s":651}
+{"ok":true,"version":"2.3.0","uptime_s":831}
 === 24. CORS check (api.marbomebel.ru) ===
 HTTP/2 200 
 access-control-allow-headers: Authorization,Content-Type,Accept
