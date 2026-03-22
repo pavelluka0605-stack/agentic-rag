@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-22T16:43:13.245554+00:00",
-  "exit_code": 0,
-  "output": "=== КЛЮЧИ ===\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMh7L57vPq/yjp/KOuov4kaiVLLVl6cC4vluJMrzvPBe root@fra-1-vm-ckr7\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA55OsJMhobQNRF88OLAT6UTK42GUN8vZFRxeZGc0l00 openclaw-hp\n=== ПРАВА ===\n700 root:root\n600 root:root\n700 root:root\n=== SSHD ===\nPermitRootLogin prohibit-password\nPasswordAuthentication yes",
-  "command": "echo '=== КЛЮЧИ ===' && cat /root/.ssh/authorized_keys && echo '=== ПРАВА ===' && stat -c '%a %U:%G' /root/.ssh /root/.ssh/authorized_keys /root && echo '=== SSHD ===' && grep -E '^PasswordAuth|^PubkeyAuth|^AuthorizedKeys|^PermitRoot' /etc/ssh/sshd_config",
-  "intent": "Проверка SSH конфигурации: ключи, права, настройки sshd"
+  "timestamp": "2026-03-22T17:55:30.452976+00:00",
+  "exit_code": 2,
+  "output": "=== 1. DOCKER PS (supabase/postgres) ===\nNAMES                    IMAGE                         STATUS                 PORTS\nn8n-postgres-1           pgvector/pgvector:pg16        Up 4 hours             127.0.0.1:5432->5432/tcp\n\n=== 2. PGVECTOR EXTENSION ===",
+  "command": "echo '=== 1. DOCKER PS (supabase/postgres) ===' && docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | grep -iE 'supabase|postgres|pgvector|NAME' && echo '' && echo '=== 2. PGVECTOR EXTENSION ===' && docker exec n8n-postgres-1 psql -U postgres -c \"SELECT version();\" 2>/dev/null && docker exec n8n-postgres-1 psql -U postgres -c \"SELECT * FROM pg_available_extensions WHERE name = 'vector';\" 2>/dev/null && docker exec n8n-postgres-1 psql -U postgres -c \"SELECT extname, extv",
+  "intent": "Проверка Supabase, pgvector, PostgreSQL конфигурации и /home/rag/.env на VPS"
 }
