@@ -1,1 +1,1 @@
-{"command":"mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA55OsJMhobQNRF88OLAT6UTK42GUN8vZFRxeZGc0l00 openclaw-hp' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && echo 'Key added:' && tail -1 /root/.ssh/authorized_keys","intent":"Добавить SSH ключ ноутбука openclaw-hp в authorized_keys на VPS"}
+{"command":"noop","intent":"completed"}
