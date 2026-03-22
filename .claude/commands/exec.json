@@ -1,4 +1,4 @@
 {
-  "script_file": ".claude/commands/scripts/deploy-audit.sh",
-  "intent": "Deploy audit: pull branch, run audit, push result"
+  "script_file": ".claude/commands/scripts/system-audit.sh",
+  "intent": "Full VPS system audit — security, services, ports, SSL, configs"
 }
