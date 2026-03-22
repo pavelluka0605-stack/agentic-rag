@@ -1,1 +1,1 @@
-{"script_file": ".claude/commands/scripts/phase1-2-fixes-cleanup.sh", "intent": "Phase 1-2: Kill duplicate N8N, move AMOCRM_TOKEN to .env, close ports, fix acme.json, cleanup"}
+{"script_file": ".claude/commands/scripts/phase3-7-config.sh", "intent": "Phase 3-7: Create CLAUDE.md, .claudeignore, agents, skills, commands on VPS"}
