@@ -1,5 +1,5 @@
 ========================================
-=== DASHBOARD DIAGNOSTIC Sun Mar 22 04:39:59 UTC 2026 ===
+=== DASHBOARD DIAGNOSTIC Sun Mar 22 09:08:15 UTC 2026 ===
 ========================================
 
 === 1. Dashboard service status ===
@@ -8,14 +8,11 @@
      Active: active (running) since Wed 2026-03-18 11:57:51 UTC; 3 days ago
    Main PID: 1364737 (next-server (v1)
       Tasks: 13 (limit: 64)
-     Memory: 69.4M (max: 256.0M available: 186.5M peak: 137.4M swap: 66.5M swap peak: 66.5M)
-        CPU: 21.212s
+     Memory: 66.9M (max: 256.0M available: 189.0M peak: 137.4M swap: 68.9M swap peak: 68.9M)
+        CPU: 21.594s
      CGroup: /system.slice/dashboard.service
              └─1364737 "next-server (v16.1.6)"
 
-Mar 21 14:55:50 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
-Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "812a70c0". This request might be from an older or newer deployment.
-Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
 Mar 21 17:11:20 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "917af6af". This request might be from an older or newer deployment.
 Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
@@ -23,15 +20,18 @@ Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "g". This request might be from an older or newer deployment.
 Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
 Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 22 05:31:39 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
+Mar 22 05:31:39 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 22 05:31:39 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 
 === 2. Control API service status ===
 ● control-api.service - Claude Code Control API
      Loaded: loaded (/etc/systemd/system/control-api.service; enabled; preset: enabled)
-     Active: active (running) since Sun 2026-03-22 04:36:37 UTC; 3min 22s ago
+     Active: active (running) since Sun 2026-03-22 04:36:37 UTC; 4h 31min ago
    Main PID: 2153225 (node)
       Tasks: 11 (limit: 32)
-     Memory: 22.9M (max: 128.0M available: 105.0M peak: 43.0M)
-        CPU: 638ms
+     Memory: 22.8M (max: 128.0M available: 105.1M peak: 43.0M)
+        CPU: 970ms
      CGroup: /system.slice/control-api.service
              └─2153225 /usr/bin/node server.js
 
@@ -53,9 +53,6 @@ LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy
 LISTEN 0      511                *:3200             *:*    users:(("next-server (v1",pid=1364737,fd=18))                                                                                                                     
 
 === 4. Dashboard logs (last 30 lines) ===
-Mar 21 11:28:02 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
-Mar 21 11:28:02 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
-Mar 21 11:28:02 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 Mar 21 11:37:56 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
 Mar 21 11:37:56 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
 Mar 21 11:37:56 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
@@ -83,6 +80,9 @@ Mar 21 17:11:22 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "g". This request might be from an older or newer deployment.
 Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
 Mar 21 17:46:53 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
+Mar 22 05:31:39 fra-1-vm-ckr7 node[1364737]: Error: Failed to find Server Action "x". This request might be from an older or newer deployment.
+Mar 22 05:31:39 fra-1-vm-ckr7 node[1364737]: Read more: https://nextjs.org/docs/messages/failed-to-find-server-action
+Mar 22 05:31:39 fra-1-vm-ckr7 node[1364737]:     at ignore-listed frames
 
 === 5. Control API logs (last 20 lines) ===
 Mar 22 04:36:34 fra-1-vm-ckr7 systemd[1]: control-api.service: Deactivated successfully.
@@ -136,7 +136,7 @@ Cache-Control: s-maxage=31536000
 ETag: "jfce4it1hf65d"
 Content-Type: text/html; charset=utf-8
 Content-Length: 8075
-Date: Sun, 22 Mar 2026 04:39:59 GMT
+Date: Sun, 22 Mar 2026 09:08:15 GMT
 Connection: keep-alive
 Keep-Alive: timeout=5
 
@@ -146,7 +146,7 @@ Keep-Alive: timeout=5
 === 10. curl localhost:3901/health (control API) ===
 {
   "status": "ok",
-  "timestamp": "2026-03-22T04:40:00.020Z"
+  "timestamp": "2026-03-22T09:08:15.293Z"
 }
 === 11. curl https://webhook.marbomebel.ru/ ===
 (no response)
@@ -199,9 +199,9 @@ NAMES                    STATUS                 PORTS
 mebelit-wp-wordpress-1   Up 7 days              0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
 mebelit-wp-db-1          Up 7 days              0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp, 33060/tcp
 n8n-traefik-traefik-1    Up 8 days              0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
-n8n-postgres-1           Up 12 days             5432/tcp
+n8n-postgres-1           Up 13 days             5432/tcp
 n8n-voice-app-1          Up 13 days             80/tcp
-n8n-n8n-1                Up 11 days             5678/tcp
+n8n-n8n-1                Up 12 days             5678/tcp
 openclaw                 Up 2 weeks (healthy)   
 
 === 16. PM2 processes ===
@@ -213,7 +213,7 @@ openclaw                 Up 2 weeks (healthy)
 HTTP/2 307 
 cache-control: s-maxage=31536000
 content-type: text/html; charset=utf-8
-date: Sun, 22 Mar 2026 04:40:00 GMT
+date: Sun, 22 Mar 2026 09:08:15 GMT
 etag: "jfce4it1hf65d"
 location: /dashboard
 vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
@@ -245,19 +245,19 @@ x-nextjs-prerender: 1
 
 === 19. Control Bridge service ===
 active
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49440 - "POST /jobs HTTP/1.1" 429 Too Many Requests
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49444 - "POST /jobs//confirm HTTP/1.1" 404 Not Found
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49450 - "GET /jobs//status HTTP/1.1" 404 Not Found
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49454 - "GET /jobs//result HTTP/1.1" 404 Not Found
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49456 - "POST /jobs HTTP/1.1" 429 Too Many Requests
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49458 - "POST /jobs//cancel HTTP/1.1" 404 Not Found
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49460 - "GET /memory/stats HTTP/1.1" 200 OK
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49474 - "GET /memory/bootstrap HTTP/1.1" 200 OK
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49480 - "GET /jobs/pending-reviews HTTP/1.1" 200 OK
-Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49494 - "POST /jobs HTTP/1.1" 401 Unauthorized
+Mar 22 07:34:16 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     161.35.154.17:33168 - "GET / HTTP/1.1" 404 Not Found
+Mar 22 07:34:16 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     161.35.154.17:33180 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+Mar 22 07:36:36 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     172.19.0.2:44974 - "GET / HTTP/1.1" 404 Not Found
+Mar 22 07:36:36 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     172.19.0.2:44974 - "POST / HTTP/1.1" 404 Not Found
+Mar 22 07:36:36 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     172.19.0.2:44974 - "POST / HTTP/1.1" 404 Not Found
+Mar 22 07:36:36 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     172.19.0.2:44974 - "POST / HTTP/1.1" 404 Not Found
+Mar 22 08:14:41 fra-1-vm-ckr7 uvicorn[2152831]: WARNING:  Invalid HTTP request received.
+Mar 22 08:14:44 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     91.231.89.6:46561 - "GET / HTTP/1.1" 404 Not Found
+Mar 22 08:14:52 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     172.19.0.2:42210 - "GET / HTTP/1.1" 404 Not Found
+Mar 22 08:17:07 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     91.196.152.38:44637 - "GET /favicon.ico HTTP/1.1" 404 Not Found
 
 === 20. Control Bridge local health ===
-{"ok":true,"version":"2.3.0","uptime_s":210}
+{"ok":true,"version":"2.3.0","uptime_s":16305}
 === 21. Control Bridge HTTPS (api.marbomebel.ru) ===
 * Host api.marbomebel.ru:443 was resolved.
 * IPv6: (none)
@@ -317,13 +317,13 @@ Mar 22 04:36:45 fra-1-vm-ckr7 uvicorn[2152831]: INFO:     127.0.0.1:49494 - "POS
 { [5 bytes data]
 < HTTP/2 200 
 < content-type: application/json
-< date: Sun, 22 Mar 2026 04:39:59 GMT
+< date: Sun, 22 Mar 2026 09:08:15 GMT
 < server: uvicorn
-< content-length: 44
+< content-length: 46
 < 
-{ [5 bytes data]
+{ [46 bytes data]
 * Connection #0 to host api.marbomebel.ru left intact
-{"ok":true,"version":"2.3.0","uptime_s":210}
+{"ok":true,"version":"2.3.0","uptime_s":16305}
 === 22. TLS cert for api.marbomebel.ru ===
 subject=CN = api.marbomebel.ru
 issuer=C = US, O = Let's Encrypt, CN = R12
@@ -331,7 +331,7 @@ notBefore=Mar 19 16:47:49 2026 GMT
 notAfter=Jun 17 16:47:48 2026 GMT
 
 === 23. Docker bridge → port 3000 ===
-{"ok":true,"version":"2.3.0","uptime_s":210}
+{"ok":true,"version":"2.3.0","uptime_s":16305}
 === 24. CORS check (api.marbomebel.ru) ===
 HTTP/2 200 
 access-control-allow-headers: Authorization,Content-Type,Accept
