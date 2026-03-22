@@ -1,4 +1,4 @@
 {
-  "command": "echo '=== CONTAINER ===' && docker ps --format '{{.Names}} {{.Image}}' | grep postgres && echo '=== DOCKER EXEC TEST ===' && docker exec n8n-postgres-1 id 2>&1 && echo '=== PG USERS ===' && docker exec n8n-postgres-1 psql -U root -c '\\du' 2>&1 || docker exec n8n-postgres-1 cat /etc/passwd | grep postgres 2>&1 && echo '=== ENV IN CONTAINER ===' && docker exec n8n-postgres-1 env | grep -iE 'POSTGRES|PG' 2>&1 && echo '=== N8N .ENV ===' && cat /opt/n8n/.env 2>/dev/null | grep -iE 'POSTGRES' && echo '=== N8N COMPOSE ===' && cat /opt/n8n/docker-compose.yml 2>/dev/null | grep -A5 -iE 'postgres|POSTGRES' && echo '=== HOME RAG ===' && ls -la /home/rag/ 2>/dev/null && cat /home/rag/.env 2>/dev/null",
-  "intent": "Диагностика PostgreSQL: пользователь, env, compose конфиг"
+  "command": "docker exec n8n-postgres-1 env | grep -iE 'POSTGRES|PG' && docker exec n8n-postgres-1 cat /etc/passwd | head -3 && cat /opt/n8n/docker-compose.yml | grep -B2 -A10 postgres",
+  "intent": "Определить пользователя PostgreSQL в контейнере"
 }
