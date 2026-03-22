@@ -1,1 +1,1 @@
-{"command":"noop","intent":"completed"}
+{"command":"sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config && systemctl restart sshd && echo 'Password auth enabled. Dont forget to disable after!'","intent":"Временно включить вход по паролю SSH"}
