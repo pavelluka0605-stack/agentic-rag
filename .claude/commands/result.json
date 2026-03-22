@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-22T15:15:16.056943+00:00",
+  "timestamp": "2026-03-22T15:34:05.889750+00:00",
   "exit_code": 0,
-  "output": "Key added:\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA55OsJMhobQNRF88OLAT6UTK42GUN8vZFRxeZGc0l00 openclaw-hp",
-  "command": "mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA55OsJMhobQNRF88OLAT6UTK42GUN8vZFRxeZGc0l00 openclaw-hp' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys && echo 'Key added:' && tail -1 /root/.ssh/authorized_keys",
-  "intent": "Добавить SSH ключ ноутбука openclaw-hp в authorized_keys на VPS"
+  "output": "Password auth enabled. Dont forget to disable after!",
+  "command": "sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config && systemctl restart sshd && echo 'Password auth enabled. Dont forget to disable after!'",
+  "intent": "Временно включить вход по паролю SSH"
 }
