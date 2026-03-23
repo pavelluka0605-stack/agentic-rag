@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-22T18:35:15.613698+00:00",
+  "timestamp": "2026-03-23T02:07:49.026475+00:00",
   "exit_code": 0,
-  "output": "NOTICE:  changing version from 2.41 to 2.36\nALTER DATABASE\nCREATE DATABASE\nCREATE EXTENSION\nCREATE TABLE\nCREATE INDEX\nCREATE INDEX\n extversion \n------------\n 0.8.2\n(1 row)\n\n          List of relations\n Schema |    Name    | Type  | Owner \n--------+------------+-------+-------\n public | embeddings | table | n8n\n(1 row)\n\nDONE",
-  "command": "docker exec n8n-postgres-1 psql -U n8n -c \"ALTER DATABASE template1 REFRESH COLLATION VERSION;\" 2>&1 && docker exec n8n-postgres-1 psql -U n8n -c \"CREATE DATABASE vector_memory TEMPLATE template0;\" 2>&1 && docker exec n8n-postgres-1 psql -U n8n -d vector_memory -c \"CREATE EXTENSION IF NOT EXISTS vector;\" 2>&1 && docker exec n8n-postgres-1 psql -U n8n -d vector_memory -c \"CREATE TABLE IF NOT EXISTS embeddings (id SERIAL PRIMARY KEY, content TEXT NOT NULL, embedding vector(1536), layer TEXT NOT NU",
-  "intent": "Fix template1 collation + create vector_memory DB via template0"
+  "output": "=== claude.env ===\nMISSING in claude.env\n=== p0 .env ===\n1\nOK: OPENAI_API_KEY in p0 .env\n=== PG vector_memory ===\n rows \n------\n    0\n(1 row)",
+  "command": "echo '=== claude.env ===' && grep -c OPENAI_API_KEY /opt/claude-code/env/claude.env 2>/dev/null && echo 'OK: OPENAI_API_KEY in claude.env' || echo 'MISSING in claude.env' && echo '=== p0 .env ===' && grep -c OPENAI_API_KEY /opt/p0-foundation/.env 2>/dev/null && echo 'OK: OPENAI_API_KEY in p0 .env' || echo 'MISSING in p0 .env' && echo '=== PG vector_memory ===' && docker exec n8n-postgres-1 psql -U n8n -d vector_memory -c 'SELECT count(*) as rows FROM embeddings;' 2>&1 || echo 'DB not accessible'",
+  "intent": "check OPENAI_API_KEY and vector_memory DB on VPS"
 }
