@@ -8,7 +8,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { VectorDB } from "./db.js";
 
-const PG_URL = process.env.PG_URL || "postgresql://n8n:222222222222222222222222@127.0.0.1:5432/vector_memory";
+const PG_URL = process.env.PG_URL || "postgresql://n8n@127.0.0.1:5432/vector_memory";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 if (!OPENAI_API_KEY) {
