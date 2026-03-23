@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-03-23T02:07:49.026475+00:00",
+  "timestamp": "2026-03-23T02:09:48.881780+00:00",
   "exit_code": 0,
-  "output": "=== claude.env ===\nMISSING in claude.env\n=== p0 .env ===\n1\nOK: OPENAI_API_KEY in p0 .env\n=== PG vector_memory ===\n rows \n------\n    0\n(1 row)",
-  "command": "echo '=== claude.env ===' && grep -c OPENAI_API_KEY /opt/claude-code/env/claude.env 2>/dev/null && echo 'OK: OPENAI_API_KEY in claude.env' || echo 'MISSING in claude.env' && echo '=== p0 .env ===' && grep -c OPENAI_API_KEY /opt/p0-foundation/.env 2>/dev/null && echo 'OK: OPENAI_API_KEY in p0 .env' || echo 'MISSING in p0 .env' && echo '=== PG vector_memory ===' && docker exec n8n-postgres-1 psql -U n8n -d vector_memory -c 'SELECT count(*) as rows FROM embeddings;' 2>&1 || echo 'DB not accessible'",
-  "intent": "check OPENAI_API_KEY and vector_memory DB on VPS"
+  "output": "OK: OPENAI_API_KEY added to claude.env\n--- Verify ---\n1\nLines with OPENAI_API_KEY in claude.env\n--- PG_URL check ---\n0\nPG_URL missing — adding...\nPG_URL added\n=== Final claude.env keys ===\nOPENAI_API_KEY\nPG_URL",
+  "command": "OPENAI_KEY=$(grep '^OPENAI_API_KEY=' /opt/p0-foundation/.env | cut -d= -f2-) && if [ -z \"$OPENAI_KEY\" ]; then echo 'ERROR: OPENAI_API_KEY empty in p0 .env'; exit 1; fi && if grep -q OPENAI_API_KEY /opt/claude-code/env/claude.env 2>/dev/null; then echo 'Already exists, updating...'; sed -i '/^OPENAI_API_KEY=/d' /opt/claude-code/env/claude.env; fi && echo \"OPENAI_API_KEY=$OPENAI_KEY\" >> /opt/claude-code/env/claude.env && echo 'OK: OPENAI_API_KEY added to claude.env' && echo '--- Verify ---' && gre",
+  "intent": "add OPENAI_API_KEY and PG_URL to claude.env for vector MCP server"
 }
