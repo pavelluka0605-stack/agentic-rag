@@ -1,1 +1,1 @@
-{"command":"noop","intent":"completed"}
+{"script_file": ".claude/commands/scripts/vpn-full-audit.sh", "intent": "Full VPS audit for VPN infrastructure planning", "ts": "2026-03-23T10:00:00Z"}
